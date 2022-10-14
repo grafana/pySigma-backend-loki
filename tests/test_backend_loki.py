@@ -79,23 +79,53 @@ def test_loki_or_and_expression(loki_backend : LogQLBackend):
         """)
     ) == ['fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`']
 
-# Loki does not support wildcards, so will produce an error if they are used
-# TODO: Loki does support  regexes - can we replace wildcards with them?
-def test_loki_wildcard_unsupported(loki_backend : LogQLBackend):
-    with pytest.raises(SigmaValueError) as e_info:
-        loki_backend.convert(
-            SigmaCollection.from_yaml("""
-                title: Test
-                status: test
-                logsource:
-                    category: test_category
-                    product: test_product
-                detection:
-                    sel:
-                        fieldA: value*
-                    condition: sel
-            """)
-        )
+# Loki does not support wildcards, so we use case-insensitive regular expressions instead
+def test_loki_wildcard_single(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: va?ue?
+                condition: sel
+        """)
+    ) == ['fieldA=~`(?i)va.ue.`']
+
+def test_loki_wildcard_multi(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: value*
+                condition: sel
+        """)
+    ) == ['fieldA=~`(?i)value.*`']
+
+# Wildcarded searches may include other regex metacharacters - these need to be escaped to prevent them from being
+# used in the transformed query
+def test_loki_wildcard_escape(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: ^v+[al]ue*$
+                condition: sel
+        """)
+    ) == ['fieldA=~`(?i)\\\\^v\\\\+\\\\[al\\\\]ue.*\\\\$`']
 
 # Loki doesn't support in expressions, so in this case, multiple or conditions should be produced
 def test_loki_in_expression(loki_backend : LogQLBackend):

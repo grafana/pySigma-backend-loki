@@ -1,13 +1,14 @@
 from sigma.conversion.state import ConversionState
 from sigma.rule import SigmaRule
 from sigma.conversion.base import TextQueryBackend
-from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, ConditionNOT
-from sigma.types import SigmaCompareExpression, SigmaString
+from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, ConditionNOT, ConditionFieldEqualsValueExpression
+from sigma.conversion.deferred import DeferredQueryExpression
+from sigma.types import SigmaCompareExpression, SigmaRegularExpression
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 # from sigma.pipelines.loki import # TODO: add pipeline imports or delete this line
 import sigma
 import re
-from typing import ClassVar, Dict, Tuple, Pattern, List
+from typing import ClassVar, Dict, Tuple, Pattern, List, Union
 
 class LogQLBackend(TextQueryBackend):
     """Loki LogQL query backend. Generates LogQL queries as described in the Loki documentation:
@@ -41,7 +42,10 @@ class LogQLBackend(TextQueryBackend):
 
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
 
-    # TODO: LogQL does not support widlcards, can we convert them accurately to regular expressions?
+    # LogQL does not support widlcards, so we convert them to regular expressions
+    wildcard_multi  : ClassVar[str] = "*"     # Character used as multi-character wildcard (replaced with .*)
+    wildcard_single : ClassVar[str] = "?"     # Character used as single-character wildcard (replaced with .)
+
     # Regular expressions
     re_expression : ClassVar[str] = "{field}=~`{regex}`"
     re_escape_char : ClassVar[str] = "\\"
@@ -71,6 +75,19 @@ class LogQLBackend(TextQueryBackend):
     deferred_separator : ClassVar[str] = "\n| "
 
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
+    
+    # Overriding Sigma implementation: LogQL does not support wildcards - so convert them into regular expressions
+    def convert_condition_field_eq_val_str(self, cond: ConditionFieldEqualsValueExpression, state: ConversionState) -> Union[str, DeferredQueryExpression]:
+        # Wildcards (*, ?) are special, but aren't supported in LogQL, so we switch to regex instead
+        # To do this, we need to escape the string to prevent any non-wildcard metacharacters from being used
+        # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
+        if cond.value.contains_special():
+            regex = '(?i)'+re.escape(str(cond.value)).replace('\\?', '.').replace('\\*', '.*')
+            cond.value = SigmaRegularExpression(regex)
+            return self.convert_condition_field_eq_val_re(cond, state)
+        else:
+            # No wildcards? No problem, we can use the default implementation
+            return super().convert_condition_field_eq_val_str(cond, state)
 
     # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will error if
     # an invalid field name is provided
