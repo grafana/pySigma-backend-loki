@@ -20,7 +20,9 @@ class LogQLBackend(TextQueryBackend):
         "ruler": "'ruler' output format",
     }
 
-    # Operator precedence: tuple of Condition{AND,OR,NOT} in order of precedence.
+    # Operator precedence: tuple of Condition{AND,OR} in order of precedence.
+    # LogQL lacks a NOT operator - this might be a problem for some rules
+    # TODO: can we add a unary NOT operator to LogQL or can be replicate it during rule generation?
     precedence : ClassVar[Tuple[ConditionItem, ConditionItem]] = (ConditionAND, ConditionOR)
     group_expression : ClassVar[str] = "({expr})"   # Expression for precedence override grouping as format string with {expr} placeholder
 
@@ -31,6 +33,7 @@ class LogQLBackend(TextQueryBackend):
     eq_token : ClassVar[str] = "="  # Token inserted between field and value (without separator)
 
     # Rather than picking between "s and `s, defaulting to `s
+    # TODO: validate the escape char and filter chars
     str_quote       : ClassVar[str] = '`'
     escape_char     : ClassVar[str] = "\\"
     add_escaped     : ClassVar[str] = "\\"
@@ -38,6 +41,7 @@ class LogQLBackend(TextQueryBackend):
 
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
 
+    # TODO: LogQL does not support widlcards, can we convert them accurately to regular expressions?
     # Regular expressions
     re_expression : ClassVar[str] = "{field}=~`{regex}`"
     re_escape_char : ClassVar[str] = "\\"
@@ -53,11 +57,14 @@ class LogQLBackend(TextQueryBackend):
         SigmaCompareExpression.CompareOperators.GT  : ">",
         SigmaCompareExpression.CompareOperators.GTE : ">=",
     }
+    # TODO: can we test for (not) null fields using LogQL? Not clear (test for an empty regex?)
 
+    # TODO: these probably should be prioritised for performance reasons
+    # See https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression
     unbound_value_str_expression : ClassVar[str] = '|= {value}'
     unbound_value_num_expression : ClassVar[str] = '|= {value}'
     unbound_value_re_expression : ClassVar[str] = '|~ {value}'
-    # not clearly supported by Sigma
+    # not clearly supported by Sigma?
     unbound_value_cidr_expression : ClassVar[str] = '| ip("{value}")'
 
     deferred_start : ClassVar[str] = "\n| "
@@ -65,9 +72,19 @@ class LogQLBackend(TextQueryBackend):
 
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
 
+    # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will error if
+    # an invalid field name is provided
+    # TODO: decide should we replace invalid characters with underscores? Or should we just ensure all fields are
+    # appropriately mapped?
     def escape_and_quote_field(self, field_name: str) -> str:
         if not self.field_quote_pattern.match(field_name):
-            raise SigmaFeatureNotSupportedByBackendError(f"Loki fields must start with an ASCII alphabet (A-z) character, underscore (_) or colon (:), and can only contain those characters and numbers (0-9). The field `{field_name}` did not meet this requirement")
+            raise SigmaFeatureNotSupportedByBackendError(f"""{field_name} is not a valid Loki label.
+It must start with either:
+- an ASCII alphabet (A-z) character
+- an underscore (_) 
+- a colon (:)
+It can also only contain those characters and numbers (0-9)
+""")
         return field_name
     
     def finalize_query_default(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
