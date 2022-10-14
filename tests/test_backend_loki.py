@@ -127,6 +127,21 @@ def test_loki_wildcard_escape(loki_backend : LogQLBackend):
         """)
     ) == ['fieldA=~`(?i)\\\\^v\\\\+\\\\[al\\\\]ue.*\\\\$`']
 
+def test_loki_wildcard_unbound(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    - va?ue*
+                condition: keywords
+        """)
+    ) == ['|~ `(?i)va.ue.*`']
+
 # Loki doesn't support in expressions, so in this case, multiple or conditions should be produced
 def test_loki_in_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -235,6 +250,23 @@ def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
                     sel:
                         field name: value
                     condition: sel
+            """)
+        )
+
+def test_loki_or_unbounds(loki_backend : LogQLBackend):
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
+        test = loki_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: test_category
+                    product: test_product
+                detection:
+                    keywords:
+                        - valueA
+                        - valueB
+                    condition: keywords
             """)
         )
 

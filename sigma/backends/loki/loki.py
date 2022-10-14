@@ -90,7 +90,7 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:
         for arg in cond.args:
             if isinstance(arg, ConditionValueExpression):
-                raise NotImplementedError("Operator 'or' not supported by the backend for unbound conditions")
+                raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions")
         else:
             return super().convert_condition_or(cond, state)
 
