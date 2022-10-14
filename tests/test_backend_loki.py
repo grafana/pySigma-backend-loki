@@ -162,6 +162,51 @@ def test_loki_regex_query(loki_backend : LogQLBackend):
         """)
     ) == ['fieldA=~`foo.*bar` and fieldB=`foo`']
 
+def test_loki_field_startswith(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|startswith: foo
+                condition: sel
+        """)
+    ) == ['fieldA=~`(?i)foo.*`']
+
+def test_loki_field_endswith(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|endswith: bar
+                condition: sel
+        """)
+    ) == ['fieldA=~`(?i).*bar`']
+
+def test_loki_field_contains(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|contains: ooba
+                condition: sel
+        """)
+    ) == ['fieldA=~`(?i).*ooba.*`']
+
 def test_loki_cidr_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
