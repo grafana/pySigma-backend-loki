@@ -1,9 +1,9 @@
 from sigma.conversion.state import ConversionState
 from sigma.rule import SigmaRule
 from sigma.conversion.base import TextQueryBackend
-from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, ConditionNOT, ConditionFieldEqualsValueExpression
+from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, ConditionNOT, ConditionFieldEqualsValueExpression, ConditionValueExpression
 from sigma.conversion.deferred import DeferredQueryExpression
-from sigma.types import SigmaCompareExpression, SigmaRegularExpression
+from sigma.types import SigmaCompareExpression, SigmaString, SigmaRegularExpression
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 # from sigma.pipelines.loki import # TODO: add pipeline imports or delete this line
 import sigma
@@ -42,7 +42,7 @@ class LogQLBackend(TextQueryBackend):
 
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
 
-    # LogQL does not support widlcards, so we convert them to regular expressions
+    # LogQL does not support wildcards, so we convert them to regular expressions
     wildcard_multi  : ClassVar[str] = "*"     # Character used as multi-character wildcard (replaced with .*)
     wildcard_single : ClassVar[str] = "?"     # Character used as single-character wildcard (replaced with .)
 
@@ -61,33 +61,57 @@ class LogQLBackend(TextQueryBackend):
         SigmaCompareExpression.CompareOperators.GT  : ">",
         SigmaCompareExpression.CompareOperators.GTE : ">=",
     }
-    # TODO: can we test for (not) null fields using LogQL? Not clear (test for an empty regex?)
+    # TODO: can we test for (not) null fields using LogQL? Not clear (test for an empty value?)
 
     # TODO: these probably should be prioritised for performance reasons
     # See https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression
     unbound_value_str_expression : ClassVar[str] = '|= {value}'
     unbound_value_num_expression : ClassVar[str] = '|= {value}'
-    unbound_value_re_expression : ClassVar[str] = '|~ {value}'
+    unbound_value_re_expression : ClassVar[str] = '|~ `{value}`'
     # not clearly supported by Sigma?
     unbound_value_cidr_expression : ClassVar[str] = '| ip("{value}")'
 
     deferred_start : ClassVar[str] = "\n| "
     deferred_separator : ClassVar[str] = "\n| "
 
+    # When converting values to regexes, we need to escape the string to prevent use of non-wildcard metacharacters
+    # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
+    def convert_wildcard_to_re(self, value: SigmaString) -> SigmaRegularExpression:
+        """Convert a SigmaString value that (probably) contains wildcards into a regular expression"""
+        return SigmaRegularExpression('(?i)'+re.escape(str(value)).replace('\\?', '.').replace('\\*', '.*'))
+
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
+
+    # Overriding Sigma implementation: LogQL does not support OR'd unbounded conditions.
+    # TODO: For now we will reject such queries, but we could potentially implement them with... you guessed it,
+    # regexes (though I'm not so sure it's a good idea...)
+    # TODO: Alternatively we could see if we can produce multiple LogQL queries from a single Sigma rule
+    # TODO: If we want to consistently reject such queries, we possibly need to do a deeper search?
+    def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:
+        for arg in cond.args:
+            if isinstance(arg, ConditionValueExpression):
+                raise NotImplementedError("Operator 'or' not supported by the backend for unbound conditions")
+        else:
+            return super().convert_condition_or(cond, state)
+
     
     # Overriding Sigma implementation: LogQL does not support wildcards - so convert them into regular expressions
     def convert_condition_field_eq_val_str(self, cond: ConditionFieldEqualsValueExpression, state: ConversionState) -> Union[str, DeferredQueryExpression]:
         # Wildcards (*, ?) are special, but aren't supported in LogQL, so we switch to regex instead
-        # To do this, we need to escape the string to prevent any non-wildcard metacharacters from being used
-        # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
         if cond.value.contains_special():
-            regex = '(?i)'+re.escape(str(cond.value)).replace('\\?', '.').replace('\\*', '.*')
-            cond.value = SigmaRegularExpression(regex)
+            cond.value = self.convert_wildcard_to_re(cond.value)
             return self.convert_condition_field_eq_val_re(cond, state)
         else:
             # No wildcards? No problem, we can use the default implementation
             return super().convert_condition_field_eq_val_str(cond, state)
+
+    # As above, but for unbound queries
+    def convert_condition_val_str(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        if cond.value.contains_special():
+            cond.value = self.convert_wildcard_to_re(cond.value)
+            return self.convert_condition_val_re(cond, state)
+        else:
+            return super().convert_condition_val_str(cond, state)
 
     # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will error if
     # an invalid field name is provided
