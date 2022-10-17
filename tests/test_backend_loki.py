@@ -21,7 +21,7 @@ def test_loki_and_expression(loki_backend : LogQLBackend):
                     fieldB: valueB
                 condition: sel
         """)
-    ) == ['fieldA=`valueA` and fieldB=`valueB`']
+    ) == [' | logfmt | fieldA=`valueA` and fieldB=`valueB`']
 
 def test_loki_or_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -38,7 +38,7 @@ def test_loki_or_expression(loki_backend : LogQLBackend):
                     fieldB: valueB
                 condition: 1 of sel*
         """)
-    ) == ['fieldA=`valueA` or fieldB=`valueB`']
+    ) == [' | logfmt | fieldA=`valueA` or fieldB=`valueB`']
 
 def test_loki_and_or_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -58,7 +58,7 @@ def test_loki_and_or_expression(loki_backend : LogQLBackend):
                         - valueB2
                 condition: sel
         """)
-    ) == ['(fieldA=`valueA1` or fieldA=`valueA2`) and (fieldB=`valueB1` or fieldB=`valueB2`)']
+    ) == [' | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and (fieldB=`valueB1` or fieldB=`valueB2`)']
 
 def test_loki_or_and_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -77,7 +77,7 @@ def test_loki_or_and_expression(loki_backend : LogQLBackend):
                     fieldB: valueB2
                 condition: 1 of sel*
         """)
-    ) == ['fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`']
+    ) == [' | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`']
 
 # Loki does not support wildcards, so we use case-insensitive regular expressions instead
 def test_loki_wildcard_single(loki_backend : LogQLBackend):
@@ -93,7 +93,7 @@ def test_loki_wildcard_single(loki_backend : LogQLBackend):
                     fieldA: va?ue?
                 condition: sel
         """)
-    ) == ['fieldA=~`(?i)va.ue.`']
+    ) == [' | logfmt | fieldA=~`(?i)va.ue.`']
 
 def test_loki_wildcard_multi(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -108,7 +108,7 @@ def test_loki_wildcard_multi(loki_backend : LogQLBackend):
                     fieldA: value*
                 condition: sel
         """)
-    ) == ['fieldA=~`(?i)value.*`']
+    ) == [' | logfmt | fieldA=~`(?i)value.*`']
 
 # Wildcarded searches may include other regex metacharacters - these need to be escaped to prevent them from being
 # used in the transformed query
@@ -125,7 +125,7 @@ def test_loki_wildcard_escape(loki_backend : LogQLBackend):
                     fieldA: ^v+[al]ue*$
                 condition: sel
         """)
-    ) == ['fieldA=~`(?i)\\\\^v\\\\+\\\\[al\\\\]ue.*\\\\$`']
+    ) == [' | logfmt | fieldA=~`(?i)\\\\^v\\\\+\\\\[al\\\\]ue.*\\\\$`']
 
 def test_loki_wildcard_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -159,7 +159,7 @@ def test_loki_in_expression(loki_backend : LogQLBackend):
                         - valueC
                 condition: sel
         """)
-    ) == ['fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
+    ) == [' | logfmt | fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
 
 def test_loki_regex_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -175,7 +175,7 @@ def test_loki_regex_query(loki_backend : LogQLBackend):
                     fieldB: foo
                 condition: sel
         """)
-    ) == ['fieldA=~`foo.*bar` and fieldB=`foo`']
+    ) == [' | logfmt | fieldA=~`foo.*bar` and fieldB=`foo`']
 
 def test_loki_field_startswith(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -190,7 +190,7 @@ def test_loki_field_startswith(loki_backend : LogQLBackend):
                     fieldA|startswith: foo
                 condition: sel
         """)
-    ) == ['fieldA=~`(?i)foo.*`']
+    ) == [' | logfmt | fieldA=~`(?i)foo.*`']
 
 def test_loki_field_endswith(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -205,7 +205,7 @@ def test_loki_field_endswith(loki_backend : LogQLBackend):
                     fieldA|endswith: bar
                 condition: sel
         """)
-    ) == ['fieldA=~`(?i).*bar`']
+    ) == [' | logfmt | fieldA=~`(?i).*bar`']
 
 def test_loki_field_contains(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -220,7 +220,7 @@ def test_loki_field_contains(loki_backend : LogQLBackend):
                     fieldA|contains: ooba
                 condition: sel
         """)
-    ) == ['fieldA=~`(?i).*ooba.*`']
+    ) == [' | logfmt | fieldA=~`(?i).*ooba.*`']
 
 def test_loki_cidr_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -235,7 +235,7 @@ def test_loki_cidr_query(loki_backend : LogQLBackend):
                     field|cidr: 192.168.0.0/16
                 condition: sel
         """)
-    ) == ['field=ip("192.168.0.0/16")']
+    ) == [' | logfmt | field=ip("192.168.0.0/16")']
 
 def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
@@ -253,6 +253,70 @@ def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
             """)
         )
 
+def test_loki_unbound(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    value
+                condition: keywords
+        """)
+    ) == ['|= `value`']
+
+def test_loki_unbound_re_wildcard(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    value*
+                condition: keywords
+        """)
+    ) == ['|~ `(?i)value.*`']
+
+def test_loki_and_unbound(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keyword1:
+                    valueA
+                keyword2:
+                    valueB
+                condition: keyword1 and keyword2
+        """)
+    ) == ['|= `valueA` |= `valueB`']
+
+def test_loki_unbound_and_field(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    valueA
+                sel:
+                    field: valueB
+                condition: keywords and sel
+        """)
+    ) == ['|= `valueA` | logfmt | field=`valueB`']
+
 def test_loki_or_unbounds(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
         test = loki_backend.convert(
@@ -267,6 +331,40 @@ def test_loki_or_unbounds(loki_backend : LogQLBackend):
                         - valueA
                         - valueB
                     condition: keywords
+            """)
+        )
+
+def test_loki_unbound_or_field(loki_backend : LogQLBackend):
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
+        test = loki_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: test_category
+                    product: test_product
+                detection:
+                    keywords:
+                        valueA
+                    sel:
+                        field: valueB
+                    condition: keywords or sel
+            """)
+        )
+
+def test_loki_not_unbound(loki_backend : LogQLBackend):
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
+        test = loki_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: test_category
+                    product: test_product
+                detection:
+                    keywords:
+                        valueA
+                    condition: not keywords
             """)
         )
 

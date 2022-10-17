@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from sigma.conversion.state import ConversionState
 from sigma.rule import SigmaRule
 from sigma.conversion.base import TextQueryBackend
@@ -9,6 +10,17 @@ from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 import sigma
 import re
 from typing import ClassVar, Dict, Tuple, Pattern, List, Union
+
+@dataclass
+class LogQLDeferredUnboundExpression(DeferredQueryExpression):
+    """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
+    expr : str
+
+    def negate(self) -> DeferredQueryExpression:
+        raise SigmaFeatureNotSupportedByBackendError("Negation of queries are not supported by the LogQL backend")
+
+    def finalize_expression(self) -> str:
+        return self.expr
 
 class LogQLBackend(TextQueryBackend):
     """Loki LogQL query backend. Generates LogQL queries as described in the Loki documentation:
@@ -40,6 +52,7 @@ class LogQLBackend(TextQueryBackend):
     add_escaped     : ClassVar[str] = "\\"
     filter_chars    : ClassVar[str] = ""
 
+    field_query_prefix      : ClassVar[str] = " | logfmt | "
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
 
     # LogQL does not support wildcards, so we convert them to regular expressions
@@ -71,8 +84,13 @@ class LogQLBackend(TextQueryBackend):
     # not clearly supported by Sigma?
     unbound_value_cidr_expression : ClassVar[str] = '| ip("{value}")'
 
-    deferred_start : ClassVar[str] = "\n| "
-    deferred_separator : ClassVar[str] = "\n| "
+    deferred_start : ClassVar[str] = ''
+    deferred_end : ClassVar[str] = ''
+    deferred_separator : ClassVar[str] = ' '
+    deferred_only_query : ClassVar[str] = ''
+
+    def convert_condition_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> LogQLDeferredUnboundExpression:
+        return LogQLDeferredUnboundExpression(state, super().convert_condition_val(cond, state))
 
     # When converting values to regexes, we need to escape the string to prevent use of non-wildcard metacharacters
     # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
@@ -90,7 +108,7 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:
         for arg in cond.args:
             if isinstance(arg, ConditionValueExpression):
-                raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions")
+                raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions", source=cond.source)
         else:
             return super().convert_condition_or(cond, state)
 
@@ -125,8 +143,25 @@ It must start with either:
 - an underscore (_) 
 - a colon (:)
 It can also only contain those characters and numbers (0-9)
-""")
+""", source=field_name)
         return field_name
+
+    # Overriding Sigma implementing: swapping the meaning of "deferred" expressions so they appear at the start
+    # of a query, rather than the end (since this is the recommended approach for LogQL)
+    def finalize_query(self, rule : SigmaRule, query : Union[str, DeferredQueryExpression], index : int, state : ConversionState, output_format : str) -> Union[str, DeferredQueryExpression]:
+        if isinstance(query, DeferredQueryExpression):
+            query = self.deferred_only_query
+        elif query is not None and len(query) > 0:
+            query = self.field_query_prefix + query
+        if state.has_deferred():
+            query = self.deferred_separator.join((
+                        deferred_expression.finalize_expression()
+                        for deferred_expression in state.deferred
+                    ) 
+                ) + query
+            # Since we've already processed the deferred parts, we can clear them
+            state.deferred.clear()
+        return super().finalize_query(rule, query, index, state, output_format)
     
     def finalize_query_default(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
         # TODO: implement the per-query output for the output format default here. Usually, the generated query is
