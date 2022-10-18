@@ -5,17 +5,37 @@
 # pySigma Loki Backend
 
 This is the Loki backend for pySigma. It provides the package `sigma.backends.loki` with the `LogQLBackend` class.
-Further, it contains the following processing pipelines in `sigma.pipelines.loki`:
-
-* pipeline1: purpose
-* pipeline2: purpose
 
 It supports the following output formats:
 
 * default: plain Loki LogQL queries
-* ruler: creates Loki queries in the ruler format for generating alerts
+* ruler: creates Loki LogQL queries in the ruler (YAML) format for generating alerts
+
+Further, it *will* contain the processing pipelines in `sigma.pipelines.loki`:
+
+* pipeline1: purpose
+* pipeline2: purpose
 
 This backend is currently maintained by:
 
 * [Nick Moore](https://github.com/kelnage/)
+
+## Work in progress
+
+These features are currently either WIP or are planned to be implemented in the near future.
+
+* Adding generic log stream selectors to all queries
+* Generating more accurate log stream selectors based on logsource
+* Where relevant, use parsers other than `logfmt` (i.e., JSON, pattern?)
+* Translate field names in Sigma signatures into relevant labels for Loki
+* Convert null fields into empty string checks
+* `not` unary operator - would require some work (basically inverting binary and boolean operators), but doable
+
+## Won't implement (probably)
+
+These features are not easily supported by the backend, and hence are unlikely to be implemented.
+
+* OR'd line filters. LogQL only supports AND'd filters within a single query
+  * Could potentially generate multiple queries from Sigma signatures that contain multiple keywords (one per keyword)
+* More TBC
 

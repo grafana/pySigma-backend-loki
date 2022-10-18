@@ -237,6 +237,55 @@ def test_loki_cidr_query(loki_backend : LogQLBackend):
         """)
     ) == [' | logfmt | field=ip("192.168.0.0/16")']
 
+def test_loki_all_query(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    field|all:
+                        - valueA
+                        - valueB
+                condition: sel
+        """)
+    ) == [' | logfmt | field=`valueA` and field=`valueB`']
+
+def test_loki_all_contains_query(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    field|all|contains:
+                        - valueA
+                        - valueB
+                condition: sel
+        """)
+    ) == [' | logfmt | field=~`(?i).*valueA.*` and field=~`(?i).*valueB.*`']
+
+def test_loki_base64_query(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    field|base64: value
+                condition: sel
+        """)
+    ) == [' | logfmt | field=`dmFsdWU=`']
+
 def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
         test = loki_backend.convert(
