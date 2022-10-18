@@ -9,6 +9,7 @@ from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 # from sigma.pipelines.loki import # TODO: add pipeline imports or delete this line
 import sigma
 import re
+from yaml import dump
 from typing import ClassVar, Dict, Tuple, Pattern, List, Union
 
 @dataclass
@@ -54,6 +55,7 @@ class LogQLBackend(TextQueryBackend):
 
     field_query_prefix      : ClassVar[str] = " | logfmt | "
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
+    field_replace_pattern   : ClassVar[Pattern] = re.compile("[^a-zA-Z0-9_:]+")
 
     # LogQL does not support wildcards, so we convert them to regular expressions
     wildcard_multi  : ClassVar[str] = "*"     # Character used as multi-character wildcard (replaced with .*)
@@ -164,25 +166,35 @@ It can also only contain those characters and numbers (0-9)
         return super().finalize_query(rule, query, index, state, output_format)
     
     def finalize_query_default(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
-        # TODO: implement the per-query output for the output format default here. Usually, the generated query is
-        # embedded into a template, e.g. a JSON format with additional information from the Sigma rule.
         return query
 
     def finalize_output_default(self, queries: List[str]) -> str:
-        # TODO: implement the output finalization for all generated queries for the format default here. Usually,
-        # the single generated queries are embedded into a structure, e.g. some JSON or XML that can be imported into
-        # the SIEM.
         return list(queries)
     
-    def finalize_query_ruler(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
-        # TODO: implement the per-query output for the output format ruler here. Usually, the generated query is
-        # embedded into a template, e.g. a JSON format with additional information from the Sigma rule.
-        return query
+    def finalize_query_ruler(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> Dict[str, any]:
+        alert = self.field_replace_pattern.sub('_', rule.title).strip('_')
+        ruler = {
+            'alert': alert,
+            'annotations': {
+                'message': rule.title,
+                'summary': rule.description
+            },
+            'expr': query,
+            'labels': {
+            }
+        }
+        if rule.level:
+            ruler['labels']['severity'] = rule.level.name.lower()
+        return ruler
 
-    def finalize_output_ruler(self, queries: List[str]) -> str:
-        # TODO: implement the output finalization for all generated queries for the format ruler here. Usually,
-        # the single generated queries are embedded into a structure, e.g. some JSON or XML that can be imported into
-        # the SIEM.
-        return "\n".join(queries)
-    
+    def finalize_output_ruler(self, queries: List[Dict[str, any]]) -> str:
+        rules = {
+            'groups': [
+                {
+                    'name': 'Sigma rules',
+                    'rules': queries
+                }
+            ]
+        }
+        return dump(queries)
     

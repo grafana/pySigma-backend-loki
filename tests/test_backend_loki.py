@@ -375,7 +375,26 @@ def test_loki_default_output(loki_backend : LogQLBackend):
 
 def test_loki_ruler_output(loki_backend : LogQLBackend):
     """Test for output format ruler."""
-    # TODO: implement a test for the output format
-    pass
-
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test signature
+            status: test
+            level: low
+            description: testing
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keyword:
+                    anything
+                condition: keyword
+        """), "ruler"
+    ) == """- alert: test_signature
+  annotations:
+    message: test signature
+    summary: testing
+  expr: '|= `anything`'
+  labels:
+    severity: low
+"""
 
