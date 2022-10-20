@@ -56,6 +56,7 @@ class LogQLBackend(TextQueryBackend):
     field_query_prefix      : ClassVar[str] = " | logfmt | "
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
     field_replace_pattern   : ClassVar[Pattern] = re.compile("[^a-zA-Z0-9_:]+")
+    field_null_expression   : ClassVar[str] = "{field}=``"
 
     # LogQL does not support wildcards, so we convert them to regular expressions
     wildcard_multi  : ClassVar[str] = "*"     # Character used as multi-character wildcard (replaced with .*)
@@ -103,8 +104,7 @@ class LogQLBackend(TextQueryBackend):
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
 
     # Overriding Sigma implementation: LogQL does not support OR'd unbounded conditions.
-    # TODO: For now we will reject such queries, but we could potentially implement them with... you guessed it,
-    # regexes (though I'm not so sure it's a good idea...)
+    # TODO: For now we will reject such queries, but we could implement them with regexes
     # TODO: Alternatively we could see if we can produce multiple LogQL queries from a single Sigma rule
     # TODO: If we want to consistently reject such queries, we possibly need to do a deeper search?
     def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:

@@ -7,6 +7,7 @@ from sigma.backends.loki import LogQLBackend
 def loki_backend():
     return LogQLBackend()
 
+# Testing boolean logic
 def test_loki_and_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
@@ -79,8 +80,8 @@ def test_loki_or_and_expression(loki_backend : LogQLBackend):
         """)
     ) == [' | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`']
 
-# Loki does not support wildcards, so we use case-insensitive regular expressions instead
-def test_loki_wildcard_single(loki_backend : LogQLBackend):
+# Loki doesn't support in expressions, so in this case, multiple or conditions should be produced
+def test_loki_in_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
             title: Test
@@ -90,11 +91,31 @@ def test_loki_wildcard_single(loki_backend : LogQLBackend):
                 product: test_product
             detection:
                 sel:
-                    fieldA: va?ue?
+                    fieldA:
+                        - valueA
+                        - valueB
+                        - valueC
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i)va.ue.`']
+    ) == [' | logfmt | fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
 
+# Testing different search identifiers
+def test_loki_null(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: null
+                condition: sel
+        """)
+    ) == [' | logfmt | fieldA=``']
+
+# Loki does not support wildcards, so we use case-insensitive regular expressions instead
 def test_loki_wildcard_multi(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
@@ -141,25 +162,6 @@ def test_loki_wildcard_unbound(loki_backend : LogQLBackend):
                 condition: keywords
         """)
     ) == ['|~ `(?i)va.ue.*`']
-
-# Loki doesn't support in expressions, so in this case, multiple or conditions should be produced
-def test_loki_in_expression(loki_backend : LogQLBackend):
-    assert loki_backend.convert(
-        SigmaCollection.from_yaml("""
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA:
-                        - valueA
-                        - valueB
-                        - valueC
-                condition: sel
-        """)
-    ) == [' | logfmt | fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
 
 def test_loki_regex_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
