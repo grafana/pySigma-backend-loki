@@ -116,6 +116,21 @@ def test_loki_null(loki_backend : LogQLBackend):
     ) == [' | logfmt | fieldA=``']
 
 # Loki does not support wildcards, so we use case-insensitive regular expressions instead
+def test_loki_wildcard_single(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: va?ue
+                condition: sel
+        """)
+    ) == [' | logfmt | fieldA=~`(?i)va.ue`']
+
 def test_loki_wildcard_multi(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
