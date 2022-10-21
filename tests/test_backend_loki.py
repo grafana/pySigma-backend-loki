@@ -303,22 +303,6 @@ def test_loki_base64_query(loki_backend : LogQLBackend):
         """)
     ) == [' | logfmt | field=`dmFsdWU=`']
 
-# def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
-#     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-#         test = loki_backend.convert(
-#             SigmaCollection.from_yaml("""
-#                 title: Test
-#                 status: test
-#                 logsource:
-#                     category: test_category
-#                     product: test_product
-#                 detection:
-#                     sel:
-#                         field name: value
-#                     condition: sel
-#             """)
-#         )
-
 def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
       assert loki_backend.convert(
           SigmaCollection.from_yaml("""
@@ -332,7 +316,7 @@ def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
                       field name: value
                   condition: sel
           """)
-      ) == [' | logfmt | field_name=`value`']
+      ) == [' | logfmt | _field_name=`value`']
 
 
 def test_loki_unbound(loki_backend : LogQLBackend):

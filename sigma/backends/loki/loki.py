@@ -105,7 +105,6 @@ class LogQLBackend(TextQueryBackend):
 
     # Overriding Sigma implementation: LogQL does not support OR'd unbounded conditions.
     # TODO: For now we will reject such queries, but we could implement them with regexes
-    # TODO: Alternatively we could see if we can produce multiple LogQL queries from a single Sigma rule
     # TODO: If we want to consistently reject such queries, we possibly need to do a deeper search?
     def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:
         for arg in cond.args:
@@ -133,21 +132,13 @@ class LogQLBackend(TextQueryBackend):
         else:
             return super().convert_condition_val_str(cond, state)
 
-    # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will error if
-    # an invalid field name is provided
-    # TODO: decide should we replace invalid characters with underscores? Or should we just ensure all fields are
-    # appropriately mapped?
+    # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will replace 
+    # invalid characters with underscores
+    # TODO: we should instead ensure all fields are appropriately mapped
     def escape_and_quote_field(self, field_name: str) -> str:
         if not self.field_quote_pattern.match(field_name):
-            # for the time being, simply replace the disallowed characters with underscores and prefix with an underscore
-            field_name = self.field_replace_pattern.sub('_', "_" + field_name).strip('_')
-#             raise SigmaFeatureNotSupportedByBackendError(f"""{field_name} is not a valid Loki label.
-# It must start with either:
-# - an ASCII alphabet (A-z) character
-# - an underscore (_) 
-# - a colon (:)
-# It can also only contain those characters and numbers (0-9)
-# """, source=field_name)
+            # for the time being, simply replace the disallowed characters with underscores
+            field_name = "_" + self.field_replace_pattern.sub('_', field_name).strip('_')
         return field_name
 
     # Overriding Sigma implementing: swapping the meaning of "deferred" expressions so they appear at the start
