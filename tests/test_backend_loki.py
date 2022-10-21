@@ -384,38 +384,21 @@ def test_loki_unbound_and_field(loki_backend : LogQLBackend):
     ) == ['|= `valueA` | logfmt | field=`valueB`']
 
 # One of the following two tests should pass!
-# def test_loki_or_unbound_works(loki_backend : LogQLBackend):
-#     assert loki_backend.convert(
-#         SigmaCollection.from_yaml("""
-#             title: Test
-#             status: test
-#             logsource:
-#                 category: test_category
-#                 product: test_product
-#             detection:
-#                 keywords:
-#                     - valueA
-#                     - valueB
-#                 condition: keywords
-#         """)
-#     ) == ['|= `valueA|valueB`']
-
-def test_loki_or_unbound_errors(loki_backend : LogQLBackend):
-    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-        test = loki_backend.convert(
-            SigmaCollection.from_yaml("""
-                title: Test
-                status: test
-                logsource:
-                    category: test_category
-                    product: test_product
-                detection:
-                    keywords:
-                        - valueA
-                        - valueB
-                    condition: keywords
-            """)
-        )
+def test_loki_or_unbound_works(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    - valueA
+                    - valueB
+                condition: keywords
+        """)
+    ) == ['|~ `valueA|valueB`']
 
 def test_loki_unbound_or_field(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:

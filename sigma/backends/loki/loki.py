@@ -23,6 +23,17 @@ class LogQLDeferredUnboundExpression(DeferredQueryExpression):
     def finalize_expression(self) -> str:
         return self.expr
 
+@dataclass
+class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
+    """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
+    exprs : List[str]
+
+    def negate(self) -> DeferredQueryExpression:
+        raise SigmaFeatureNotSupportedByBackendError("Negation of queries are not supported by the LogQL backend")
+
+    def finalize_expression(self) -> str:
+        return f"|~ `{'|'.join((re.escape(str(val)) for val in self.exprs))}`"
+
 class LogQLBackend(TextQueryBackend):
     """Loki LogQL query backend. Generates LogQL queries as described in the Loki documentation:
 
@@ -107,9 +118,16 @@ class LogQLBackend(TextQueryBackend):
     # TODO: For now we will reject such queries, but we could implement them with regexes
     # TODO: If we want to consistently reject such queries, we possibly need to do a deeper search?
     def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:
+        unbound_deferred_or = None
         for arg in cond.args:
             if isinstance(arg, ConditionValueExpression):
-                raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions", source=cond.source)
+                if unbound_deferred_or is None:
+                    unbound_deferred_or = LogQLDeferredOrUnboundExpression(state, [])
+                unbound_deferred_or.exprs.append(arg.value)
+            elif unbound_deferred_or is not None:
+                raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions combined with field conditions", source=cond.source)
+        if unbound_deferred_or is not None:
+            return unbound_deferred_or
         else:
             return super().convert_condition_or(cond, state)
 
