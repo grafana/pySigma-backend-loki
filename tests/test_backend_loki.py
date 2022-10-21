@@ -99,6 +99,40 @@ def test_loki_in_expression(loki_backend : LogQLBackend):
         """)
     ) == [' | logfmt | fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
 
+def test_loki_all_query(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    field|all:
+                        - valueA
+                        - valueB
+                condition: sel
+        """)
+    ) == [' | logfmt | field=`valueA` and field=`valueB`']
+
+def test_loki_all_contains_query(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    field|all|contains:
+                        - valueA
+                        - valueB
+                condition: sel
+        """)
+    ) == [' | logfmt | field=~`(?i).*valueA.*` and field=~`(?i).*valueB.*`']
+
 # Testing different search identifiers
 def test_loki_null(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -254,40 +288,6 @@ def test_loki_cidr_query(loki_backend : LogQLBackend):
         """)
     ) == [' | logfmt | field=ip("192.168.0.0/16")']
 
-def test_loki_all_query(loki_backend : LogQLBackend):
-    assert loki_backend.convert(
-        SigmaCollection.from_yaml("""
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    field|all:
-                        - valueA
-                        - valueB
-                condition: sel
-        """)
-    ) == [' | logfmt | field=`valueA` and field=`valueB`']
-
-def test_loki_all_contains_query(loki_backend : LogQLBackend):
-    assert loki_backend.convert(
-        SigmaCollection.from_yaml("""
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    field|all|contains:
-                        - valueA
-                        - valueB
-                condition: sel
-        """)
-    ) == [' | logfmt | field=~`(?i).*valueA.*` and field=~`(?i).*valueB.*`']
-
 def test_loki_base64_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
@@ -303,21 +303,37 @@ def test_loki_base64_query(loki_backend : LogQLBackend):
         """)
     ) == [' | logfmt | field=`dmFsdWU=`']
 
+# def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
+#     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
+#         test = loki_backend.convert(
+#             SigmaCollection.from_yaml("""
+#                 title: Test
+#                 status: test
+#                 logsource:
+#                     category: test_category
+#                     product: test_product
+#                 detection:
+#                     sel:
+#                         field name: value
+#                     condition: sel
+#             """)
+#         )
+
 def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
-    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-        test = loki_backend.convert(
-            SigmaCollection.from_yaml("""
-                title: Test
-                status: test
-                logsource:
-                    category: test_category
-                    product: test_product
-                detection:
-                    sel:
-                        field name: value
-                    condition: sel
-            """)
-        )
+      assert loki_backend.convert(
+          SigmaCollection.from_yaml("""
+              title: Test
+              status: test
+              logsource:
+                  category: test_category
+                  product: test_product
+              detection:
+                  sel:
+                      field name: value
+                  condition: sel
+          """)
+      ) == [' | logfmt | field_name=`value`']
+
 
 def test_loki_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -383,7 +399,24 @@ def test_loki_unbound_and_field(loki_backend : LogQLBackend):
         """)
     ) == ['|= `valueA` | logfmt | field=`valueB`']
 
-def test_loki_or_unbounds(loki_backend : LogQLBackend):
+# One of the following two tests should pass!
+# def test_loki_or_unbound_works(loki_backend : LogQLBackend):
+#     assert loki_backend.convert(
+#         SigmaCollection.from_yaml("""
+#             title: Test
+#             status: test
+#             logsource:
+#                 category: test_category
+#                 product: test_product
+#             detection:
+#                 keywords:
+#                     - valueA
+#                     - valueB
+#                 condition: keywords
+#         """)
+#     ) == ['|= `valueA|valueB`']
+
+def test_loki_or_unbound_errors(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
         test = loki_backend.convert(
             SigmaCollection.from_yaml("""

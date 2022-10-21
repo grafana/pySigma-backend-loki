@@ -139,13 +139,15 @@ class LogQLBackend(TextQueryBackend):
     # appropriately mapped?
     def escape_and_quote_field(self, field_name: str) -> str:
         if not self.field_quote_pattern.match(field_name):
-            raise SigmaFeatureNotSupportedByBackendError(f"""{field_name} is not a valid Loki label.
-It must start with either:
-- an ASCII alphabet (A-z) character
-- an underscore (_) 
-- a colon (:)
-It can also only contain those characters and numbers (0-9)
-""", source=field_name)
+            # for the time being, simply replace the disallowed characters with underscores and prefix with an underscore
+            field_name = self.field_replace_pattern.sub('_', "_" + field_name).strip('_')
+#             raise SigmaFeatureNotSupportedByBackendError(f"""{field_name} is not a valid Loki label.
+# It must start with either:
+# - an ASCII alphabet (A-z) character
+# - an underscore (_) 
+# - a colon (:)
+# It can also only contain those characters and numbers (0-9)
+# """, source=field_name)
         return field_name
 
     # Overriding Sigma implementing: swapping the meaning of "deferred" expressions so they appear at the start
