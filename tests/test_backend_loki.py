@@ -7,6 +7,22 @@ from sigma.backends.loki import LogQLBackend
 def loki_backend():
     return LogQLBackend()
 
+# Simple field equality test
+def test_loki_field_eq(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: valueA
+                condition: sel
+        """)
+    ) == [' | logfmt | fieldA=`valueA`']
+
 # Testing boolean logic
 def test_loki_and_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -418,6 +434,100 @@ def test_loki_multi_or_unbound(loki_backend : LogQLBackend):
         """)
     ) == ['|~ `valueA|valueB` |~ `valueC|valueD`']
 
+# Testing negation
+def test_loki_not_unbound(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    valueA
+                condition: not keywords
+        """)
+    ) == ['!= `valueA`']
+
+def test_loki_not_unbound_wildcard(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    value*
+                condition: not keywords
+        """)
+    ) == ['!~ `(?i)value.*`']
+
+def test_loki_not_or_unbound(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    - valueA
+                    - valueB
+                condition: not keywords
+        """)
+    ) == ['!= `valueA` != `valueB`']
+
+def test_loki_field_not_eq(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: valueA
+                condition: not sel
+        """)
+    ) == [' | logfmt | fieldA!=`valueA`']
+
+def test_loki_field_not_and_eq(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: valueA
+                    fieldB: valueB
+                condition: not sel
+        """)
+    ) == [' | logfmt | fieldA!=`valueA` and fieldB!=`valueB`']
+
+def test_loki_field_not_not_eq(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: valueA
+                condition: not (not sel)
+        """)
+    ) == [' | logfmt | fieldA=`valueA`']
+
+# Unimplemented tests
 def test_loki_unbound_or_field(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
         test = loki_backend.convert(
@@ -433,22 +543,6 @@ def test_loki_unbound_or_field(loki_backend : LogQLBackend):
                     sel:
                         field: valueB
                     condition: keywords or sel
-            """)
-        )
-
-def test_loki_not_unbound(loki_backend : LogQLBackend):
-    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-        test = loki_backend.convert(
-            SigmaCollection.from_yaml("""
-                title: Test
-                status: test
-                logsource:
-                    category: test_category
-                    product: test_product
-                detection:
-                    keywords:
-                        valueA
-                    condition: not keywords
             """)
         )
 

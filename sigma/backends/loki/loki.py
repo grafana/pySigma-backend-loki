@@ -15,24 +15,28 @@ from typing import ClassVar, Dict, Tuple, Pattern, List, Union
 @dataclass
 class LogQLDeferredUnboundExpression(DeferredQueryExpression):
     """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
-    expr : str
+    value : str
+    op    : str = "|=" # default to matching
 
     def negate(self) -> DeferredQueryExpression:
-        raise SigmaFeatureNotSupportedByBackendError("Negation of queries are not supported by the LogQL backend")
+        self.op = LogQLBackend.negated_line_filter_operator[self.op]
+        return self
 
     def finalize_expression(self) -> str:
-        return self.expr
+        return f"{self.op} {self.value}"
 
 @dataclass
 class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
     """'Defer' unbounded OR matching to pipelined command **BEFORE** main search expression."""
     exprs : List[str]
+    op    : str = "|~" # default to matching
 
     def negate(self) -> DeferredQueryExpression:
-        raise SigmaFeatureNotSupportedByBackendError("Negation of queries are not supported by the LogQL backend")
+        self.op = LogQLBackend.negated_line_filter_operator[self.op]
+        return self
 
     def finalize_expression(self) -> str:
-        return f"|~ `{'|'.join((re.escape(str(val)) for val in self.exprs))}`"
+        return f"{self.op} `{'|'.join((re.escape(str(val)) for val in self.exprs))}`"
 
 class LogQLBackend(TextQueryBackend):
     """Loki LogQL query backend. Generates LogQL queries as described in the Loki documentation:
@@ -43,6 +47,32 @@ class LogQLBackend(TextQueryBackend):
     formats : Dict[str, str] = {
         "default": "Plain Loki queries",
         "ruler": "'ruler' output format",
+    }
+
+    negated_line_filter_operator : ClassVar[Dict[str, str]] = {
+        "|=": "!=",
+        "!=": "|=",
+        "|~": "!~",
+        "!~": "|~"
+    }
+
+    negated_label_filter_operator : ClassVar[Dict[str, str]] = {
+        "=" : "!=",
+        "!=": "="
+    }
+
+    negated_cmp_operator : ClassVar[Dict[SigmaCompareExpression.CompareOperators, SigmaCompareExpression.CompareOperators]] = {
+        SigmaCompareExpression.CompareOperators.LT  : SigmaCompareExpression.CompareOperators.GTE,
+        SigmaCompareExpression.CompareOperators.LTE : SigmaCompareExpression.CompareOperators.GT,
+        SigmaCompareExpression.CompareOperators.GT  : SigmaCompareExpression.CompareOperators.LTE,
+        SigmaCompareExpression.CompareOperators.GTE  : SigmaCompareExpression.CompareOperators.LT
+    }
+
+    negated_expr : ClassVar[Dict[str, str]] = {
+        "{field}=~`{regex}`"  : "{field}!~`{regex}`",
+        "{field}!~`{regex}`"  : "{field}=~`{regex}`",
+        'field=ip("{value}")' : 'field!=ip("{value}")',
+        'field!=ip("{value}")' : 'field=ip("{value}")'
     }
 
     # Operator precedence: tuple of Condition{AND,OR} in order of precedence.
@@ -90,9 +120,9 @@ class LogQLBackend(TextQueryBackend):
     }
 
     # See https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression
-    unbound_value_str_expression : ClassVar[str] = '|= {value}'
-    unbound_value_num_expression : ClassVar[str] = '|= {value}'
-    unbound_value_re_expression : ClassVar[str] = '|~ `{value}`'
+    unbound_value_str_expression : ClassVar[str] = '{value}'
+    unbound_value_num_expression : ClassVar[str] = '{value}'
+    unbound_value_re_expression : ClassVar[str] = '`{value}`'
     # not clearly supported by Sigma?
     unbound_value_cidr_expression : ClassVar[str] = '| ip("{value}")'
 
@@ -101,9 +131,6 @@ class LogQLBackend(TextQueryBackend):
     deferred_separator : ClassVar[str] = ' '
     deferred_only_query : ClassVar[str] = ''
 
-    def convert_condition_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> DeferredQueryExpression:
-        return LogQLDeferredUnboundExpression(state, super().convert_condition_val(cond, state))
-
     # When converting values to regexes, we need to escape the string to prevent use of non-wildcard metacharacters
     # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
     def convert_wildcard_to_re(self, value: SigmaString) -> SigmaRegularExpression:
@@ -111,10 +138,38 @@ class LogQLBackend(TextQueryBackend):
         return SigmaRegularExpression('(?i)'+re.escape(str(value)).replace('\\?', '.').replace('\\*', '.*'))
 
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
+    def convert_condition_not(self, cond : ConditionNOT, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        """Conversion of NOT conditions."""
+        state.processing_state['not_count'] = state.processing_state.get('not_count', 0) + 1
+        # ...I hate this already...
+        LogQLBackend.eq_token = LogQLBackend.negated_label_filter_operator[LogQLBackend.eq_token]
+        LogQLBackend.re_expression = LogQLBackend.negated_expr[LogQLBackend.re_expression]
+        LogQLBackend.cidr_expression = LogQLBackend.negated_expr[LogQLBackend.cidr_expression]
+        arg = cond.args[0]
+        expr = self.convert_condition(arg, state)
+        state.processing_state['not_count'] -= 1
+        # ...I still hate this...
+        LogQLBackend.eq_token = LogQLBackend.negated_label_filter_operator[LogQLBackend.eq_token]
+        LogQLBackend.re_expression = LogQLBackend.negated_expr[LogQLBackend.re_expression]
+        LogQLBackend.cidr_expression = LogQLBackend.negated_expr[LogQLBackend.cidr_expression]
+        return expr
+
+    def is_negated(self, state : ConversionState) -> bool:
+        return state.processing_state.get('not_count', 0) % 2 == 1
+
+    # Overriding Sigma implementation: inverting ANDs and ORs if they are negated
+    def convert_condition(self, cond : ConditionItem, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        if self.is_negated(state) and cond.__class__ in self.precedence:
+            if isinstance(cond, ConditionAND):
+                cond = ConditionOR(cond.args, cond.source)
+            if isinstance(cond, ConditionOR):
+                cond = ConditionAND(cond.args, cond.source)
+        return super().convert_condition(cond, state)
+
     # Overriding Sigma implementation: work-around for issue SigmaHQ/pySigma#69
     def convert_condition_group(self, cond : ConditionItem, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         expr = self.convert_condition(cond, state)
-        if expr is None or isinstance(expr, DeferredQueryExpression):
+        if expr is None or isinstance(expr, DeferredQueryExpression) or len(expr) == 0:
             return expr
         return self.group_expression.format(expr=expr)
 
@@ -132,7 +187,6 @@ class LogQLBackend(TextQueryBackend):
             return unbound_deferred_or
         else:
             return super().convert_condition_or(cond, state)
-
     
     # Overriding Sigma implementation: LogQL does not support wildcards - so convert them into regular expressions
     def convert_condition_field_eq_val_str(self, cond: ConditionFieldEqualsValueExpression, state: ConversionState) -> Union[str, DeferredQueryExpression]:
@@ -144,13 +198,26 @@ class LogQLBackend(TextQueryBackend):
             # No wildcards? No problem, we can use the default implementation
             return super().convert_condition_field_eq_val_str(cond, state)
 
-    # As above, but for unbound queries
+    # As above, but for unbound queries, and wrap in a deferred expression
     def convert_condition_val_str(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         if cond.value.contains_special():
             cond.value = self.convert_wildcard_to_re(cond.value)
             return self.convert_condition_val_re(cond, state)
-        else:
-            return super().convert_condition_val_str(cond, state)
+        return LogQLDeferredUnboundExpression(state, self.convert_value_str(cond.value, state), 
+                "|=" if not self.is_negated(state) else "!=")
+
+    def convert_condition_val_num(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        return LogQLDeferredUnboundExpression(state, cond.value,
+                "|=" if not self.is_negated(state) else "!=")
+
+    def convert_condition_val_re(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        return LogQLDeferredUnboundExpression(state, self.quote_string(self.convert_value_re(cond.value, state)),
+                "|~" if not self.is_negated(state) else "!~")
+
+    def convert_condition_field_compare_op_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        if self.is_negated(state):
+            cond.value.op = LogQLBackend.negated_cmp_operator[cond.value.op]
+        return super().convert_condition_field_compare_op_val(cond, state)
 
     # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will replace 
     # invalid characters with underscores
@@ -168,6 +235,8 @@ class LogQLBackend(TextQueryBackend):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             query = self.field_query_prefix + query
+        elif query is None:
+            query = ""
         if state.has_deferred():
             query = self.deferred_separator.join((
                         deferred_expression.finalize_expression()
