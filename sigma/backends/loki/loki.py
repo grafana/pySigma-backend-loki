@@ -25,7 +25,7 @@ class LogQLDeferredUnboundExpression(DeferredQueryExpression):
 
 @dataclass
 class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
+    """'Defer' unbounded OR matching to pipelined command **BEFORE** main search expression."""
     exprs : List[str]
 
     def negate(self) -> DeferredQueryExpression:
@@ -88,9 +88,7 @@ class LogQLBackend(TextQueryBackend):
         SigmaCompareExpression.CompareOperators.GT  : ">",
         SigmaCompareExpression.CompareOperators.GTE : ">=",
     }
-    # TODO: can we test for (not) null fields using LogQL? Not clear (test for an empty value?)
 
-    # TODO: these probably should be prioritised for performance reasons
     # See https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression
     unbound_value_str_expression : ClassVar[str] = '|= {value}'
     unbound_value_num_expression : ClassVar[str] = '|= {value}'
@@ -103,7 +101,7 @@ class LogQLBackend(TextQueryBackend):
     deferred_separator : ClassVar[str] = ' '
     deferred_only_query : ClassVar[str] = ''
 
-    def convert_condition_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> LogQLDeferredUnboundExpression:
+    def convert_condition_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> DeferredQueryExpression:
         return LogQLDeferredUnboundExpression(state, super().convert_condition_val(cond, state))
 
     # When converting values to regexes, we need to escape the string to prevent use of non-wildcard metacharacters
@@ -113,10 +111,14 @@ class LogQLBackend(TextQueryBackend):
         return SigmaRegularExpression('(?i)'+re.escape(str(value)).replace('\\?', '.').replace('\\*', '.*'))
 
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
+    # Overriding Sigma implementation: work-around for issue SigmaHQ/pySigma#69
+    def convert_condition_group(self, cond : ConditionItem, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        expr = self.convert_condition(cond, state)
+        if expr is None or isinstance(expr, DeferredQueryExpression):
+            return expr
+        return self.group_expression.format(expr=expr)
 
-    # Overriding Sigma implementation: LogQL does not support OR'd unbounded conditions.
-    # TODO: For now we will reject such queries, but we could implement them with regexes
-    # TODO: If we want to consistently reject such queries, we possibly need to do a deeper search?
+    # Overriding Sigma implementation: LogQL does not support OR'd unbounded conditions, but does support |'d searches in regexes
     def convert_condition_or(self, cond: ConditionOR, state: ConversionState) -> Union[str, DeferredQueryExpression]:
         unbound_deferred_or = None
         for arg in cond.args:
