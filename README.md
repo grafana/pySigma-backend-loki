@@ -28,14 +28,10 @@ These features are currently either WIP or are planned to be implemented in the 
 * Generating more accurate log stream selectors based on logsource
 * Where relevant, use parsers other than `logfmt` (i.e., JSON, pattern?)
 * Translate field names in Sigma signatures into relevant labels for Loki
-* Convert null fields into empty string checks
-* `not` unary operator - would require some work (basically inverting binary and boolean operators), but doable
 
 ## Won't implement (probably)
 
 These features are not easily supported by the backend, and hence are unlikely to be implemented.
 
-* OR'd line filters. LogQL only supports AND'd filters within a single query
-  * Could potentially generate multiple queries from Sigma signatures that contain multiple keywords (one per keyword)
-* More TBC
+*  More complex keyword/line filter searches than ANDs of ORs
 
