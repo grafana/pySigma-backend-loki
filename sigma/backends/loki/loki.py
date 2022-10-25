@@ -69,10 +69,12 @@ class LogQLBackend(TextQueryBackend):
     }
 
     negated_expr : ClassVar[Dict[str, str]] = {
-        "{field}=~`{regex}`"  : "{field}!~`{regex}`",
-        "{field}!~`{regex}`"  : "{field}=~`{regex}`",
-        'field=ip("{value}")' : 'field!=ip("{value}")',
-        'field!=ip("{value}")' : 'field=ip("{value}")'
+        "{field}=~`{regex}`"   : "{field}!~`{regex}`",
+        "{field}!~`{regex}`"   : "{field}=~`{regex}`",
+        'field=ip("{value}")'  : 'field!=ip("{value}")',
+        'field!=ip("{value}")' : 'field=ip("{value}")',
+        "{field}=``"           : '{field}!=``',
+        "{field}!=``"          : '{field}=``'
     }
 
     # Operator precedence: tuple of Condition{AND,OR} in order of precedence.
@@ -145,6 +147,7 @@ class LogQLBackend(TextQueryBackend):
         LogQLBackend.eq_token = LogQLBackend.negated_label_filter_operator[LogQLBackend.eq_token]
         LogQLBackend.re_expression = LogQLBackend.negated_expr[LogQLBackend.re_expression]
         LogQLBackend.cidr_expression = LogQLBackend.negated_expr[LogQLBackend.cidr_expression]
+        LogQLBackend.field_null_expression = LogQLBackend.negated_expr[LogQLBackend.field_null_expression]
         arg = cond.args[0]
         expr = self.convert_condition(arg, state)
         state.processing_state['not_count'] -= 1
@@ -152,18 +155,35 @@ class LogQLBackend(TextQueryBackend):
         LogQLBackend.eq_token = LogQLBackend.negated_label_filter_operator[LogQLBackend.eq_token]
         LogQLBackend.re_expression = LogQLBackend.negated_expr[LogQLBackend.re_expression]
         LogQLBackend.cidr_expression = LogQLBackend.negated_expr[LogQLBackend.cidr_expression]
+        LogQLBackend.field_null_expression = LogQLBackend.negated_expr[LogQLBackend.field_null_expression]
         return expr
 
     def is_negated(self, state : ConversionState) -> bool:
         return state.processing_state.get('not_count', 0) % 2 == 1
 
+    # Overriding Sigma implementation: change behaviour for negated classes (as args aren't negated until they are converted)
+    def compare_precedence(self, outer : ConditionItem, inner : ConditionItem) -> bool:
+        outer_class = outer.__class__
+        if (inner.__class__ in self.precedence and outer_class in self.precedence):
+            if len(list(cls for cls in outer.parent_chain_classes() if cls == ConditionNOT)) % 2 == 1:
+                # At this point, we have an odd number of NOTs in the parent chain, outer will have been inverted, but
+                # inner will not yet been inverted, and we know inner is either an AND or an OR
+                inner_class = ConditionAND if inner.__class__ == ConditionOR else ConditionOR
+                return self.precedence.index(inner_class) <= self.precedence.index(outer_class)
+        return super().compare_precedence(outer, inner)
+
     # Overriding Sigma implementation: inverting ANDs and ORs if they are negated
     def convert_condition(self, cond : ConditionItem, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         if self.is_negated(state) and cond.__class__ in self.precedence:
             if isinstance(cond, ConditionAND):
-                cond = ConditionOR(cond.args, cond.source)
-            if isinstance(cond, ConditionOR):
-                cond = ConditionAND(cond.args, cond.source)
+                newcond = ConditionOR(cond.args, cond.source)
+            elif isinstance(cond, ConditionOR):
+                newcond = ConditionAND(cond.args, cond.source)
+            # Update the parent references to reflect the new structure
+            newcond.parent = cond.parent
+            for arg in cond.args:
+                arg.parent = newcond
+            return super().convert_condition(newcond, state)
         return super().convert_condition(cond, state)
 
     # Overriding Sigma implementation: work-around for issue SigmaHQ/pySigma#69
@@ -179,7 +199,9 @@ class LogQLBackend(TextQueryBackend):
         for arg in cond.args:
             if isinstance(arg, ConditionValueExpression):
                 if unbound_deferred_or is None:
-                    unbound_deferred_or = LogQLDeferredOrUnboundExpression(state, [])
+                    unbound_deferred_or = LogQLDeferredOrUnboundExpression(state, [], "|~")
+                    if self.is_negated(state):
+                        unbound_deferred_or.negate()
                 unbound_deferred_or.exprs.append(arg.value)
             elif unbound_deferred_or is not None:
                 raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions combined with field conditions", source=cond.source)
@@ -187,6 +209,14 @@ class LogQLBackend(TextQueryBackend):
             return unbound_deferred_or
         else:
             return super().convert_condition_or(cond, state)
+
+    # Overriding Sigma implementation: LogQL does not support OR'd AND'd unbounded conditions
+    def convert_condition_and(self, cond: ConditionAND, state: ConversionState) -> Union[str, DeferredQueryExpression]:
+        if cond.parent_condition_chain_contains(ConditionOR):
+            for arg in cond.args:
+                if isinstance(arg, ConditionValueExpression):
+                    raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions combined with 'and'", source=cond.source)
+        return super().convert_condition_and(cond, state)
     
     # Overriding Sigma implementation: LogQL does not support wildcards - so convert them into regular expressions
     def convert_condition_field_eq_val_str(self, cond: ConditionFieldEqualsValueExpression, state: ConversionState) -> Union[str, DeferredQueryExpression]:
@@ -203,21 +233,35 @@ class LogQLBackend(TextQueryBackend):
         if cond.value.contains_special():
             cond.value = self.convert_wildcard_to_re(cond.value)
             return self.convert_condition_val_re(cond, state)
-        return LogQLDeferredUnboundExpression(state, self.convert_value_str(cond.value, state), 
-                "|=" if not self.is_negated(state) else "!=")
+        expr = LogQLDeferredUnboundExpression(state, self.convert_value_str(cond.value, state))
+        if self.is_negated(state):
+            expr.negate()
+        return expr
 
     def convert_condition_val_num(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
-        return LogQLDeferredUnboundExpression(state, cond.value,
-                "|=" if not self.is_negated(state) else "!=")
+        expr = LogQLDeferredUnboundExpression(state, cond.value)
+        if self.is_negated(state):
+            expr.negate()
+        return expr
 
     def convert_condition_val_re(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
-        return LogQLDeferredUnboundExpression(state, self.quote_string(self.convert_value_re(cond.value, state)),
-                "|~" if not self.is_negated(state) else "!~")
+        expr = LogQLDeferredUnboundExpression(state, self.quote_string(self.convert_value_re(cond.value, state)), "|~")
+        if self.is_negated(state):
+            expr.negate()
+        return expr
 
     def convert_condition_field_compare_op_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         if self.is_negated(state):
             cond.value.op = LogQLBackend.negated_cmp_operator[cond.value.op]
         return super().convert_condition_field_compare_op_val(cond, state)
+
+    # Overriding Sigma implementation: use convert_condition rather than convert_condition_or
+    def convert_condition_field_eq_expansion(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        or_cond = ConditionOR([
+            ConditionFieldEqualsValueExpression(cond.field, value)
+            for value in cond.value.values
+        ], cond.source)
+        return self.convert_condition(or_cond, state)
 
     # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will replace 
     # invalid characters with underscores
