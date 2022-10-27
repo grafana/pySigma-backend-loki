@@ -21,7 +21,7 @@ def test_loki_field_eq(loki_backend : LogQLBackend):
                     fieldA: valueA
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=`valueA`']
+    ) == [' | %log_parser% | fieldA=`valueA`']
 
 def test_loki_field_eq_num(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -36,7 +36,7 @@ def test_loki_field_eq_num(loki_backend : LogQLBackend):
                     fieldA: 100
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=100']
+    ) == [' | %log_parser% | fieldA=100']
 
 # Testing boolean logic
 def test_loki_and_expression(loki_backend : LogQLBackend):
@@ -53,7 +53,7 @@ def test_loki_and_expression(loki_backend : LogQLBackend):
                     fieldB: valueB
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=`valueA` and fieldB=`valueB`']
+    ) == [' | %log_parser% | fieldA=`valueA` and fieldB=`valueB`']
 
 def test_loki_or_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -70,7 +70,7 @@ def test_loki_or_expression(loki_backend : LogQLBackend):
                     fieldB: valueB
                 condition: 1 of sel*
         """)
-    ) == [' | logfmt | fieldA=`valueA` or fieldB=`valueB`']
+    ) == [' | %log_parser% | fieldA=`valueA` or fieldB=`valueB`']
 
 def test_loki_and_or_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -90,7 +90,7 @@ def test_loki_and_or_expression(loki_backend : LogQLBackend):
                         - valueB2
                 condition: sel
         """)
-    ) == [' | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and (fieldB=`valueB1` or fieldB=`valueB2`)']
+    ) == [' | %log_parser% | (fieldA=`valueA1` or fieldA=`valueA2`) and (fieldB=`valueB1` or fieldB=`valueB2`)']
 
 def test_loki_or_and_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -109,7 +109,7 @@ def test_loki_or_and_expression(loki_backend : LogQLBackend):
                     fieldB: valueB2
                 condition: 1 of sel*
         """)
-    ) == [' | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`']
+    ) == [' | %log_parser% | fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`']
 
 # Loki doesn't support in expressions, so in this case, multiple or conditions should be produced
 def test_loki_in_expression(loki_backend : LogQLBackend):
@@ -128,7 +128,7 @@ def test_loki_in_expression(loki_backend : LogQLBackend):
                         - valueC
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
+    ) == [' | %log_parser% | fieldA=`valueA` or fieldA=`valueB` or fieldA=`valueC`']
 
 def test_loki_all_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -145,7 +145,7 @@ def test_loki_all_query(loki_backend : LogQLBackend):
                         - valueB
                 condition: sel
         """)
-    ) == [' | logfmt | field=`valueA` and field=`valueB`']
+    ) == [' | %log_parser% | field=`valueA` and field=`valueB`']
 
 def test_loki_all_contains_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -162,7 +162,7 @@ def test_loki_all_contains_query(loki_backend : LogQLBackend):
                         - valueB
                 condition: sel
         """)
-    ) == [' | logfmt | field=~`(?i).*valueA.*` and field=~`(?i).*valueB.*`']
+    ) == [' | %log_parser% | field=~`(?i).*valueA.*` and field=~`(?i).*valueB.*`']
 
 # Testing different search identifiers
 def test_loki_null(loki_backend : LogQLBackend):
@@ -178,7 +178,7 @@ def test_loki_null(loki_backend : LogQLBackend):
                     fieldA: null
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=``']
+    ) == [' | %log_parser% | fieldA=``']
 
 # Loki does not support wildcards, so we use case-insensitive regular expressions instead
 def test_loki_wildcard_single(loki_backend : LogQLBackend):
@@ -194,7 +194,7 @@ def test_loki_wildcard_single(loki_backend : LogQLBackend):
                     fieldA: va?ue
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i)va.ue`']
+    ) == [' | %log_parser% | fieldA=~`(?i)va.ue`']
 
 def test_loki_wildcard_multi(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -209,7 +209,7 @@ def test_loki_wildcard_multi(loki_backend : LogQLBackend):
                     fieldA: value*
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i)value.*`']
+    ) == [' | %log_parser% | fieldA=~`(?i)value.*`']
 
 # Wildcarded searches may include other regex metacharacters - these need to be escaped to prevent them from being
 # used in the transformed query
@@ -226,7 +226,7 @@ def test_loki_wildcard_escape(loki_backend : LogQLBackend):
                     fieldA: ^v+[al]ue*$
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i)\\\\^v\\\\+\\\\[al\\\\]ue.*\\\\$`']
+    ) == [' | %log_parser% | fieldA=~`(?i)\\\\^v\\\\+\\\\[al\\\\]ue.*\\\\$`']
 
 def test_loki_wildcard_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -257,7 +257,7 @@ def test_loki_regex_query(loki_backend : LogQLBackend):
                     fieldB: foo
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`foo.*bar` and fieldB=`foo`']
+    ) == [' | %log_parser% | fieldA=~`foo.*bar` and fieldB=`foo`']
 
 def test_loki_field_startswith(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -272,7 +272,7 @@ def test_loki_field_startswith(loki_backend : LogQLBackend):
                     fieldA|startswith: foo
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i)foo.*`']
+    ) == [' | %log_parser% | fieldA=~`(?i)foo.*`']
 
 def test_loki_field_endswith(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -287,7 +287,7 @@ def test_loki_field_endswith(loki_backend : LogQLBackend):
                     fieldA|endswith: bar
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i).*bar`']
+    ) == [' | %log_parser% | fieldA=~`(?i).*bar`']
 
 def test_loki_field_contains(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -302,7 +302,7 @@ def test_loki_field_contains(loki_backend : LogQLBackend):
                     fieldA|contains: ooba
                 condition: sel
         """)
-    ) == [' | logfmt | fieldA=~`(?i).*ooba.*`']
+    ) == [' | %log_parser% | fieldA=~`(?i).*ooba.*`']
 
 def test_loki_cidr_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -317,7 +317,7 @@ def test_loki_cidr_query(loki_backend : LogQLBackend):
                     field|cidr: 192.168.0.0/16
                 condition: sel
         """)
-    ) == [' | logfmt | field=ip("192.168.0.0/16")']
+    ) == [' | %log_parser% | field=ip("192.168.0.0/16")']
 
 def test_loki_base64_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -332,7 +332,7 @@ def test_loki_base64_query(loki_backend : LogQLBackend):
                     field|base64: value
                 condition: sel
         """)
-    ) == [' | logfmt | field=`dmFsdWU=`']
+    ) == [' | %log_parser% | field=`dmFsdWU=`']
 
 def test_loki_base64offset_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -347,7 +347,7 @@ def test_loki_base64offset_query(loki_backend : LogQLBackend):
                     field|base64offset: value
                 condition: sel
         """)
-    ) == [' | logfmt | field=`dmFsdW` or field=`ZhbHVl` or field=`2YWx1Z`']
+    ) == [' | %log_parser% | field=`dmFsdW` or field=`ZhbHVl` or field=`2YWx1Z`']
 
 def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
       assert loki_backend.convert(
@@ -362,7 +362,7 @@ def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
                       field name: value
                   condition: sel
           """)
-      ) == [' | logfmt | _field_name=`value`']
+      ) == [' | %log_parser% | _field_name=`value`']
 
 
 def test_loki_unbound(loki_backend : LogQLBackend):
@@ -442,7 +442,7 @@ def test_loki_unbound_and_field(loki_backend : LogQLBackend):
                     field: valueB
                 condition: keywords and sel
         """)
-    ) == ['|= `valueA` | logfmt | field=`valueB`']
+    ) == ['|= `valueA` | %log_parser% | field=`valueB`']
 
 def test_loki_or_unbound_works(loki_backend : LogQLBackend):
     assert loki_backend.convert(

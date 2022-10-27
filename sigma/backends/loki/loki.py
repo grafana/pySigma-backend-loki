@@ -96,7 +96,7 @@ class LogQLBackend(TextQueryBackend):
     add_escaped     : ClassVar[str] = "\\"
     filter_chars    : ClassVar[str] = ""
 
-    field_query_prefix      : ClassVar[str] = " | logfmt | "
+    field_query_prefix      : ClassVar[str] = " | %log_parser% | "
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
     field_replace_pattern   : ClassVar[Pattern] = re.compile("[^a-zA-Z0-9_:]+")
     field_null_expression   : ClassVar[str] = "{field}=``"
