@@ -362,8 +362,37 @@ def test_loki_field_name_with_whitespace(loki_backend : LogQLBackend):
                       field name: value
                   condition: sel
           """)
-      ) == [' | logfmt | _field_name=`value`']
+      ) == [' | logfmt | field_name=`value`']
 
+def test_loki_field_name_leading_num(loki_backend : LogQLBackend):
+      assert loki_backend.convert(
+          SigmaCollection.from_yaml("""
+              title: Test
+              status: test
+              logsource:
+                  category: test_category
+                  product: test_product
+              detection:
+                  sel:
+                      0field: value
+                  condition: sel
+          """)
+      ) == [' | logfmt | _0field=`value`']
+
+def test_loki_field_name_invalid(loki_backend : LogQLBackend):
+      assert loki_backend.convert(
+          SigmaCollection.from_yaml("""
+              title: Test
+              status: test
+              logsource:
+                  category: test_category
+                  product: test_product
+              detection:
+                  sel:
+                      field.name@A-Z: value
+                  condition: sel
+          """)
+      ) == [' | logfmt | field_name_A_Z=`value`']
 
 def test_loki_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(

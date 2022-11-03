@@ -6,7 +6,7 @@ from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, Condition
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.types import SigmaCompareExpression, SigmaString, SigmaRegularExpression 
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
-from sigma.pipelines.loki import loki_log_parser
+# from sigma.pipelines.loki import loki_log_parser
 import sigma
 import re
 from yaml import dump
@@ -179,6 +179,24 @@ class LogQLBackend(TextQueryBackend):
         # default to logfmt - relevant for auditd, and many other applications
         return "logfmt"
 
+    def sanitize_label_key(self, key : str, isprefix : bool = True) -> str:
+        """Implements the logic used by Loki to sanitize labels.
+ 
+        See: https://github.com/grafana/loki/blob/main/pkg/logql/log/util.go#L21"""
+        # An empty key seems impossible to specify in Sigma, but left in for completeness
+        if key is None or len(key) == 0: # pragma: no cover
+            return ""
+        key = key.strip()
+        if len(key) == 0: # pragma: no cover
+            return key
+        if isprefix and key[0] >= '0' and key[0] <= '9':
+            key = "_" + key
+        return "".join(
+                (r
+                    if (r >= 'a' and r <= 'z') or (r >= 'A' and r <= 'Z') or r == '_' or (r >= '0' and r <= '9')
+                    else "_"
+            for r in key))
+
     # Overriding Sigma implementation: change behaviour for negated classes (as args aren't negated until they are converted)
     def compare_precedence(self, outer : ConditionItem, inner : ConditionItem) -> bool:
         outer_class = outer.__class__
@@ -268,7 +286,9 @@ class LogQLBackend(TextQueryBackend):
             expr.negate()
         return expr
 
-    def convert_condition_field_compare_op_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+    # Although implemented in pySigma, there does not currently seem to be a way of writing
+    # Sigma rules that incorporate (the negation of) comparison operations
+    def convert_condition_field_compare_op_val(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]: # pragma: no cover
         if self.is_negated(state):
             cond.value.op = LogQLBackend.negated_cmp_operator[cond.value.op]
         return super().convert_condition_field_compare_op_val(cond, state)
@@ -285,10 +305,7 @@ class LogQLBackend(TextQueryBackend):
     # invalid characters with underscores
     # TODO: we should instead ensure all fields are appropriately mapped
     def escape_and_quote_field(self, field_name: str) -> str:
-        if not self.field_quote_pattern.match(field_name):
-            # for the time being, simply replace the disallowed characters with underscores
-            field_name = "_" + self.field_replace_pattern.sub('_', field_name).strip('_')
-        return field_name
+        return self.sanitize_label_key(field_name)
 
     # Overriding Sigma implementing: swapping the meaning of "deferred" expressions so they appear at the start
     # of a query, rather than the end (since this is the recommended approach for LogQL)
@@ -298,7 +315,6 @@ class LogQLBackend(TextQueryBackend):
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
             query = " | " + self.select_log_parser(rule.logsource) + " | " + query
-            # query = self.field_query_prefix + query
         elif query is None:
             query = ""
         if state.has_deferred():
