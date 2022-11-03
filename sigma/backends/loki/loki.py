@@ -69,12 +69,12 @@ class LogQLBackend(TextQueryBackend):
     }
 
     negated_expr : ClassVar[Dict[str, str]] = {
-        "{field}=~`{regex}`"   : "{field}!~`{regex}`",
-        "{field}!~`{regex}`"   : "{field}=~`{regex}`",
-        'field=ip("{value}")'  : 'field!=ip("{value}")',
-        'field!=ip("{value}")' : 'field=ip("{value}")',
-        "{field}=``"           : '{field}!=``',
-        "{field}!=``"          : '{field}=``'
+        "{field}=~`{regex}`"     : "{field}!~`{regex}`",
+        "{field}!~`{regex}`"     : "{field}=~`{regex}`",
+        '{field}=ip("{value}")'  : '{field}!=ip("{value}")',
+        '{field}!=ip("{value}")' : '{field}=ip("{value}")',
+        "{field}=``"             : '{field}!=``',
+        "{field}!=``"            : '{field}=``'
     }
 
     # Operator precedence: tuple of Condition{AND,OR} in order of precedence.
@@ -109,7 +109,7 @@ class LogQLBackend(TextQueryBackend):
     re_escape : ClassVar[Tuple[str]] = ()
 
     # cidr expressions
-    cidr_expression : ClassVar[str] = 'field=ip("{value}")'
+    cidr_expression : ClassVar[str] = '{field}=ip("{value}")'
 
     compare_op_expression : ClassVar[str] = "{field}{operator}{value}"
     compare_operators : ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]] = {

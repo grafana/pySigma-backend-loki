@@ -155,12 +155,12 @@ def test_loki_not_all_query(loki_backend : LogQLBackend):
                 product: test_product
             detection:
                 sel:
-                    field|all:
+                    fieldA|all:
                         - valueA
                         - valueB
                 condition: not sel
         """)
-    ) == [' | logfmt | field!=`valueA` or field!=`valueB`']
+    ) == [' | logfmt | fieldA!=`valueA` or fieldA!=`valueB`']
 
 def test_loki_not_base64_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -172,10 +172,10 @@ def test_loki_not_base64_query(loki_backend : LogQLBackend):
                 product: test_product
             detection:
                 sel:
-                    field|base64: value
+                    fieldA|base64: value
                 condition: not sel
         """)
-    ) == [' | logfmt | field!=`dmFsdWU=`']
+    ) == [' | logfmt | fieldA!=`dmFsdWU=`']
 
 def test_loki_not_base64offset_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -187,10 +187,10 @@ def test_loki_not_base64offset_query(loki_backend : LogQLBackend):
                 product: test_product
             detection:
                 sel:
-                    field|base64offset: value
+                    fieldA|base64offset: value
                 condition: not sel
         """)
-    ) == [' | logfmt | field!=`dmFsdW` and field!=`ZhbHVl` and field!=`2YWx1Z`']
+    ) == [' | logfmt | fieldA!=`dmFsdW` and fieldA!=`ZhbHVl` and fieldA!=`2YWx1Z`']
 
 # Testing different search identifiers
 def test_loki_not_null(loki_backend : LogQLBackend):
@@ -280,10 +280,10 @@ def test_loki_not_cidr_query(loki_backend : LogQLBackend):
                 product: test_product
             detection:
                 sel:
-                    field|cidr: 192.168.0.0/16
+                    fieldA|cidr: 192.168.0.0/16
                 condition: not sel
         """)
-    ) == [' | logfmt | field!=ip("192.168.0.0/16")']
+    ) == [' | logfmt | fieldA!=ip("192.168.0.0/16")']
 
 def test_loki_not_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -359,10 +359,10 @@ def test_loki_not_unbound_or_field(loki_backend : LogQLBackend):
                 keywords:
                     valueA
                 sel:
-                    field: valueB
+                    fieldA: valueB
                 condition: not (keywords or sel)
         """)
-    ) == ['!= `valueA` | logfmt | field!=`valueB`']
+    ) == ['!= `valueA` | logfmt | fieldA!=`valueB`']
 
 def test_loki_not_unbound_and_field(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
@@ -377,7 +377,7 @@ def test_loki_not_unbound_and_field(loki_backend : LogQLBackend):
                     keywords:
                         valueA
                     sel:
-                        field: valueB
+                        fieldA: valueB
                     condition: not (keywords and sel)
             """)
         )
