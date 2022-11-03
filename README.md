@@ -26,7 +26,6 @@ These features are currently either WIP or are planned to be implemented in the 
 
 * Adding generic log stream selectors to all queries
 * Generating more accurate log stream selectors based on logsource
-* Where relevant, use parsers other than `logfmt` (i.e., JSON, pattern?)
 * Translate field names in Sigma signatures into relevant labels for Loki
 
 ## Won't implement (probably)
