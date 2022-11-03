@@ -508,6 +508,36 @@ def test_loki_multi_or_unbound(loki_backend : LogQLBackend):
         """)
     ) == ['|~ `valueA|valueB` |~ `valueC|valueD`']
 
+def test_loki_windows_logsource(loki_backend : LogQLBackend):
+      assert loki_backend.convert(
+          SigmaCollection.from_yaml("""
+              title: Test
+              status: test
+              logsource:
+                  category: test_category
+                  product: windows
+              detection:
+                  sel:
+                      key1.key2: value
+                  condition: sel
+          """)
+      ) == [' | json | key1_key2=`value`']
+
+def test_loki_azure_logsource(loki_backend : LogQLBackend):
+      assert loki_backend.convert(
+          SigmaCollection.from_yaml("""
+              title: Test
+              status: test
+              logsource:
+                  category: test_category
+                  product: azure
+              detection:
+                  sel:
+                      key1.key2: value
+                  condition: sel
+          """)
+      ) == [' | json | key1_key2=`value`']
+
 # Unimplemented tests
 def test_loki_unbound_or_field(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
