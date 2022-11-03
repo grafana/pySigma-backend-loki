@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from sigma.conversion.state import ConversionState
-from sigma.rule import SigmaRule
+from sigma.rule import SigmaRule, SigmaLogSource
 from sigma.conversion.base import TextQueryBackend
 from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, ConditionNOT, ConditionFieldEqualsValueExpression, ConditionValueExpression
 from sigma.conversion.deferred import DeferredQueryExpression
-from sigma.types import SigmaCompareExpression, SigmaString, SigmaRegularExpression
+from sigma.types import SigmaCompareExpression, SigmaString, SigmaRegularExpression 
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
-# from sigma.pipelines.loki import # TODO: add pipeline imports or delete this line
+from sigma.pipelines.loki import loki_log_parser
 import sigma
 import re
 from yaml import dump
@@ -96,7 +96,6 @@ class LogQLBackend(TextQueryBackend):
     add_escaped     : ClassVar[str] = "\\"
     filter_chars    : ClassVar[str] = ""
 
-    field_query_prefix      : ClassVar[str] = " | %log_parser% | "
     field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
     field_replace_pattern   : ClassVar[Pattern] = re.compile("[^a-zA-Z0-9_:]+")
     field_null_expression   : ClassVar[str] = "{field}=``"
@@ -160,6 +159,25 @@ class LogQLBackend(TextQueryBackend):
 
     def is_negated(self, state : ConversionState) -> bool:
         return state.processing_state.get('not_count', 0) % 2 == 1
+
+    def select_log_parser(self, logsource : SigmaLogSource):
+        # TODO: this currently supports two commonly used formats - more advanced parser formats would
+        # be required/more efficient for other sources
+        if logsource.product in ("windows", "azure", "zeek"):
+            # Most Windows log data comes from EventLog, and both Promtail and FluentD exporters produce
+            # JSON output for Loki. 
+            # Azure log data also arrives in Loki in JSON format, via the Logstash exporter 
+            # - Note: if you are using the Azure data source in Grafana, the query language is Kusto QL
+            # Zeek's default log file format (TSV) is not clearly supported by promtail/loki - but
+            # fortunately Zeek also offers a JSON format alternative.
+            # See:
+            #  - https://grafana.com/docs/loki/latest/clients/promtail/scraping/#windows-event-log
+            #  - https://blog.e-mundo.de/post/painless-and-secure-windows-event-log-delivery-with-fluent-bit-loki-and-grafana/
+            #  - https://www.elastic.co/guide/en/logstash/current/plugins-inputs-azure_event_hubs.html
+            #  - https://docs.zeek.org/en/master/log-formats.html#zeek-json-format-logs
+            return "json"
+        # default to logfmt - relevant for auditd, and many other applications
+        return "logfmt"
 
     # Overriding Sigma implementation: change behaviour for negated classes (as args aren't negated until they are converted)
     def compare_precedence(self, outer : ConditionItem, inner : ConditionItem) -> bool:
@@ -278,7 +296,9 @@ class LogQLBackend(TextQueryBackend):
         if isinstance(query, DeferredQueryExpression):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
-            query = self.field_query_prefix + query
+            # selecting an appropriate log parser to use
+            query = " | " + self.select_log_parser(rule.logsource) + " | " + query
+            # query = self.field_query_prefix + query
         elif query is None:
             query = ""
         if state.has_deferred():
@@ -289,6 +309,7 @@ class LogQLBackend(TextQueryBackend):
                 ) + query
             # Since we've already processed the deferred parts, we can clear them
             state.deferred.clear()
+
         return super().finalize_query(rule, query, index, state, output_format)
     
     def finalize_query_default(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
