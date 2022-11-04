@@ -182,6 +182,14 @@ class LogQLBackend(TextQueryBackend):
         # default to logfmt - relevant for auditd, and many other applications
         return "logfmt"
 
+    def select_log_stream(self, logsource : SigmaLogSource):
+        if logsource.product == "windows":
+            return '{job=~"eventlog|winlog|windows|fluentbit.*"}'
+        if logsource.product == "azure":
+            return '{job="logstash"}'
+        # By default, bring back all log streams
+        return '{job=~".*"}'
+
     def sanitize_label_key(self, key : str, isprefix : bool = True) -> str:
         """Implements the logic used by Loki to sanitize labels.
  
@@ -338,7 +346,7 @@ class LogQLBackend(TextQueryBackend):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
-            query = " | " + self.select_log_parser(rule.logsource) + " | " + query
+            query = "| " + self.select_log_parser(rule.logsource) + " | " + query
         elif query is None:
             query = ""
         if state.has_deferred():
@@ -346,10 +354,11 @@ class LogQLBackend(TextQueryBackend):
                         deferred_expression.finalize_expression()
                         for deferred_expression in state.deferred
                     ) 
-                ) + query
+                ) + (" " + query if len(query) > 0 else "")
             # Since we've already processed the deferred parts, we can clear them
             state.deferred.clear()
-
+        # Select an appropriate source based on the logsource
+        query = self.select_log_stream(rule.logsource) + " " + query
         return super().finalize_query(rule, query, index, state, output_format)
     
     def finalize_query_default(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
