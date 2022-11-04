@@ -266,7 +266,17 @@ class LogQLBackend(TextQueryBackend):
         if unbound_deferred_or is not None:
             return unbound_deferred_or
         else:
-            return super().convert_condition_or(cond, state)
+            joiner = self.token_separator + self.or_token + self.token_separator
+
+            return joiner.join((
+                    converted
+                    for converted in (
+                        self.convert_condition(arg, state) if self.compare_precedence(cond, arg)
+                        else self.convert_condition_group(arg, state)
+                        for arg in cond.args
+                    )
+                    if converted is not None and not isinstance(converted, DeferredQueryExpression) and len(converted) > 0
+                ))
 
     # Overriding Sigma implementation: LogQL does not support OR'd AND'd unbounded conditions
     def convert_condition_and(self, cond: ConditionAND, state: ConversionState) -> Union[str, DeferredQueryExpression]:
@@ -276,7 +286,17 @@ class LogQLBackend(TextQueryBackend):
             for arg in cond.args:
                 if isinstance(arg, ConditionValueExpression):
                     raise SigmaFeatureNotSupportedByBackendError("Operator 'or' not supported by the backend for unbound conditions combined with 'and'", source=cond.source)
-        return super().convert_condition_and(cond, state)
+        joiner = self.token_separator + self.and_token + self.token_separator
+        return joiner.join((
+                converted
+                for converted in (
+                    self.convert_condition(arg, state) if self.compare_precedence(cond, arg)
+                    else self.convert_condition_group(arg, state)
+                    for arg in cond.args
+                )
+                if converted is not None and not isinstance(converted, DeferredQueryExpression) and len(converted) > 0
+            ))
+        # return super().convert_condition_and(cond, state)
     
     # Overriding Sigma implementation: LogQL does not support wildcards - so convert them into regular expressions
     def convert_condition_field_eq_val_str(self, cond: ConditionFieldEqualsValueExpression, state: ConversionState) -> Union[str, DeferredQueryExpression]:

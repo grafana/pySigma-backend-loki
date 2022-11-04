@@ -55,7 +55,7 @@ def test_loki_and_expression(loki_backend : LogQLBackend):
         """)
     ) == ['{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB`']
 
-def test_loki_field_and_unbound_expression(loki_backend : LogQLBackend):
+def test_loki_field_and_unbound_group_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
             title: Test
