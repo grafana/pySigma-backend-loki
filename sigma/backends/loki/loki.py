@@ -136,6 +136,10 @@ class LogQLBackend(TextQueryBackend):
         """Convert a SigmaString value that (probably) contains wildcards into a regular expression"""
         return SigmaRegularExpression('(?i)'+re.escape(str(value)).replace('\\?', '.').replace('\\*', '.*'))
 
+    def convert_value_re(self, r : SigmaRegularExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        """Loki does not need to do any additional escaping for regular expressions"""
+        return r.regexp
+
     # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
     def convert_condition_not(self, cond : ConditionNOT, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of NOT conditions through application of De Morgan's laws."""
@@ -188,7 +192,7 @@ class LogQLBackend(TextQueryBackend):
         if logsource.product == "azure":
             return '{job="logstash"}'
         # By default, bring back all log streams
-        return '{job=~".*"}'
+        return '{job=~".+"}'
 
     def sanitize_label_key(self, key : str, isprefix : bool = True) -> str:
         """Implements the logic used by Loki to sanitize labels.
