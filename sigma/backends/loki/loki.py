@@ -36,7 +36,12 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         return self
 
     def finalize_expression(self) -> str:
-        return f"{self.op} `{'|'.join((re.escape(str(val)) for val in self.exprs))}`"
+        or_value = '|'.join((re.escape(str(val)) for val in self.exprs))
+        if '`' in or_value:
+            or_value = '"' + SigmaRegularExpression(or_value).escape('"') + '"'
+        else:
+            or_value = '`' + or_value + '`'
+        return f"{self.op} {or_value}"
 
 class LogQLBackend(TextQueryBackend):
     """Loki LogQL query backend. Generates LogQL queries as described in the Loki documentation:
@@ -69,8 +74,8 @@ class LogQLBackend(TextQueryBackend):
     }
 
     negated_expr : ClassVar[Dict[str, str]] = {
-        "{field}=~`{regex}`"     : "{field}!~`{regex}`",
-        "{field}!~`{regex}`"     : "{field}=~`{regex}`",
+        "{field}=~{regex}"       : "{field}!~{regex}",
+        "{field}!~{regex}"       : "{field}=~{regex}",
         '{field}=ip("{value}")'  : '{field}!=ip("{value}")',
         '{field}!=ip("{value}")' : '{field}=ip("{value}")',
         "{field}=``"             : '{field}!=``',
@@ -89,13 +94,11 @@ class LogQLBackend(TextQueryBackend):
     eq_token : ClassVar[str] = "="  # Token inserted between field and value (without separator)
 
     # Rather than picking between "s and `s, defaulting to `s
-    # TODO: validate the escape char and filter chars
     str_quote       : ClassVar[str] = '`'
     escape_char     : ClassVar[str] = "\\"
     add_escaped     : ClassVar[str] = "\\"
     filter_chars    : ClassVar[str] = ""
 
-    field_quote_pattern     : ClassVar[Pattern] = re.compile("^[a-zA-Z_:][a-zA-Z0-9_:]*$")
     field_replace_pattern   : ClassVar[Pattern] = re.compile("[^a-zA-Z0-9_:]+")
     field_null_expression   : ClassVar[str] = "{field}=``"
 
@@ -104,7 +107,7 @@ class LogQLBackend(TextQueryBackend):
     wildcard_single : ClassVar[str] = "?"     # Character used as single-character wildcard (replaced with .)
 
     # Regular expressions
-    re_expression : ClassVar[str] = "{field}=~`{regex}`"
+    re_expression : ClassVar[str] = "{field}=~{regex}"
     re_escape_char : ClassVar[str] = "\\"
     re_escape : ClassVar[Tuple[str]] = ()
 
@@ -122,13 +125,15 @@ class LogQLBackend(TextQueryBackend):
     # See https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression
     unbound_value_str_expression : ClassVar[str] = '{value}'
     unbound_value_num_expression : ClassVar[str] = '{value}'
-    unbound_value_re_expression : ClassVar[str] = '`{value}`'
+    unbound_value_re_expression : ClassVar[str] = '{value}'
     # not clearly supported by Sigma?
     unbound_value_cidr_expression : ClassVar[str] = '| ip("{value}")'
 
     deferred_start : ClassVar[str] = ''
     deferred_separator : ClassVar[str] = ' '
     deferred_only_query : ClassVar[str] = ''
+
+    # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
 
     # When converting values to regexes, we need to escape the string to prevent use of non-wildcard metacharacters
     # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
@@ -137,10 +142,11 @@ class LogQLBackend(TextQueryBackend):
         return SigmaRegularExpression('(?i)'+re.escape(str(value)).replace('\\?', '.').replace('\\*', '.*'))
 
     def convert_value_re(self, r : SigmaRegularExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
-        """Loki does not need to do any additional escaping for regular expressions"""
-        return r.regexp
+        """Loki does not need to do any additional escaping for regular expressions if we can use the tilde character"""
+        if '`' in r.regexp:
+            return '"' + r.escape('"') + '"'
+        return '`' + r.regexp + '`'
 
-    # Documentation: https://sigmahq-pysigma.readthedocs.io/en/latest/Backends.html
     def convert_condition_not(self, cond : ConditionNOT, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of NOT conditions through application of De Morgan's laws."""
         state.processing_state['not_count'] = state.processing_state.get('not_count', 0) + 1
@@ -331,7 +337,7 @@ class LogQLBackend(TextQueryBackend):
 
     def convert_condition_val_re(self, cond : ConditionValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Convert unbound regular expression queries into deferred line filters."""
-        expr = LogQLDeferredUnboundExpression(state, self.quote_string(self.convert_value_re(cond.value, state)), "|~")
+        expr = LogQLDeferredUnboundExpression(state, self.convert_value_re(cond.value, state), "|~")
         if self.is_negated(state):
             expr.negate()
         return expr
@@ -355,11 +361,25 @@ class LogQLBackend(TextQueryBackend):
         ], cond.source)
         return self.convert_condition(or_cond, state)
 
-    # Overriding Sigma implementation - Loki has strict rules about field (label) names, so for now we will replace 
-    # invalid characters with underscores
+    # Overriding Sigma implementation - Loki has strict rules about field (label) names, so use their rules
     def escape_and_quote_field(self, field_name: str) -> str:
         """Use Loki's sanitize function to ensure the field name is appropriately escaped."""
         return self.sanitize_label_key(field_name)
+
+    # Overriding Sigma implementation - if a string doesn't contain a tilde character, easier to use it to quote strings,
+    # otherwise we will default to using a double quote character, and escape the string appropriately
+    def convert_value_str(self, s : SigmaString, state : ConversionState) -> str:
+        """By default, use the tilde character to quote fields, which needs limited escaping. If the value contains
+        a tilde character, use double quotes and apply more rigourous escaping."""
+        quote = '`'
+        if any([c == quote for c in s]):
+            quote = '"'
+        # If our string doesn't contain any tilde characters
+        if quote == '`':
+            converted = s.convert()
+        else:
+            converted = s.convert(escape_char='\\', add_escaped='"\\')
+        return quote + converted + quote
 
     # Overriding Sigma implementing: swapping the meaning of "deferred" expressions so they appear at the start
     # of a query, rather than the end (since this is the recommended approach for LogQL)

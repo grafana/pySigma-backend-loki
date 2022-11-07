@@ -23,6 +23,36 @@ def test_loki_field_eq(loki_backend : LogQLBackend):
         """)
     ) == ['{job=~".+"} | logfmt | fieldA=`valueA`']
 
+def test_loki_field_eq_tilde(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: value`A
+                condition: sel
+        """)
+    ) == ['{job=~".+"} | logfmt | fieldA="value`A"']
+
+def test_loki_field_eq_tilde_double_quote(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: v"alue`A
+                condition: sel
+        """)
+    ) == ['{job=~".+"} | logfmt | fieldA="v\\"alue`A"']
+
 def test_loki_field_eq_num(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
@@ -277,6 +307,36 @@ def test_loki_regex_query(loki_backend : LogQLBackend):
                 condition: sel
         """)
     ) == ['{job=~".+"} | logfmt | fieldA=~`foo.*bar` and fieldB=`foo`']
+
+def test_loki_field_re_tilde(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|re: value`A
+                condition: sel
+        """)
+    ) == ['{job=~".+"} | logfmt | fieldA=~"value`A"']
+
+def test_loki_field_re_tilde_double_quote(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|re: v"alue`A
+                condition: sel
+        """)
+    ) == ['{job=~".+"} | logfmt | fieldA=~"v\\"alue`A"']
 
 def test_loki_field_startswith(loki_backend : LogQLBackend):
     assert loki_backend.convert(
