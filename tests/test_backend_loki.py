@@ -7,7 +7,7 @@ from sigma.backends.loki import LogQLBackend
 def loki_backend():
     return LogQLBackend()
 
-# Simple field equality test
+# Testing field filters
 def test_loki_field_eq(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
@@ -84,25 +84,6 @@ def test_loki_and_expression(loki_backend : LogQLBackend):
                 condition: sel
         """)
     ) == ['{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB`']
-
-def test_loki_field_and_unbound_group_expression(loki_backend : LogQLBackend):
-    assert loki_backend.convert(
-        SigmaCollection.from_yaml("""
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA: valueA
-                keywords1:
-                    valueB
-                keywords2:
-                    valueC
-                condition: sel and (keywords1 and keywords2)
-        """)
-    ) == ['{job=~".+"} |= `valueB` |= `valueC` | logfmt | fieldA=`valueA`']
 
 def test_loki_or_expression(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -276,21 +257,6 @@ def test_loki_wildcard_escape(loki_backend : LogQLBackend):
                 condition: sel
         """)
     ) == ['{job=~".+"} | logfmt | fieldA=~`(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$`']
-
-def test_loki_wildcard_unbound(loki_backend : LogQLBackend):
-    assert loki_backend.convert(
-        SigmaCollection.from_yaml("""
-            title: test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                keywords:
-                    - va?ue*
-                condition: keywords
-        """)
-    ) == ['{job=~".+"} |~ `(?i)va.ue.*`']
 
 def test_loki_regex_query(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -473,6 +439,7 @@ def test_loki_field_name_invalid(loki_backend : LogQLBackend):
           """)
       ) == ['{job=~".+"} | logfmt | field_name_A_Z=`value`']
 
+# Testing unbound keyword line filters
 def test_loki_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
@@ -513,10 +480,10 @@ def test_loki_unbound_re_wildcard(loki_backend : LogQLBackend):
                 product: test_product
             detection:
                 keywords:
-                    value*
+                    va?ue*
                 condition: keywords
         """)
-    ) == ['{job=~".+"} |~ `(?i)value.*`']
+    ) == ['{job=~".+"} |~ `(?i)va.ue.*`']
 
 def test_loki_and_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -535,24 +502,7 @@ def test_loki_and_unbound(loki_backend : LogQLBackend):
         """)
     ) == ['{job=~".+"} |= `valueA` |= `valueB`']
 
-def test_loki_unbound_and_field(loki_backend : LogQLBackend):
-    assert loki_backend.convert(
-        SigmaCollection.from_yaml("""
-            title: test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                keywords:
-                    valueA
-                sel:
-                    fieldA: valueB
-                condition: keywords and sel
-        """)
-    ) == ['{job=~".+"} |= `valueA` | logfmt | fieldA=`valueB`']
-
-def test_loki_or_unbound_works(loki_backend : LogQLBackend):
+def test_loki_or_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml("""
             title: Test
@@ -567,6 +517,22 @@ def test_loki_or_unbound_works(loki_backend : LogQLBackend):
                 condition: keywords
         """)
     ) == ['{job=~".+"} |~ `valueA|valueB`']
+
+def test_loki_or_unbound_tilde_double_quote(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    - value`A
+                    - value"B
+                condition: keywords
+        """)
+    ) == ['{job=~".+"} |~ "value`A|value\\"B"']
 
 def test_loki_multi_or_unbound(loki_backend : LogQLBackend):
     assert loki_backend.convert(
@@ -587,6 +553,44 @@ def test_loki_multi_or_unbound(loki_backend : LogQLBackend):
         """)
     ) == ['{job=~".+"} |~ `valueA|valueB` |~ `valueC|valueD`']
 
+# Testing both field filters and unbound line filters
+def test_loki_field_and_unbound(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    valueA
+                sel:
+                    fieldA: valueB
+                condition: keywords and sel
+        """)
+    ) == ['{job=~".+"} |= `valueA` | logfmt | fieldA=`valueB`']
+
+def test_loki_field_and_unbound_group_expression(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: valueA
+                keywords1:
+                    valueB
+                keywords2:
+                    valueC
+                condition: sel and (keywords1 and keywords2)
+        """)
+    ) == ['{job=~".+"} |= `valueB` |= `valueC` | logfmt | fieldA=`valueA`']
+
+# Testing specific logsources
 def test_loki_windows_logsource(loki_backend : LogQLBackend):
       assert loki_backend.convert(
           SigmaCollection.from_yaml("""
@@ -617,7 +621,7 @@ def test_loki_azure_logsource(loki_backend : LogQLBackend):
           """)
       ) == ['{job="logstash"} | json | key1_key2=`value`']
 
-# Unimplemented tests
+# Tests for unimplemented/unsupported features
 def test_loki_unbound_or_field(loki_backend : LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
         test = loki_backend.convert(
