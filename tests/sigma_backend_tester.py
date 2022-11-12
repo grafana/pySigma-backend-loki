@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 from sigma.backends.loki import LogQLBackend
+from sigma.pipelines.loki import loki_log_parser
 from sigma.collection import SigmaCollection
 from sigma.rule import SigmaError, SigmaDetection
 from pprint import pp
@@ -32,7 +33,7 @@ args = parser.parse_args()
 
 rule_path = args.signature_path
 
-backend = LogQLBackend()
+backend = LogQLBackend(processing_pipeline=loki_log_parser())
 counters = {
         'parse_error': 0,
         'convert_error': 0,
