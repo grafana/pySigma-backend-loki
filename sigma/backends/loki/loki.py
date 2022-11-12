@@ -401,6 +401,9 @@ class LogQLBackend(TextQueryBackend):
                 ) + (" " + query if len(query) > 0 else "")
             # Since we've already processed the deferred parts, we can clear them
             state.deferred.clear()
+        if rule.fields and len(rule.fields) > 0:
+            line_fmt_fields = ' '.join('{{.' + self.sanitize_label_key(field) + '}}' for field in rule.fields)
+            query = query + f" | line_format \"{line_fmt_fields}\"" 
         # Select an appropriate source based on the logsource
         query = self.select_log_stream(rule.logsource) + " " + query
         return super().finalize_query(rule, query, index, state, output_format)

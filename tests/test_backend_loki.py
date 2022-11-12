@@ -590,7 +590,7 @@ def test_loki_field_and_unbound_group_expression(loki_backend : LogQLBackend):
         """)
     ) == ['{job=~".+"} |= `valueB` |= `valueC` | logfmt | fieldA=`valueA`']
 
-# Testing specific logsources
+# Testing specific logsources and other Sigma features
 def test_loki_windows_logsource(loki_backend : LogQLBackend):
       assert loki_backend.convert(
           SigmaCollection.from_yaml("""
@@ -620,6 +620,25 @@ def test_loki_azure_logsource(loki_backend : LogQLBackend):
                   condition: sel
           """)
       ) == ['{job="logstash"} | json | key1_key2=`value`']
+
+def test_loki_fields(loki_backend : LogQLBackend):
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml("""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: valueA
+                    fieldB: valueB
+                condition: sel
+            fields:
+                - fieldA
+                - fieldB
+        """)
+    ) == ['{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB` | line_format "{{.fieldA}} {{.fieldB}}"']
 
 # Tests for unimplemented/unsupported features
 def test_loki_unbound_or_field(loki_backend : LogQLBackend):
