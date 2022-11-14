@@ -11,10 +11,9 @@ It supports the following output formats:
 * default: plain Loki LogQL queries
 * ruler: creates Loki LogQL queries in the ruler (YAML) format for generating alerts
 
-Further, it *will* contain the processing pipelines in `sigma.pipelines.loki`:
+Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
-* pipeline1: purpose
-* pipeline2: purpose
+* loki\_log\_parser: converts field names to logfmt labels used by Grafana
 
 This backend is currently maintained by:
 
@@ -24,9 +23,11 @@ This backend is currently maintained by:
 
 These features are currently either WIP or are planned to be implemented in the near future.
 
-* Adding generic log stream selectors to all queries
+* Various processing pipelines for other applications and log sources
+* Some generated queries are too large for Loki - such rules could be factored into multiple queries
+* Analysing a rule's searches to identify line filters that could improve the query performance
 * Generating more accurate log stream selectors based on logsource
-* Translate field names in Sigma signatures into relevant labels for Loki
+* Translate field names in Sigma signatures into relevant labels for Loki using pipelines
 
 ## Won't implement (probably)
 
