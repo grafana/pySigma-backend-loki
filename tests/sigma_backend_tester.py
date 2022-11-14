@@ -19,13 +19,13 @@ parser.add_argument('signature_path',
 parser.add_argument('-c', '--counts', action='store_true',
         help='Produce counts of the numbers of signatures processed and counts of successes/fails, along with error counts')
 parser.add_argument('-p', '--print', action='store_true',
-        help='Print the query(s) that were generated for the backend')
+        help='Print the query(s) that were generated for the backend, and validation stdout if applicable')
 parser.add_argument('-s', '--summarize', action='store_true',
         help='Produce a summary of the processed signature\'s log source information')
 parser.add_argument('-t', '--tests', type=str,
         help="""A path to either a single test log file or a directory containing one or more test log files, used during the validation of the generated rule(s). If a path to a directory is provided, this script will look for .log files with the same directory structure of the signature_path (i.e., if there is a rules/bad.yml file within signature_path, the script will look for a rules/bad.log file within the path specified in tests)""")
 parser.add_argument('-v', '--validate', action='store_true', 
-        help='Validate the generated rule(s) through the backend engine, printing the stdout results')
+        help='Validate the generated rule(s) through the backend engine, where one or more lines of stdout denotes a successful validation')
 parser.add_argument('-u', '--unique', action='store_true',
         help='Print the unique types and messages of errors that occur during the process')
 
@@ -58,7 +58,10 @@ def validate_with_backend(query, test_file=subprocess.DEVNULL):
         test_file = subprocess.DEVNULL
     result = subprocess.run(["logcli", "--stdin", "query", query],
             stdin=test_file, capture_output=True)
-    return (result.returncode, result.stdout, result.stderr)
+    stdout = result.stdout.decode()
+    stderr = result.stderr.decode()
+    # For now, we will assume that if logcli produces one or more lines of stdout, we have validated the query
+    return (result.returncode, stdout, stderr, stdout.count(os.linesep) > 0)
 
 def find_all_detection_items(detection, acc):
     for value in detection.detection_items:
@@ -107,12 +110,12 @@ def process_file(file_path, test_file, args, counters):
                     if args.print:
                         print(loki_query)
                     if args.validate:
-                        (returncode, stdout, stderr) = validate_with_backend(loki_query, test_file)
+                        (returncode, stdout, stderr, valid) = validate_with_backend(loki_query, test_file)
                         if returncode != 0:
                             counters['validate_error'] += 1
-                        else:
+                        elif valid:
                             counters['validate_success'] += 1
-                        if len(stdout) > 0:
+                        if args.print and len(stdout) > 0:
                             print(stdout)
                         if args.unique and len(stderr) > 0:
                             counters['validate_stderr'][stderr] = counters['validate_stderr'].get(stderr, 0) + 1
