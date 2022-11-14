@@ -172,6 +172,8 @@ elif os.path.isdir(rule_path):
                     counters['total_test_logs'] += 1
                 else:
                     test_file = None
+            elif test_file:
+                test_file.seek(0) # reset the stream position each time
             process_file(rule_file_path, test_file, args, counters)
 else:
     print(f"Could not find rule file/directory: {rule_path}")
