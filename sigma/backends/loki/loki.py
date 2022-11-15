@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import ClassVar, Dict, List, Pattern, Tuple, Union
+from typing import Any, ClassVar, Dict, List, Optional, Pattern, Tuple, Union
 
 from sigma.conditions import (
     ConditionAND,
@@ -133,7 +133,7 @@ class LogQLBackend(TextQueryBackend):
     # Regular expressions
     re_expression: ClassVar[str] = "{field}=~{regex}"
     re_escape_char: ClassVar[str] = "\\"
-    re_escape: ClassVar[Tuple[str]] = ()
+    re_escape: ClassVar[Optional[Tuple[str]]] = None
 
     # cidr expressions
     cidr_expression: ClassVar[str] = '{field}=ip("{value}")'
@@ -551,12 +551,12 @@ class LogQLBackend(TextQueryBackend):
     ) -> str:
         return query
 
-    def finalize_output_default(self, queries: List[str]) -> str:
+    def finalize_output_default(self, queries: List[str]) -> List[str]:
         return list(queries)
 
     def finalize_query_ruler(
         self, rule: SigmaRule, query: str, index: int, state: ConversionState
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Use information from the Sigma rule to produce human readable information for
         an alert."""
         alert = self.field_replace_pattern.sub("_", rule.title).strip("_")
@@ -567,10 +567,10 @@ class LogQLBackend(TextQueryBackend):
             "labels": {},
         }
         if rule.level:
-            ruler["labels"]["severity"] = rule.level.name.lower()
+            ruler["labels"]["severity"] = rule.level.name.lower()  # type: ignore
         return ruler
 
-    def finalize_output_ruler(self, queries: List[Dict[str, any]]) -> str:
+    def finalize_output_ruler(self, queries: List[Dict[str, Any]]) -> str:
         """Produce a collection of alert queries bundled together in a single Loki ruler
         YAML format."""
         rules = {"groups": [{"name": "Sigma rules", "rules": queries}]}

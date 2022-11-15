@@ -3,6 +3,7 @@ import collections
 import operator
 import os
 import subprocess
+from typing import Any, Dict
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
@@ -59,7 +60,7 @@ args = parser.parse_args()
 rule_path = args.signature_path
 
 backend = LogQLBackend(processing_pipeline=loki_log_parser())
-counters = {
+counters: Dict[str, Any] = {
     "parse_error": 0,
     "convert_error": 0,
     "validate_error": 0,
