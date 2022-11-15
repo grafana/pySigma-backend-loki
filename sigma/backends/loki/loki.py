@@ -14,8 +14,6 @@ from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.types import SigmaCompareExpression, SigmaString, SigmaRegularExpression
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 
-# from sigma.pipelines.loki import loki_log_parser
-import sigma
 import re
 from yaml import dump
 from typing import ClassVar, Dict, Tuple, Pattern, List, Union
