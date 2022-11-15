@@ -550,7 +550,7 @@ def test_loki_not_multi_or_unbound(loki_backend: LogQLBackend):
         )
 
 
-def test_loki_not_or_unbound(loki_backend: LogQLBackend):
+def test_loki_not_or_unbound_1(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(
@@ -568,7 +568,7 @@ def test_loki_not_or_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `valueA` |= `valueB`']
+        == ['{job=~".+"} != `valueA` != `valueB`']
     )
 
 
@@ -638,7 +638,7 @@ def test_loki_field_and_not_multi_unbound_expression(loki_backend: LogQLBackend)
     )
 
 
-def test_loki_not_or_unbound(loki_backend: LogQLBackend):
+def test_loki_not_or_unbound_2(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(
