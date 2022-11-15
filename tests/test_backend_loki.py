@@ -335,8 +335,8 @@ def test_loki_wildcard_multi(loki_backend: LogQLBackend):
     )
 
 
-# Wildcarded searches may include other regex metacharacters - these need to be escaped to prevent them from being
-# used in the transformed query
+# Wildcarded searches may include other regex metacharacters -
+# these need to be escaped to prevent them from being used in the transformed query
 def test_loki_wildcard_escape(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(

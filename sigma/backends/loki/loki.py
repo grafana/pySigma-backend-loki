@@ -104,9 +104,8 @@ class LogQLBackend(TextQueryBackend):
         ConditionAND,
         ConditionOR,
     )
-    group_expression: ClassVar[
-        str
-    ] = "({expr})"  # Expression for precedence override grouping as format string with {expr} placeholder
+    # Expression for precedence override grouping as format string with {expr} placeholder
+    group_expression: ClassVar[str] = "({expr})"
 
     # Generated query tokens
     token_separator: str = " "  # separator inserted between all boolean operators
@@ -161,8 +160,10 @@ class LogQLBackend(TextQueryBackend):
     deferred_only_query: ClassVar[str] = ""
 
     # Loki-specific functions
-    # When converting values to regexes, we need to escape the string to prevent use of non-wildcard metacharacters
-    # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive, we also prepend with (?i)
+    # When converting values to regexes, we need to escape the string to prevent use of
+    # non-wildcard metacharacters
+    # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive,
+    # we also prepend with (?i)
     def convert_wildcard_to_re(self, value: SigmaString) -> SigmaRegularExpression:
         """Convert a SigmaString value that contains wildcards into a regular expression"""
         return SigmaRegularExpression(
@@ -170,15 +171,17 @@ class LogQLBackend(TextQueryBackend):
         )
 
     def select_log_parser(self, logsource: SigmaLogSource):
-        """Select a relevant log parser based on common approaches to ingesting data into Loki. Currently
-        defaults to logfmt, but will use the json parser for Windows, Azure and Zeek signatures."""
-        # TODO: this currently supports two commonly used formats - more advanced parser formats would
-        # be required/more efficient for other sources
+        """Select a relevant log parser based on common approaches to ingesting data into Loki.
+        Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
+        signatures."""
+        # TODO: this currently supports two commonly used formats -
+        # more advanced parser formats would be required/more efficient for other sources
         if logsource.product in ("windows", "azure", "zeek"):
-            # Most Windows log data comes from EventLog, and both Promtail and FluentD exporters produce
-            # JSON output for Loki.
+            # Most Windows log data comes from EventLog, and both Promtail and FluentD
+            # exporters produce JSON output for Loki.
             # Azure log data also arrives in Loki in JSON format, via the Logstash exporter
-            # - Note: if you are using the Azure data source in Grafana, the query language is Kusto QL
+            # - Note: if you are using the Azure data source in Grafana, the query language
+            # is Kusto QL
             # Zeek's default log file format (TSV) is not clearly supported by promtail/loki - but
             # fortunately Zeek also offers a JSON format alternative.
             # See:
@@ -191,8 +194,8 @@ class LogQLBackend(TextQueryBackend):
         return "logfmt"
 
     def select_log_stream(self, logsource: SigmaLogSource):
-        """Select a logstream based on the logsource information included within a rule and following the assumptions
-        described in select_log_parser."""
+        """Select a logstream based on the logsource information included within a rule and
+        following the assumptions described in select_log_parser."""
         if logsource.product == "windows":
             return '{job=~"eventlog|winlog|windows|fluentbit.*"}'
         if logsource.product == "azure":
@@ -234,7 +237,8 @@ class LogQLBackend(TextQueryBackend):
     def convert_value_re(
         self, r: SigmaRegularExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Loki does not need to do any additional escaping for regular expressions if we can use the tilde character"""
+        """Loki does not need to do any additional escaping for regular expressions if we can
+        use the tilde character"""
         if "`" in r.regexp:
             return '"' + r.escape('"') + '"'
         return "`" + r.regexp + "`"
@@ -280,8 +284,8 @@ class LogQLBackend(TextQueryBackend):
 
     # Change behaviour for negated classes (as args aren't negated until they are converted)
     def compare_precedence(self, outer: ConditionItem, inner: ConditionItem) -> bool:
-        """As this implements negation by changing the sub-tree and swapping ANDs and ORs, the precedence
-        rules for such operators also needs to be flipped."""
+        """As this implements negation by changing the sub-tree and swapping ANDs and ORs,
+        the precedence rules for such operators also needs to be flipped."""
         outer_class = outer.__class__
         if inner.__class__ in self.precedence and outer_class in self.precedence:
             if (
@@ -338,7 +342,8 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_or(
         self, cond: ConditionOR, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Implements OR'd unbounded conditions as a regex that combines the search terms with |s."""
+        """Implements OR'd unbounded conditions as a regex that combines the search terms
+        with |s."""
         unbound_deferred_or = None
         for arg in cond.args:
             if isinstance(arg, ConditionValueExpression):
@@ -351,7 +356,8 @@ class LogQLBackend(TextQueryBackend):
                 unbound_deferred_or.exprs.append(arg.value)
             elif unbound_deferred_or is not None:
                 raise SigmaFeatureNotSupportedByBackendError(
-                    "Operator 'or' not supported by the backend for unbound conditions combined with field conditions",
+                    "Operator 'or' not supported by the backend for unbound conditions combined "
+                    "with field conditions",
                     source=cond.source,
                 )
         if unbound_deferred_or is not None:
@@ -378,13 +384,14 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_and(
         self, cond: ConditionAND, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Checks that unbounded conditions are not also being combined with ORs (as we cannot implement
-        such an expression with regexes)."""
+        """Checks that unbounded conditions are not also being combined with ORs
+        (as we cannot implement such an expression with regexes)."""
         if cond.parent_condition_chain_contains(ConditionOR):
             for arg in cond.args:
                 if isinstance(arg, ConditionValueExpression):
                     raise SigmaFeatureNotSupportedByBackendError(
-                        "Operator 'or' not supported by the backend for unbound conditions combined with 'and'",
+                        "Operator 'or' not supported by the backend for unbound conditions "
+                        "combined with 'and'",
                         source=cond.source,
                     )
         joiner = self.token_separator + self.and_token + self.token_separator
@@ -421,8 +428,8 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_val_str(
         self, cond: ConditionValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Converts all unbound wildcard conditions into regular expression queries, replacing wildcards
-        with appropriate regex metacharacters."""
+        """Converts all unbound wildcard conditions into regular expression queries,
+        replacing wildcards with appropriate regex metacharacters."""
         if cond.value.contains_special():
             cond.value = self.convert_wildcard_to_re(cond.value)
             return self.convert_condition_val_re(cond, state)
@@ -453,8 +460,9 @@ class LogQLBackend(TextQueryBackend):
             expr.negate()
         return expr
 
-    # Although implemented in pySigma, there does not currently seem to be a way of writing Sigma rules that
-    # incorporate (the negation of) comparison operations, so ignore for code coverage purposes
+    # Although implemented in pySigma, there does not currently seem to be a way of writing
+    # Sigma rules that incorporate (the negation of) comparison operations, so ignore for
+    # code coverage purposes
     def convert_condition_field_compare_op_val(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:  # pragma: no cover
@@ -464,12 +472,14 @@ class LogQLBackend(TextQueryBackend):
             cond.value.op = LogQLBackend.negated_cmp_operator[cond.value.op]
         return super().convert_condition_field_compare_op_val(cond, state)
 
-    # Use convert_condition rather than convert_condition_or (which prevented negation from being applied)
+    # Use convert_condition rather than convert_condition_or
+    # (which prevented negation from being applied)
     def convert_condition_field_eq_expansion(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Ensures that the OR condition created when expanding an equality for many values goes through
-        convert_condition, rather than convert_condition_or, as it would circumvent it's negation."""
+        """Ensures that the OR condition created when expanding an equality for many values
+        goes through convert_condition, rather than convert_condition_or, as it would
+        circumvent it's negation."""
         or_cond = ConditionOR(
             [
                 ConditionFieldEqualsValueExpression(cond.field, value)
@@ -487,8 +497,9 @@ class LogQLBackend(TextQueryBackend):
     # If a string doesn't contain a tilde character, easier to use it to quote strings, otherwise we will default to
     # using a double quote character, and escape the string appropriately
     def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
-        """By default, use the tilde character to quote fields, which needs limited escaping. If the value contains
-        a tilde character, use double quotes and apply more rigourous escaping."""
+        """By default, use the tilde character to quote fields, which needs limited escaping.
+        If the value contains a tilde character, use double quotes and apply more rigourous
+        escaping."""
         quote = "`"
         if any([c == quote for c in s]):
             quote = '"'
@@ -499,8 +510,9 @@ class LogQLBackend(TextQueryBackend):
             converted = s.convert(escape_char="\\", add_escaped='"\\')
         return quote + converted + quote
 
-    # Swapping the meaning of "deferred" expressions so they appear at the start of a query, rather than the end
-    # (since this is the recommended approach for LogQL), and add in log stream selectors & parser
+    # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
+    # rather than the end (since this is the recommended approach for LogQL), and add in log
+    # stream selectors & parser
     def finalize_query(
         self,
         rule: SigmaRule,
@@ -509,8 +521,8 @@ class LogQLBackend(TextQueryBackend):
         state: ConversionState,
         output_format: str,
     ) -> Union[str, DeferredQueryExpression]:
-        """Complete the conversion of the query, selecting an appropriate log parser if necessary, and
-        pre-pending deferred line filters."""
+        """Complete the conversion of the query, selecting an appropriate log parser if necessary,
+        and pre-pending deferred line filters."""
         if isinstance(query, DeferredQueryExpression):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
@@ -547,7 +559,8 @@ class LogQLBackend(TextQueryBackend):
     def finalize_query_ruler(
         self, rule: SigmaRule, query: str, index: int, state: ConversionState
     ) -> Dict[str, any]:
-        """Use information from the Sigma rule to produce human readable information for an alert."""
+        """Use information from the Sigma rule to produce human readable information for
+        an alert."""
         alert = self.field_replace_pattern.sub("_", rule.title).strip("_")
         ruler = {
             "alert": alert,
@@ -560,6 +573,7 @@ class LogQLBackend(TextQueryBackend):
         return ruler
 
     def finalize_output_ruler(self, queries: List[Dict[str, any]]) -> str:
-        """Produce a collection of alert queries bundled together in a single Loki ruler YAML format."""
+        """Produce a collection of alert queries bundled together in a single Loki ruler
+        YAML format."""
         rules = {"groups": [{"name": "Sigma rules", "rules": queries}]}
         return dump(queries)
