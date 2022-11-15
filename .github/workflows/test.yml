@@ -26,6 +26,11 @@ jobs:
           poetry-version: ${{ matrix.poetry-version }}
       - name: Install dependencies
         run: poetry install
+      - name: Run formatter, linter and type checker
+        run: |
+          poetry run black --check .
+          poetry run mypy --explicit-package-bases .
+          poetry run flake8 .
       - name: Run tests
         run: poetry run pytest --cov=sigma --cov-report term --cov-report xml:cov.xml -vv
       - name: Store coverage for badge
