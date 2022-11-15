@@ -568,7 +568,7 @@ def test_loki_not_or_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `valueA` |= `valueB`']
+        == ['{job=~".+"} != `valueA` != `valueB`']
     )
 
 
@@ -635,28 +635,6 @@ def test_loki_field_and_not_multi_unbound_expression(loki_backend: LogQLBackend)
             )
         )
         == ['{job=~".+"} != `valueB` != `valueC` | logfmt | fieldA=`valueA`']
-    )
-
-
-def test_loki_not_or_unbound(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                keywords:
-                    - valueA
-                    - valueB
-                condition: not keywords
-        """
-            )
-        )
-        == ['{job=~".+"} != `valueA` != `valueB`']
     )
 
 
