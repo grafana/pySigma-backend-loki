@@ -1,1 +1,1 @@
-from .loki import LogQLBackend
+from .loki import LogQLBackend  # noqa: F401

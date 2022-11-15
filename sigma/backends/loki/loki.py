@@ -183,9 +183,9 @@ class LogQLBackend(TextQueryBackend):
             # Zeek's default log file format (TSV) is not clearly supported by promtail/loki - but
             # fortunately Zeek also offers a JSON format alternative.
             # See:
-            #  - https://grafana.com/docs/loki/latest/clients/promtail/scraping/#windows-event-log
-            #  - https://blog.e-mundo.de/post/painless-and-secure-windows-event-log-delivery-with-fluent-bit-loki-and-grafana/
-            #  - https://www.elastic.co/guide/en/logstash/current/plugins-inputs-azure_event_hubs.html
+            #  - https://grafana.com/docs/loki/latest/clients/promtail/scraping/#windows-event-log  # noqa: E501
+            #  - https://blog.e-mundo.de/post/painless-and-secure-windows-event-log-delivery-with-fluent-bit-loki-and-grafana/  # noqa: E501
+            #  - https://www.elastic.co/guide/en/logstash/current/plugins-inputs-azure_event_hubs.html  # noqa: E501
             #  - https://docs.zeek.org/en/master/log-formats.html#zeek-json-format-logs
             return "json"
         # default to logfmt - relevant for auditd, and many other applications
@@ -227,8 +227,8 @@ class LogQLBackend(TextQueryBackend):
 
     # Implementing negation through De Morgan's laws
     def is_negated(self, state: ConversionState) -> bool:
-        """A utility function for determining whether or not the current operation should be negated or not, based on
-        the count of NOT operations above in the tree."""
+        """A utility function for determining whether or not the current operation should be
+        negated or not, based on the count of NOT operations above in the tree."""
         return state.processing_state.get("not_count", 0) % 2 == 1
 
     # Overriding Sigma TextQueryBackend functionality as necessary
@@ -248,8 +248,8 @@ class LogQLBackend(TextQueryBackend):
         state.processing_state["not_count"] = (
             state.processing_state.get("not_count", 0) + 1
         )
-        # As the TextQueryBackend doesn't break these patterns into consitituent operators, we need to
-        # change the class variables to reflect the negation of the relevant operations
+        # As the TextQueryBackend doesn't break these patterns into constituent operators,
+        # we need to change the class variables to reflect the negation of the relevant operations
         LogQLBackend.eq_token = LogQLBackend.negated_label_filter_operator[
             LogQLBackend.eq_token
         ]
@@ -265,7 +265,8 @@ class LogQLBackend(TextQueryBackend):
         arg = cond.args[0]
         expr = self.convert_condition(arg, state)
         state.processing_state["not_count"] -= 1
-        # Once the negated sub-tree has been processed, we can revert them back to their prior behaviour
+        # Once the negated sub-tree has been processed, we can revert them back to
+        # their prior behaviour
         LogQLBackend.eq_token = LogQLBackend.negated_label_filter_operator[
             LogQLBackend.eq_token
         ]
@@ -297,8 +298,9 @@ class LogQLBackend(TextQueryBackend):
                 % 2
                 == 1
             ):
-                # At this point, we have an odd number of NOTs in the parent chain, outer will have been inverted, but
-                # inner will not yet been inverted, and we know inner is either an AND or an OR
+                # At this point, we have an odd number of NOTs in the parent chain, outer
+                # will have been inverted, but inner will not yet been inverted, and we
+                # know inner is either an AND or an OR
                 inner_class = (
                     ConditionAND if inner.__class__ == ConditionOR else ConditionOR
                 )
@@ -492,8 +494,9 @@ class LogQLBackend(TextQueryBackend):
         """Use Loki's sanitize function to ensure the field name is appropriately escaped."""
         return self.sanitize_label_key(field_name)
 
-    # If a string doesn't contain a tilde character, easier to use it to quote strings, otherwise we will default to
-    # using a double quote character, and escape the string appropriately
+    # If a string doesn't contain a tilde character, easier to use it to quote strings,
+    # otherwise we will default to using a double quote character, and escape the string
+    # appropriately
     def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
         """By default, use the tilde character to quote fields, which needs limited escaping.
         If the value contains a tilde character, use double quotes and apply more rigourous
@@ -574,4 +577,4 @@ class LogQLBackend(TextQueryBackend):
         """Produce a collection of alert queries bundled together in a single Loki ruler
         YAML format."""
         rules = {"groups": [{"name": "Sigma rules", "rules": queries}]}
-        return dump(queries)
+        return dump(rules)

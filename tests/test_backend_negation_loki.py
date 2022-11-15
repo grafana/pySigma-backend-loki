@@ -142,7 +142,8 @@ def test_loki_not_and_or_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA!=`valueA1` and fieldA!=`valueA2` or fieldB!=`valueB1` and fieldB!=`valueB2`'
+            '{job=~".+"} | logfmt | fieldA!=`valueA1` and fieldA!=`valueA2` '
+            'or fieldB!=`valueB1` and fieldB!=`valueB2`'
         ]
     )
 
@@ -169,7 +170,8 @@ def test_loki_not_or_and_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | (fieldA!=`valueA1` or fieldB!=`valueB1`) and (fieldA!=`valueA2` or fieldB!=`valueB2`)'
+            '{job=~".+"} | logfmt | (fieldA!=`valueA1` or fieldB!=`valueB1`) and '
+            '(fieldA!=`valueA2` or fieldB!=`valueB2`)'
         ]
     )
 
@@ -507,8 +509,8 @@ def test_loki_not_unbound_or_field(loki_backend: LogQLBackend):
 
 
 def test_loki_not_unbound_and_field(loki_backend: LogQLBackend):
-    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-        test = loki_backend.convert(
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError):
+        loki_backend.convert(
             SigmaCollection.from_yaml(
                 """
                 title: Test
@@ -528,8 +530,8 @@ def test_loki_not_unbound_and_field(loki_backend: LogQLBackend):
 
 
 def test_loki_not_multi_or_unbound(loki_backend: LogQLBackend):
-    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-        test = loki_backend.convert(
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError):
+        loki_backend.convert(
             SigmaCollection.from_yaml(
                 """
                 title: Test
