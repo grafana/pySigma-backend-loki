@@ -32,12 +32,12 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: poetry run python print-coverage.py >> $GITHUB_ENV
       - name: Create coverage badge
-        if: ${{ github.repository == 'kelnage/pySigma-backend-loki' && github.event_name == 'push' && runner.os == 'Linux' }}
+        if: ${{ github.repository == 'grafana/pySigma-backend-loki' && github.event_name == 'push' && runner.os == 'Linux' }}
         uses: schneegans/dynamic-badges-action@v1.1.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: 246287f4de22321bb497c8ae34601c29
-          filename: kelnage-pySigma-backend-loki.json
+          filename: grafana-pySigma-backend-loki.json
           label: Coverage
           message: ${{ env.COVERAGE }}
           color: ${{ env.COVERAGE_COLOR }}
