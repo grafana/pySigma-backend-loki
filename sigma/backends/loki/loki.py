@@ -2,17 +2,20 @@ import re
 from dataclasses import dataclass
 from typing import ClassVar, Dict, List, Pattern, Tuple, Union
 
-from sigma.conditions import (ConditionAND,
-                              ConditionFieldEqualsValueExpression,
-                              ConditionItem, ConditionNOT, ConditionOR,
-                              ConditionValueExpression)
+from sigma.conditions import (
+    ConditionAND,
+    ConditionFieldEqualsValueExpression,
+    ConditionItem,
+    ConditionNOT,
+    ConditionOR,
+    ConditionValueExpression,
+)
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 from sigma.rule import SigmaLogSource, SigmaRule
-from sigma.types import (SigmaCompareExpression, SigmaRegularExpression,
-                         SigmaString)
+from sigma.types import SigmaCompareExpression, SigmaRegularExpression, SigmaString
 from yaml import dump
 
 
