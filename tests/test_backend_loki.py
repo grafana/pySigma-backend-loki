@@ -940,12 +940,15 @@ def test_loki_ruler_output(loki_backend: LogQLBackend):
             ),
             "ruler",
         )
-        == """- alert: test_signature
-  annotations:
-    message: test signature
-    summary: testing
-  expr: '{job=~".+"} |= `anything`'
-  labels:
-    severity: low
+        == """groups:
+- name: Sigma rules
+  rules:
+  - alert: test_signature
+    annotations:
+      message: test signature
+      summary: testing
+    expr: '{job=~".+"} |= `anything`'
+    labels:
+      severity: low
 """
     )
