@@ -143,7 +143,7 @@ def test_loki_not_and_or_expression(loki_backend: LogQLBackend):
         )
         == [
             '{job=~".+"} | logfmt | fieldA!=`valueA1` and fieldA!=`valueA2` '
-            'or fieldB!=`valueB1` and fieldB!=`valueB2`'
+            "or fieldB!=`valueB1` and fieldB!=`valueB2`"
         ]
     )
 
@@ -171,7 +171,7 @@ def test_loki_not_or_and_expression(loki_backend: LogQLBackend):
         )
         == [
             '{job=~".+"} | logfmt | (fieldA!=`valueA1` or fieldB!=`valueB1`) and '
-            '(fieldA!=`valueA2` or fieldB!=`valueB2`)'
+            "(fieldA!=`valueA2` or fieldB!=`valueB2`)"
         ]
     )
 
