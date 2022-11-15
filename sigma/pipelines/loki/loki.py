@@ -1,5 +1,5 @@
-from sigma.processing.transformations import FieldMappingTransformation
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
+from sigma.processing.transformations import FieldMappingTransformation
 
 
 def loki_log_parser() -> ProcessingPipeline:
