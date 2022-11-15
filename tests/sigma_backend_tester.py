@@ -2,14 +2,12 @@ import argparse
 import collections
 import operator
 import os
-import re
 import subprocess
-import sys
+
 from sigma.backends.loki import LogQLBackend
-from sigma.pipelines.loki import loki_log_parser
 from sigma.collection import SigmaCollection
-from sigma.rule import SigmaError, SigmaDetection
-from pprint import pp
+from sigma.pipelines.loki import loki_log_parser
+from sigma.rule import SigmaDetection, SigmaError
 
 parser = argparse.ArgumentParser(
     description="A script to help test pySigma backends using Sigma signature files",

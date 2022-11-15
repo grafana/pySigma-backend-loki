@@ -1,6 +1,5 @@
-import pytest
-from sigma.collection import SigmaCollection
 from sigma.backends.loki import LogQLBackend
+from sigma.collection import SigmaCollection
 from sigma.pipelines.loki import loki_log_parser
 
 

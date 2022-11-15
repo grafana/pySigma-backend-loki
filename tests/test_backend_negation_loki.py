@@ -1,7 +1,7 @@
 import pytest
-from sigma.exceptions import SigmaValueError, SigmaFeatureNotSupportedByBackendError
-from sigma.collection import SigmaCollection
 from sigma.backends.loki import LogQLBackend
+from sigma.collection import SigmaCollection
+from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 
 
 @pytest.fixture

@@ -1,24 +1,22 @@
+import re
 from dataclasses import dataclass
-from sigma.conversion.state import ConversionState
-from sigma.rule import SigmaRule, SigmaLogSource
-from sigma.conversion.base import TextQueryBackend
+from typing import ClassVar, Dict, List, Pattern, Tuple, Union
+
 from sigma.conditions import (
-    ConditionItem,
     ConditionAND,
-    ConditionOR,
-    ConditionNOT,
     ConditionFieldEqualsValueExpression,
+    ConditionItem,
+    ConditionNOT,
+    ConditionOR,
     ConditionValueExpression,
 )
+from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
-from sigma.types import SigmaCompareExpression, SigmaString, SigmaRegularExpression
+from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
-
-# from sigma.pipelines.loki import loki_log_parser
-import sigma
-import re
+from sigma.rule import SigmaLogSource, SigmaRule
+from sigma.types import SigmaCompareExpression, SigmaRegularExpression, SigmaString
 from yaml import dump
-from typing import ClassVar, Dict, Tuple, Pattern, List, Union
 
 
 @dataclass

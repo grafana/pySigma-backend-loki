@@ -1,19 +1,5 @@
-from sigma.pipelines.common import logsource_windows, windows_logsource_mapping
-from sigma.processing.transformations import (
-    AddConditionTransformation,
-    FieldMappingTransformation,
-    DetectionItemFailureTransformation,
-    RuleFailureTransformation,
-    SetStateTransformation,
-    ValueListPlaceholderTransformation,
-)
-from sigma.processing.conditions import (
-    LogsourceCondition,
-    IncludeFieldCondition,
-    ExcludeFieldCondition,
-    RuleProcessingItemAppliedCondition,
-)
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
+from sigma.processing.transformations import FieldMappingTransformation
 
 
 def loki_log_parser() -> ProcessingPipeline:
@@ -36,18 +22,5 @@ def loki_log_parser() -> ProcessingPipeline:
                     }
                 ),
             )
-            #             ProcessingItem(     # This is an example for processing items generated from the mapping above.
-            #                 identifier=f"loki_windows_{service}",
-            #                 transformation=AddConditionTransformation({ "source": source}),
-            #                 rule_conditions=[logsource_windows(service)],
-            #             )
-            #             for service, source in windows_logsource_mapping.items()
-            #         ] + [
-            #             ProcessingItem(     # Field mappings
-            #                 identifier="loki_field_mapping",
-            #                 transformation=FieldMappingTransformation({
-            #                     "EventID": "event_id",      # TODO: define your own field mappings
-            #                 })
-            #             )
         ],
     )
