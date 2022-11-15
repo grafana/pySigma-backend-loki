@@ -19,6 +19,18 @@ This backend is currently maintained by:
 
 * [Nick Moore](https://github.com/kelnage/)
 
+## Installation
+
+To get started developing/testing pySigma-backend-loki, these steps may help you get started:
+
+1. [Install poetry](https://python-poetry.org/docs/#installation)
+2. Clone this repository and open a terminal/shell in the top-level directory
+3. Run `poetry install` to install the Python dependencies
+4. Run `poetry shell` to activate the poetry environment
+5. Check it all works by running `poetry run pytest`
+6. (Optional) If you wish to validate the generated rules using sigma\_backend\_tester.py, install
+   [LogCLI](https://grafana.com/docs/loki/latest/tools/logcli/)
+
 ## Work in progress
 
 These features are currently either WIP or are planned to be implemented in the near future.
