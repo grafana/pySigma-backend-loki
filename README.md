@@ -1,5 +1,5 @@
 ![Tests](https://github.com/grafana/pySigma-backend-loki/actions/workflows/test.yml/badge.svg)
-[![Coverage Status](https://coveralls.io/repos/github/grafana/pySigma-backend-loki/badge.svg?branch=add-mypy-flake8-and-black&t=lvM1Ns)](https://coveralls.io/github/grafana/pySigma-backend-loki?branch=add-mypy-flake8-and-black)
+[![Coverage Status](https://coveralls.io/repos/github/grafana/pySigma-backend-loki/badge.svg?branch=main&t=lvM1Ns)](https://coveralls.io/github/grafana/pySigma-backend-loki?branch=main)
 ![Status](https://img.shields.io/badge/Status-pre--release-orange)
 
 # pySigma Loki Backend
