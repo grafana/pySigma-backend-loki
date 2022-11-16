@@ -3,6 +3,7 @@ import collections
 import operator
 import os
 import subprocess
+from typing import Any, Dict
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
@@ -15,19 +16,22 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument(
     "signature_path",
-    help="A path to either a single Sigma signature YAML file or a directory containing one or more signatures (incl. sub-folders)",
+    help="A path to either a single Sigma signature YAML file or a directory containing "
+    "one or more signatures (incl. sub-folders)",
 )
 parser.add_argument(
     "-c",
     "--counts",
     action="store_true",
-    help="Produce counts of the numbers of signatures processed and counts of successes/fails, along with error counts",
+    help="Produce counts of the numbers of signatures processed and counts of successes/fails, "
+    "along with error counts",
 )
 parser.add_argument(
     "-p",
     "--print",
     action="store_true",
-    help="Print the query(s) that were generated for the backend, and validation stdout if applicable",
+    help="Print the query(s) that were generated for the backend, and validation stdout if "
+    "applicable",
 )
 parser.add_argument(
     "-s",
@@ -39,13 +43,18 @@ parser.add_argument(
     "-t",
     "--tests",
     type=str,
-    help="""A path to either a single test log file or a directory containing one or more test log files, used during the validation of the generated rule(s). If a path to a directory is provided, this script will look for .log files with the same directory structure of the signature_path (i.e., if there is a rules/bad.yml file within signature_path, the script will look for a rules/bad.log file within the path specified in tests)""",
+    help="A path to either a single test log file or a directory containing one or more test log "
+    "files, used during the validation of the generated rule(s). If a path to a directory is "
+    "provided, this script will look for .log files with the same directory structure of the "
+    "signature_path (i.e., if there is a rules/bad.yml file within signature_path, the script "
+    "will look for a rules/bad.log file within the path specified in tests)",
 )
 parser.add_argument(
     "-v",
     "--validate",
     action="store_true",
-    help="Validate the generated rule(s) through the backend engine, where one or more lines of stdout denotes a successful validation",
+    help="Validate the generated rule(s) through the backend engine, where one or more lines of "
+    "stdout denotes a successful validation",
 )
 parser.add_argument(
     "-u",
@@ -59,7 +68,7 @@ args = parser.parse_args()
 rule_path = args.signature_path
 
 backend = LogQLBackend(processing_pipeline=loki_log_parser())
-counters = {
+counters: Dict[str, Any] = {
     "parse_error": 0,
     "convert_error": 0,
     "validate_error": 0,
@@ -87,7 +96,8 @@ def validate_with_backend(query, test_file=subprocess.DEVNULL):
     )
     stdout = result.stdout.decode()
     stderr = result.stderr.decode()
-    # For now, we will assume that if logcli produces one or more lines of stdout, we have validated the query
+    # For now, we will assume that if logcli produces one or more lines of stdout,
+    # we have validated the query
     return (result.returncode, stdout, stderr, stdout.count(os.linesep) > 0)
 
 
@@ -240,12 +250,14 @@ else:
 if args.counts:
     percent_conv = counters["convert_success"] / counters["total_sigs"] * 100
     print(
-        f"Successfully converted {counters['convert_success']} out of {counters['total_sigs']} ({percent_conv:.2f}%) signatures"
+        f"Successfully converted {counters['convert_success']} out of "
+        f"{counters['total_sigs']} ({percent_conv:.2f}%) signatures"
     )
     if args.validate:
         percent_valid = counters["validate_success"] / counters["convert_success"] * 100
         print(
-            f"Successfully validated {counters['validate_success']} out of {counters['convert_success']} ({percent_valid:.2f}%) signatures"
+            f"Successfully validated {counters['validate_success']} out of "
+            f"{counters['convert_success']} ({percent_valid:.2f}%) signatures"
         )
     print(f"YAML parse errors: {counters['parse_error']}")
     print(f"Conversion errors: {counters['convert_error']}")

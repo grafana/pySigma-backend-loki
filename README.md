@@ -1,5 +1,5 @@
-![Tests](https://github.com/kelnage/pySigma-backend-loki/actions/workflows/test.yml/badge.svg)
-![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/kelnage/246287f4de22321bb497c8ae34601c29/raw/kelnage-pySigma-backend-loki.json)
+![Tests](https://github.com/grafana/pySigma-backend-loki/actions/workflows/test.yml/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/grafana/pySigma-backend-loki/badge.svg?branch=main&t=lvM1Ns)](https://coveralls.io/github/grafana/pySigma-backend-loki?branch=main)
 ![Status](https://img.shields.io/badge/Status-pre--release-orange)
 
 # pySigma Loki Backend
@@ -17,7 +17,8 @@ Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
 This backend is currently maintained by:
 
-* [Nick Moore](https://github.com/kelnage/)
+* [Nick Moore](https://github.com/kelnage)
+* [Mostafa Moradian](https://github.com/mostafa)
 
 ## Installation
 
@@ -45,5 +46,4 @@ These features are currently either WIP or are planned to be implemented in the 
 
 These features are not easily supported by the backend, and hence are unlikely to be implemented.
 
-*  More complex keyword/line filter searches than ANDs of ORs
-
+* More complex keyword/line filter searches than ANDs of ORs

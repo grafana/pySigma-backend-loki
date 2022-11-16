@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "pySigma Loki backend"
 authors = ["Nick Moore <nicholas.moore@grafana.com>"]
 license = "Apache-2.0"
-repository = "https://github.com/kelnage/pySigma-backend-loki"
+repository = "https://github.com/grafana/pySigma-backend-loki"
 packages = [
     { include = "sigma" }
 ]
@@ -19,6 +19,11 @@ pysigma = "^0.8.9"
 pytest = "^7.1.3"
 pytest-cov = "^4.0.0"
 coverage = "^6.5.0"
+mypy = "^0.991"
+pytest-mypy = "^0.10.1"
+types-pyyaml = "6.0.12.2"
+flake8 = "^5.0.4"
+black = "^22.10.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

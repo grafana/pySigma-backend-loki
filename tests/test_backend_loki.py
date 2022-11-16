@@ -163,7 +163,8 @@ def test_loki_and_or_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and (fieldB=`valueB1` or fieldB=`valueB2`)'
+            '{job=~".+"} | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and '
+            "(fieldB=`valueB1` or fieldB=`valueB2`)"
         ]
     )
 
@@ -190,7 +191,8 @@ def test_loki_or_and_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or fieldA=`valueA2` and fieldB=`valueB2`'
+            '{job=~".+"} | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or '
+            "fieldA=`valueA2` and fieldB=`valueB2`"
         ]
     )
 
@@ -883,15 +885,16 @@ def test_loki_fields(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB` | line_format "{{.fieldA}} {{.fieldB}}"'
+            '{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB` | '
+            'line_format "{{.fieldA}} {{.fieldB}}"'
         ]
     )
 
 
 # Tests for unimplemented/unsupported features
 def test_loki_unbound_or_field(loki_backend: LogQLBackend):
-    with pytest.raises(SigmaFeatureNotSupportedByBackendError) as e_info:
-        test = loki_backend.convert(
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError):
+        loki_backend.convert(
             SigmaCollection.from_yaml(
                 """
                 title: Test
@@ -937,12 +940,15 @@ def test_loki_ruler_output(loki_backend: LogQLBackend):
             ),
             "ruler",
         )
-        == """- alert: test_signature
-  annotations:
-    message: test signature
-    summary: testing
-  expr: '{job=~".+"} |= `anything`'
-  labels:
-    severity: low
+        == """groups:
+- name: Sigma rules
+  rules:
+  - alert: test_signature
+    annotations:
+      message: test signature
+      summary: testing
+    expr: '{job=~".+"} |= `anything`'
+    labels:
+      severity: low
 """
     )
