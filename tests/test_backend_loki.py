@@ -925,7 +925,7 @@ def test_loki_very_long_query_or(loki_backend: LogQLBackend):
 
 def test_loki_very_long_query_no_or(loki_backend: LogQLBackend):
     yaml = (
-        f"""
+        """
             title: Test
             status: test
             logsource:
@@ -951,7 +951,7 @@ def test_loki_very_long_query_no_or(loki_backend: LogQLBackend):
 
 def test_loki_very_long_query_too_few_or_args(loki_backend: LogQLBackend):
     yaml = (
-        f"""
+        """
             title: Test
             status: test
             logsource:

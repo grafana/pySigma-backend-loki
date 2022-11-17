@@ -255,7 +255,9 @@ class LogQLBackend(TextQueryBackend):
             return cond_size + sum(self.estimate_query_length(arg) for arg in cond.args)
         return cond_size
 
-    def partition_rule(self, rule: SigmaRule, partitions: int) -> [ParentChainMixin]:
+    def partition_rule(
+        self, rule: SigmaRule, partitions: int
+    ) -> List[ParentChainMixin]:
         """Given a rule that is (probably) going to generate a query that is longer
         than the maximum query length for LogQL, break it into smaller conditions, by
         identifying the highest level OR in the parse tree and equally dividing its
@@ -274,7 +276,7 @@ class LogQLBackend(TextQueryBackend):
                 parsed_copy = copy.deepcopy(rule.detection.parsed_condition[y].parsed)
                 # Find the top-OR and partition it
                 found_or = False
-                conditions = deque()
+                conditions = deque[ParentChainMixin]()
                 conditions.append(parsed_copy)
                 while conditions:
                     # breadth-first search the parse tree to find the highest OR
@@ -285,7 +287,8 @@ class LogQLBackend(TextQueryBackend):
                         if arg_count < partitions:
                             # TODO: decide a better way of producing warnings
                             print(
-                                f"Too few arguments to highest OR, reducing partition count to {arg_count}",
+                                f"Too few arguments to highest OR, reducing partition "
+                                f"count to {arg_count}",
                                 file=sys.stderr,
                             )
                             return self.partition_rule(rule, arg_count)
@@ -301,7 +304,8 @@ class LogQLBackend(TextQueryBackend):
                     # No OR statement within the large query, so probably no way of
                     # dividing query
                     print(
-                        "Cannot partition a rule that exceeds query length limits due to lack of ORs",
+                        "Cannot partition a rule that exceeds query length limits "
+                        "due to lack of ORs",
                         file=sys.stderr,
                     )
                     return [cond.parsed for cond in rule.detection.parsed_condition]
