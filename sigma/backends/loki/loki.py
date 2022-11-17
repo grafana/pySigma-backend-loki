@@ -1,4 +1,8 @@
+import copy
+import math
 import re
+import sys
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, ClassVar, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -9,11 +13,12 @@ from sigma.conditions import (
     ConditionNOT,
     ConditionOR,
     ConditionValueExpression,
+    ParentChainMixin,
 )
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
-from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
+from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.rule import SigmaLogSource, SigmaRule
 from sigma.types import SigmaCompareExpression, SigmaRegularExpression, SigmaString
 from yaml import dump
@@ -231,7 +236,138 @@ class LogQLBackend(TextQueryBackend):
         negated or not, based on the count of NOT operations above in the tree."""
         return state.processing_state.get("not_count", 0) % 2 == 1
 
+    def estimate_query_length(self, cond: ParentChainMixin) -> int:
+        """Attempt to estimate the length of the LogQL query that will be generated, in
+        order to decide whether the rule needs to be partitioned into smaller rules.
+        """
+        cond_size = 0
+        if isinstance(cond, ConditionOR):
+            cond_size = 4 * (cond.arg_count - 1)
+        elif isinstance(cond, ConditionAND):
+            cond_size = 5 * (cond.arg_count - 1)
+        elif isinstance(cond, ConditionNOT):
+            cond_size = 0
+        else:
+            cond_size = 3 + len(str(cond.value))
+            if hasattr(cond, "field"):
+                cond_size += len(cond.field)
+        if hasattr(cond, "arg_count") and cond.arg_count > 0:
+            return cond_size + sum(self.estimate_query_length(arg) for arg in cond.args)
+        return cond_size
+
+    def partition_rule(self, rule: SigmaRule, partitions: int) -> [ParentChainMixin]:
+        """Given a rule that is (probably) going to generate a query that is longer
+        than the maximum query length for LogQL, break it into smaller conditions, by
+        identifying the highest level OR in the parse tree and equally dividing its
+        arguments between copies of the same rule.
+
+        Notes:
+            This code makes a number of assumptions about a rule:
+             - a rule contains at least one OR (prints warning if one can't be found)
+             - all arguments of the top-OR are same length (likely a bad assumption!)
+             - if we had multiple parsed_conditions, they each need processing
+               separately
+        """
+        new_conditions = []
+        for y in range(len(rule.detection.parsed_condition)):
+            for x in range(partitions):
+                parsed_copy = copy.deepcopy(rule.detection.parsed_condition[y].parsed)
+                # Find the top-OR and partition it
+                found_or = False
+                conditions = deque()
+                conditions.append(parsed_copy)
+                while conditions:
+                    # breadth-first search the parse tree to find the highest OR
+                    cond = conditions.popleft()
+                    if isinstance(cond, ConditionOR):
+                        arg_count = len(cond.args)
+                        # If we need more partitions than arguments to the top OR, give up
+                        if arg_count < partitions:
+                            # TODO: decide a better way of producing warnings
+                            print(
+                                f"Too few arguments to highest OR, reducing partition count to {arg_count}",
+                                file=sys.stderr,
+                            )
+                            return self.partition_rule(rule, arg_count)
+                        i = x * int(arg_count / partitions)
+                        j = (x + 1) * int(arg_count / partitions)
+                        cond.args = cond.args[i:j]
+                        found_or = True
+                        break
+                    if isinstance(cond, (ConditionAND, ConditionNOT)):
+                        for arg in cond.args:
+                            conditions.append(arg)
+                if not found_or:
+                    # No OR statement within the large query, so probably no way of
+                    # dividing query
+                    print(
+                        "Cannot partition a rule that exceeds query length limits due to lack of ORs",
+                        file=sys.stderr,
+                    )
+                    return [cond.parsed for cond in rule.detection.parsed_condition]
+                new_conditions.append(parsed_copy)
+        return new_conditions
+
     # Overriding Sigma TextQueryBackend functionality as necessary
+    def convert_rule(
+        self, rule: SigmaRule, output_format: Optional[str] = None
+    ) -> List[str]:
+        """
+        Convert a single Sigma rule into one or more queries, based on the maximum
+        estimated length of a generated query. Largely copied from pySigma, with
+        modifications for partitioning rules into smaller queries.
+        """
+        state = ConversionState()
+        try:
+            processing_pipeline = (
+                self.backend_processing_pipeline
+                + self.processing_pipeline
+                + self.output_format_processing_pipeline[
+                    output_format or self.default_format
+                ]
+            )
+
+            error_state = "applying processing pipeline on"
+            processing_pipeline.apply(rule)  # 1. Apply transformations
+            state.processing_state = processing_pipeline.state
+
+            conditions = [cond.parsed for cond in rule.detection.parsed_condition]
+            max_estimated_length = max(
+                self.estimate_query_length(cond) for cond in conditions
+            )
+            # Max LogQL query length is 5120, use 80% of that limit due to estimation
+            threshold_length = 4096
+            if max_estimated_length > threshold_length:
+                partitions = math.ceil(max_estimated_length / threshold_length)
+                conditions = self.partition_rule(rule, partitions)
+
+            error_state = "converting"
+            queries = [  # 2. Convert condition
+                self.convert_condition(cond, state) for cond in conditions
+            ]
+
+            error_state = "finalizing query for"
+            return [  # 3. Postprocess generated query
+                self.finalize_query(
+                    rule, query, index, state, output_format or self.default_format
+                )
+                for index, query in enumerate(queries)
+            ]
+        except SigmaError as e:  # pragma: no cover
+            if self.collect_errors:
+                self.errors.append((rule, e))
+                return []
+            else:
+                raise e
+        except Exception as e:  # pragma: no cover
+            # enrich all other exceptions with Sigma-specific context information
+            msg = f" (while {error_state} rule {str(rule.source)})"
+            if len(e.args) > 1:
+                e.args = (e.args[0] + msg,) + e.args[1:]
+            else:
+                e.args = (e.args[0] + msg,)
+            raise
+
     def convert_value_re(
         self, r: SigmaRegularExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:

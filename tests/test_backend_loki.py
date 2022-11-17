@@ -1,4 +1,6 @@
 import pytest
+import random
+import string
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
@@ -889,6 +891,98 @@ def test_loki_fields(loki_backend: LogQLBackend):
             'line_format "{{.fieldA}} {{.fieldB}}"'
         ]
     )
+
+
+def test_loki_very_long_query_or(loki_backend: LogQLBackend):
+    long_field = f"longField{'A' * 50}"
+    yaml = (
+        f"""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel_each:
+                    {long_field}: valueA
+                sel_partitioned:
+                    longFieldB|contains:
+"""
+        + "\n".join(
+            "                       - "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(100)
+        )
+        + """
+                condition: all of sel_*
+            """
+    )
+    test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+    assert len(test) > 1 and (
+        f"{long_field}=`valueA`" in q and len(q) < 5120 for q in test
+    )
+
+
+def test_loki_very_long_query_no_or(loki_backend: LogQLBackend):
+    yaml = (
+        f"""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+"""
+        + "\n".join(
+            "                       field"
+            + "".join(random.choices(string.ascii_letters, k=5))
+            + ": "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(200)
+        )
+        + """
+                condition: sel
+            """
+    )
+    test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+    assert len(test) == 1 and len(test[0]) > 5120
+
+
+def test_loki_very_long_query_too_few_or_args(loki_backend: LogQLBackend):
+    yaml = (
+        f"""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                selA:
+"""
+        + "\n".join(
+            "                       field"
+            + "".join(random.choices(string.ascii_letters, k=5))
+            + ": "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(100)
+        )
+        + """
+                selB:
+"""
+        + "\n".join(
+            "                       field"
+            + "".join(random.choices(string.ascii_letters, k=5))
+            + ": "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(100)
+        )
+        + """
+                condition: 1 of sel*
+            """
+    )
+    test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+    assert len(test) == 2 and all(len(query) > 5120 for query in test)
 
 
 # Tests for unimplemented/unsupported features
