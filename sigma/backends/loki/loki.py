@@ -2,9 +2,8 @@ import copy
 import math
 import re
 import sys
-from collections import deque
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any, ClassVar, Deque, Dict, List, Optional, Pattern, Tuple, Union
 
 from sigma.conditions import (
     ConditionAND,
@@ -276,7 +275,7 @@ class LogQLBackend(TextQueryBackend):
                 parsed_copy = copy.deepcopy(rule.detection.parsed_condition[y].parsed)
                 # Find the top-OR and partition it
                 found_or = False
-                conditions = deque[ParentChainMixin]()
+                conditions = Deque[ParentChainMixin]()
                 conditions.append(parsed_copy)
                 while conditions:
                     # breadth-first search the parse tree to find the highest OR
