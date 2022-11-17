@@ -1,6 +1,7 @@
 import pytest
 import random
 import string
+import warnings
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
@@ -945,8 +946,11 @@ def test_loki_very_long_query_no_or(loki_backend: LogQLBackend):
                 condition: sel
             """
     )
-    test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
-    assert len(test) == 1 and len(test[0]) > 5120
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+        assert len(w) == 1
+        assert len(test) == 1 and len(test[0]) > 5120
 
 
 def test_loki_very_long_query_too_few_or_args(loki_backend: LogQLBackend):
@@ -981,8 +985,11 @@ def test_loki_very_long_query_too_few_or_args(loki_backend: LogQLBackend):
                 condition: 1 of sel*
             """
     )
-    test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
-    assert len(test) == 2 and all(len(query) > 5120 for query in test)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+        assert len(w) == 1
+        assert len(test) == 2 and all(len(query) > 5120 for query in test)
 
 
 # Tests for unimplemented/unsupported features

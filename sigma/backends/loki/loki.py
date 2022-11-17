@@ -1,7 +1,6 @@
 import copy
 import math
 import re
-import sys
 from dataclasses import dataclass
 from typing import Any, ClassVar, Deque, Dict, List, Optional, Pattern, Tuple, Union
 
@@ -20,6 +19,7 @@ from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.rule import SigmaLogSource, SigmaRule
 from sigma.types import SigmaCompareExpression, SigmaRegularExpression, SigmaString
+from warnings import warn
 from yaml import dump
 
 
@@ -241,12 +241,14 @@ class LogQLBackend(TextQueryBackend):
         """
         cond_size = 0
         if isinstance(cond, ConditionOR):
-            cond_size = 4 * (cond.arg_count - 1)
+            # Add 2 for the spaces
+            cond_size = (len(self.or_token) + 2) * (cond.arg_count - 1)
         elif isinstance(cond, ConditionAND):
-            cond_size = 5 * (cond.arg_count - 1)
+            cond_size = (len(self.and_token) + 2) * (cond.arg_count - 1)
         elif isinstance(cond, ConditionNOT):
             cond_size = 0
         else:
+            # 3 based on a single operator surrounded by spaces
             cond_size = 3 + len(str(cond.value))
             if hasattr(cond, "field"):
                 cond_size += len(cond.field)
@@ -264,15 +266,17 @@ class LogQLBackend(TextQueryBackend):
 
         Notes:
             This code makes a number of assumptions about a rule:
-             - a rule contains at least one OR (prints warning if one can't be found)
+             - a rule contains at least one OR (warning if one can't be found)
              - all arguments of the top-OR are same length (likely a bad assumption!)
              - if we had multiple parsed_conditions, they each need processing
                separately
         """
         new_conditions = []
-        for y in range(len(rule.detection.parsed_condition)):
-            for x in range(partitions):
-                parsed_copy = copy.deepcopy(rule.detection.parsed_condition[y].parsed)
+        for cond_ind in range(len(rule.detection.parsed_condition)):
+            for part_ind in range(partitions):
+                parsed_copy = copy.deepcopy(
+                    rule.detection.parsed_condition[cond_ind].parsed
+                )
                 # Find the top-OR and partition it
                 found_or = False
                 conditions = Deque[ParentChainMixin]()
@@ -284,16 +288,14 @@ class LogQLBackend(TextQueryBackend):
                         arg_count = len(cond.args)
                         # If we need more partitions than arguments to the top OR, give up
                         if arg_count < partitions:
-                            # TODO: decide a better way of producing warnings
-                            print(
+                            warn(
                                 f"Too few arguments to highest OR, reducing partition "
                                 f"count to {arg_count}",
-                                file=sys.stderr,
                             )
                             return self.partition_rule(rule, arg_count)
-                        i = x * int(arg_count / partitions)
-                        j = (x + 1) * int(arg_count / partitions)
-                        cond.args = cond.args[i:j]
+                        start = part_ind * int(arg_count / partitions)
+                        end = (part_ind + 1) * int(arg_count / partitions)
+                        cond.args = cond.args[start:end]
                         found_or = True
                         break
                     if isinstance(cond, (ConditionAND, ConditionNOT)):
@@ -302,10 +304,9 @@ class LogQLBackend(TextQueryBackend):
                 if not found_or:
                     # No OR statement within the large query, so probably no way of
                     # dividing query
-                    print(
+                    warn(
                         "Cannot partition a rule that exceeds query length limits "
                         "due to lack of ORs",
-                        file=sys.stderr,
                     )
                     return [cond.parsed for cond in rule.detection.parsed_condition]
                 new_conditions.append(parsed_copy)
