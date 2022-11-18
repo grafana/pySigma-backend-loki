@@ -357,7 +357,7 @@ class LogQLBackend(TextQueryBackend):
                 )
                 for index, query in enumerate(queries)
             ]
-        except SigmaError as e:  # pragma: no cover
+        except SigmaError as e:
             if self.collect_errors:
                 self.errors.append((rule, e))
                 return []

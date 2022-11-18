@@ -1014,6 +1014,29 @@ def test_loki_unbound_or_field(loki_backend: LogQLBackend):
         )
 
 
+def test_loki_collect_errors(loki_backend: LogQLBackend):
+    loki_backend.collect_errors = True
+    rules = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    valueA
+                sel:
+                    fieldA: valueB
+                condition: keywords or sel
+        """
+    )
+    loki_backend.convert(rules)
+    assert len(loki_backend.errors) == 1
+    (r, e) = loki_backend.errors[0]
+    assert r == rules[0] and isinstance(e, SigmaFeatureNotSupportedByBackendError)
+
+
 def test_loki_default_output(loki_backend: LogQLBackend):
     """Test for output format default."""
     # TODO: implement a test for the output format
