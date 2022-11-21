@@ -1,4 +1,7 @@
 import pytest
+import random
+import string
+import warnings
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
@@ -891,6 +894,104 @@ def test_loki_fields(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_very_long_query_or(loki_backend: LogQLBackend):
+    long_field = f"longField{'A' * 50}"
+    yaml = (
+        f"""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel_each:
+                    {long_field}: valueA
+                sel_partitioned:
+                    longFieldB|contains:
+"""
+        + "\n".join(
+            "                       - "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(100)
+        )
+        + """
+                condition: all of sel_*
+            """
+    )
+    test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+    assert len(test) > 1 and (
+        f"{long_field}=`valueA`" in q and len(q) < 5120 for q in test
+    )
+
+
+def test_loki_very_long_query_no_or(loki_backend: LogQLBackend):
+    yaml = (
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+"""
+        + "\n".join(
+            "                       field"
+            + "".join(random.choices(string.ascii_letters, k=5))
+            + ": "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(200)
+        )
+        + """
+                condition: sel
+            """
+    )
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+        assert len(w) == 1
+        assert len(test) == 1 and len(test[0]) > 5120
+
+
+def test_loki_very_long_query_too_few_or_args(loki_backend: LogQLBackend):
+    yaml = (
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                selA:
+"""
+        + "\n".join(
+            "                       field"
+            + "".join(random.choices(string.ascii_letters, k=5))
+            + ": "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(100)
+        )
+        + """
+                selB:
+"""
+        + "\n".join(
+            "                       field"
+            + "".join(random.choices(string.ascii_letters, k=5))
+            + ": "
+            + "".join(random.choices(string.ascii_letters, k=50))
+            for _ in range(100)
+        )
+        + """
+                condition: 1 of sel*
+            """
+    )
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
+        assert len(w) == 1
+        assert len(test) == 2 and all(len(query) > 5120 for query in test)
+
+
 # Tests for unimplemented/unsupported features
 def test_loki_unbound_or_field(loki_backend: LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError):
@@ -911,6 +1012,29 @@ def test_loki_unbound_or_field(loki_backend: LogQLBackend):
             """
             )
         )
+
+
+def test_loki_collect_errors(loki_backend: LogQLBackend):
+    loki_backend.collect_errors = True
+    rules = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    valueA
+                sel:
+                    fieldA: valueB
+                condition: keywords or sel
+        """
+    )
+    loki_backend.convert(rules)
+    assert len(loki_backend.errors) == 1
+    (r, e) = loki_backend.errors[0]
+    assert r == rules[0] and isinstance(e, SigmaFeatureNotSupportedByBackendError)
 
 
 def test_loki_default_output(loki_backend: LogQLBackend):

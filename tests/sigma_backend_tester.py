@@ -73,6 +73,7 @@ counters: Dict[str, Any] = {
     "convert_error": 0,
     "validate_error": 0,
     "total_sigs": 0,
+    "total_queries": 0,
     "total_files": 0,
     "total_test_logs": 0,
     "convert_success": 0,
@@ -96,9 +97,15 @@ def validate_with_backend(query, test_file=subprocess.DEVNULL):
     )
     stdout = result.stdout.decode()
     stderr = result.stderr.decode()
-    # For now, we will assume that if logcli produces one or more lines of stdout,
-    # we have validated the query
-    return (result.returncode, stdout, stderr, stdout.count(os.linesep) > 0)
+    valid = False
+    # If we have an input file, the query is valid if logcli produces one or more lines
+    # of output. Otherwise, check logcli's return code to ensure the query is
+    # syntactically valid
+    if test_file is not subprocess.DEVNULL:
+        valid = stdout.count(os.linesep) > 0
+    else:
+        valid = result.returncode == 0
+    return (result.returncode, stdout, stderr, valid)
 
 
 def find_all_detection_items(detection, acc):
@@ -152,13 +159,14 @@ def process_file(file_path, test_file, args, counters):
                 counters["error_types"][error_type] = (
                     counters["error_types"].get(error_type, 0) + 1
                 )
-                counters["error_messages"][str(err)] = (
-                    counters["error_messages"].get(str(err), 0) + 1
+                counters["error_messages"][str(err).strip()] = (
+                    counters["error_messages"].get(str(err).strip(), 0) + 1
                 )
             return
         try:
             loki_rules = backend.convert(sigma_rules)
             counters["convert_success"] += len(sigma_rules)
+            counters["total_queries"] += len(loki_rules)
             if args.validate or args.print:
                 for loki_query in loki_rules:
                     if args.print:
@@ -172,10 +180,10 @@ def process_file(file_path, test_file, args, counters):
                         elif valid:
                             counters["validate_success"] += 1
                         if args.print and len(stdout) > 0:
-                            print(stdout)
+                            print(stdout.strip())
                         if args.unique and len(stderr) > 0:
-                            counters["validate_stderr"][stderr] = (
-                                counters["validate_stderr"].get(stderr, 0) + 1
+                            counters["validate_stderr"][stderr.strip()] = (
+                                counters["validate_stderr"].get(stderr.strip(), 0) + 1
                             )
         except SigmaError as err:
             counters["convert_error"] += 1
@@ -254,10 +262,10 @@ if args.counts:
         f"{counters['total_sigs']} ({percent_conv:.2f}%) signatures"
     )
     if args.validate:
-        percent_valid = counters["validate_success"] / counters["convert_success"] * 100
+        percent_valid = counters["validate_success"] / counters["total_queries"] * 100
         print(
             f"Successfully validated {counters['validate_success']} out of "
-            f"{counters['convert_success']} ({percent_valid:.2f}%) signatures"
+            f"{counters['total_queries']} ({percent_valid:.2f}%) queries"
         )
     print(f"YAML parse errors: {counters['parse_error']}")
     print(f"Conversion errors: {counters['convert_error']}")

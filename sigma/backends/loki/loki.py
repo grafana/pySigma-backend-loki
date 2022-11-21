@@ -1,6 +1,8 @@
+import copy
+import math
 import re
 from dataclasses import dataclass
-from typing import Any, ClassVar, Dict, List, Optional, Pattern, Tuple, Union
+from typing import Any, ClassVar, Deque, Dict, List, Optional, Pattern, Tuple, Union
 
 from sigma.conditions import (
     ConditionAND,
@@ -9,13 +11,15 @@ from sigma.conditions import (
     ConditionNOT,
     ConditionOR,
     ConditionValueExpression,
+    ParentChainMixin,
 )
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
-from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
+from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.rule import SigmaLogSource, SigmaRule
 from sigma.types import SigmaCompareExpression, SigmaRegularExpression, SigmaString
+from warnings import warn
 from yaml import dump
 
 
@@ -227,11 +231,162 @@ class LogQLBackend(TextQueryBackend):
 
     # Implementing negation through De Morgan's laws
     def is_negated(self, state: ConversionState) -> bool:
-        """A utility function for determining whether or not the current operation should be
-        negated or not, based on the count of NOT operations above in the tree."""
+        """A utility function for determining whether or not the current operation
+        should be negated or not, based on the count of NOT operations, maintainined
+        in the processing state."""
         return state.processing_state.get("not_count", 0) % 2 == 1
 
+    def is_negated_chain(self, cond: ParentChainMixin) -> bool:
+        """A utility function for determining whether or not the current operation
+        should be negated, based on the count of NOT operations in the parent chain
+        class. This will be less efficient than is_negated(), but is required when we
+        lack the processing state."""
+        return (
+            len(
+                list(
+                    parent
+                    for parent in cond.parent_chain_classes()
+                    if parent == ConditionNOT
+                )
+            )
+            % 2
+            == 1
+        )
+
+    def partition_rule(
+        self, condition: ParentChainMixin, partitions: int
+    ) -> List[ParentChainMixin]:
+        """Given a rule that is (probably) going to generate a query that is longer
+        than the maximum query length for LogQL, break it into smaller conditions, by
+        identifying the highest level OR in the parse tree and equally dividing its
+        arguments between copies of the same rule.
+
+        Notes:
+            This code makes a number of assumptions about a rule:
+             - a rule contains at least one OR (warning if one can't be found)
+             - all arguments of the top-OR are same length (likely a bad assumption!)
+             - if we had multiple parsed_conditions, they each need processing
+               separately
+        """
+        new_conditions: List[ParentChainMixin] = []
+        for part_ind in range(partitions):
+            condition_copy = copy.deepcopy(condition)
+            # Find the top-OR and partition it
+            found_or = False
+            conditions = Deque[ParentChainMixin]()
+            conditions.append(condition_copy)
+            while conditions:
+                # breadth-first search the parse tree to find the highest OR
+                cond = conditions.popleft()
+                if (
+                    isinstance(cond, ConditionOR) and not self.is_negated_chain(cond)
+                ) or (isinstance(cond, ConditionAND) and self.is_negated_chain(cond)):
+                    arg_count = len(cond.args)
+                    # If we need more partitions than arguments to the top OR, try with
+                    # just that many
+                    if arg_count < partitions:
+                        warn(
+                            f"Too few arguments to highest OR, reducing partition "
+                            f"count to {arg_count}",
+                        )
+                        return self.partition_rule(condition, arg_count)
+                    start = part_ind * int(arg_count / partitions)
+                    end = (part_ind + 1) * int(arg_count / partitions)
+                    cond.args = cond.args[start:end]
+                    found_or = True
+                    break
+                if cond.operator:
+                    for arg in cond.args:
+                        conditions.append(arg)
+            if not found_or:
+                # No OR statement within the large query, so probably no way of
+                # dividing query
+                warn(
+                    "Cannot partition a rule that exceeds query length limits "
+                    "due to lack of ORs",
+                )
+                return [condition]
+            new_conditions.append(condition_copy)
+        return new_conditions
+
     # Overriding Sigma TextQueryBackend functionality as necessary
+    def convert_rule(
+        self, rule: SigmaRule, output_format: Optional[str] = None
+    ) -> List[str]:
+        """
+        Convert a single Sigma rule into one or more queries, based on the maximum
+        estimated length of a generated query. Largely copied from pySigma, with
+        modifications for partitioning rules into smaller queries.
+        """
+        state = ConversionState()
+        attempted_conversion = False
+        attempt_shortening = False
+        try:
+            processing_pipeline = (
+                self.backend_processing_pipeline
+                + self.processing_pipeline
+                + self.output_format_processing_pipeline[
+                    output_format or self.default_format
+                ]
+            )
+
+            error_state = "applying processing pipeline on"
+            processing_pipeline.apply(rule)  # 1. Apply transformations
+            state.processing_state = processing_pipeline.state
+
+            conditions = [cond.parsed for cond in rule.detection.parsed_condition]
+            shortened_conditions: List[ParentChainMixin] = []
+            final_queries: List[str] = []
+
+            threshold_length = 4096  # 80% of Loki limit (5120) due to query expansion
+            while not attempted_conversion or attempt_shortening:
+                if attempt_shortening:
+                    conditions = shortened_conditions
+                    attempt_shortening = False
+
+                error_state = "converting"
+                queries = [  # 2. Convert condition
+                    self.convert_condition(cond, state) for cond in conditions
+                ]
+
+                error_state = "finalizing query for"
+                for index, query in enumerate(queries, start=len(final_queries)):
+                    final_query = self.finalize_query(
+                        rule, query, index, state, output_format or self.default_format
+                    )
+                    if len(final_query) < threshold_length:
+                        # If the query is within the threshold length, all is well
+                        final_queries.append(final_query)
+                    elif not attempted_conversion:
+                        # If this is the first pass, try to shorten the condition
+                        shortened_conditions.extend(
+                            self.partition_rule(
+                                conditions[index],
+                                math.ceil(len(final_query) / threshold_length),
+                            )
+                        )
+                        attempt_shortening = True
+                    else:
+                        # Otherwise, produce the query anyway?
+                        final_queries.append(final_query)
+                attempted_conversion = True
+            return final_queries
+
+        except SigmaError as e:
+            if self.collect_errors:
+                self.errors.append((rule, e))
+                return []
+            else:
+                raise e
+        except Exception as e:  # pragma: no cover
+            # enrich all other exceptions with Sigma-specific context information
+            msg = f" (while {error_state} rule {str(rule.source)})"
+            if len(e.args) > 1:
+                e.args = (e.args[0] + msg,) + e.args[1:]
+            else:
+                e.args = (e.args[0] + msg,)
+            raise
+
     def convert_value_re(
         self, r: SigmaRegularExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
@@ -287,17 +442,7 @@ class LogQLBackend(TextQueryBackend):
         the precedence rules for such operators also needs to be flipped."""
         outer_class = outer.__class__
         if inner.__class__ in self.precedence and outer_class in self.precedence:
-            if (
-                len(
-                    list(
-                        cls
-                        for cls in outer.parent_chain_classes()
-                        if cls == ConditionNOT
-                    )
-                )
-                % 2
-                == 1
-            ):
+            if self.is_negated_chain(outer):
                 # At this point, we have an odd number of NOTs in the parent chain, outer
                 # will have been inverted, but inner will not yet been inverted, and we
                 # know inner is either an AND or an OR
