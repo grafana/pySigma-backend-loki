@@ -235,27 +235,6 @@ class LogQLBackend(TextQueryBackend):
         negated or not, based on the count of NOT operations above in the tree."""
         return state.processing_state.get("not_count", 0) % 2 == 1
 
-    def estimate_query_length(self, cond: ParentChainMixin) -> int:
-        """Attempt to estimate the length of the LogQL query that will be generated, in
-        order to decide whether the rule needs to be partitioned into smaller rules.
-        """
-        cond_size = 0
-        if isinstance(cond, ConditionOR):
-            # Add 2 for the spaces
-            cond_size = (len(self.or_token) + 2) * (cond.arg_count - 1)
-        elif isinstance(cond, ConditionAND):
-            cond_size = (len(self.and_token) + 2) * (cond.arg_count - 1)
-        elif isinstance(cond, ConditionNOT):
-            cond_size = 0
-        else:
-            # 3 based on a single operator surrounded by spaces
-            cond_size = 3 + len(str(cond.value))
-            if hasattr(cond, "field"):
-                cond_size += len(cond.field)
-        if hasattr(cond, "arg_count") and cond.arg_count > 0:
-            return cond_size + sum(self.estimate_query_length(arg) for arg in cond.args)
-        return cond_size
-
     def partition_rule(
         self, condition: ParentChainMixin, partitions: int
     ) -> List[ParentChainMixin]:
