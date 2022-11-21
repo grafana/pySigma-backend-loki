@@ -231,9 +231,21 @@ class LogQLBackend(TextQueryBackend):
 
     # Implementing negation through De Morgan's laws
     def is_negated(self, state: ConversionState) -> bool:
-        """A utility function for determining whether or not the current operation should be
-        negated or not, based on the count of NOT operations above in the tree."""
+        """A utility function for determining whether or not the current operation
+        should be negated or not, based on the count of NOT operations, maintainined
+        in the processing state."""
         return state.processing_state.get("not_count", 0) % 2 == 1
+
+    def is_negated_chain(self, cond: ParentChainMixin) -> bool:
+        """A utility function for determining whether or not the current operation
+        should be negated, based on the count of NOT operations in the parent chain
+        class. This will be less efficient than is_negated(), but is required when we
+        lack the processing state."""
+        return (
+            sum(1 for parent in cond.parent_chain_classes() if parent == ConditionNOT)
+            % 2
+            == 1
+        )
 
     def partition_rule(
         self, condition: ParentChainMixin, partitions: int
@@ -260,7 +272,9 @@ class LogQLBackend(TextQueryBackend):
             while conditions:
                 # breadth-first search the parse tree to find the highest OR
                 cond = conditions.popleft()
-                if isinstance(cond, ConditionOR):
+                if (
+                    isinstance(cond, ConditionOR) and not self.is_negated_chain(cond)
+                ) or (isinstance(cond, ConditionAND) and self.is_negated_chain(cond)):
                     arg_count = len(cond.args)
                     # If we need more partitions than arguments to the top OR, try with
                     # just that many
@@ -275,7 +289,7 @@ class LogQLBackend(TextQueryBackend):
                     cond.args = cond.args[start:end]
                     found_or = True
                     break
-                if isinstance(cond, (ConditionAND, ConditionNOT)):
+                if cond.operator:
                     for arg in cond.args:
                         conditions.append(arg)
             if not found_or:
@@ -422,17 +436,7 @@ class LogQLBackend(TextQueryBackend):
         the precedence rules for such operators also needs to be flipped."""
         outer_class = outer.__class__
         if inner.__class__ in self.precedence and outer_class in self.precedence:
-            if (
-                len(
-                    list(
-                        cls
-                        for cls in outer.parent_chain_classes()
-                        if cls == ConditionNOT
-                    )
-                )
-                % 2
-                == 1
-            ):
+            if self.is_negated_chain(outer):
                 # At this point, we have an odd number of NOTs in the parent chain, outer
                 # will have been inverted, but inner will not yet been inverted, and we
                 # know inner is either an AND or an OR
