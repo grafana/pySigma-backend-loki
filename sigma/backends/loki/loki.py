@@ -242,7 +242,13 @@ class LogQLBackend(TextQueryBackend):
         class. This will be less efficient than is_negated(), but is required when we
         lack the processing state."""
         return (
-            sum(1 for parent in cond.parent_chain_classes() if parent == ConditionNOT)
+            len(
+                list(
+                    parent
+                    for parent in cond.parent_chain_classes()
+                    if parent == ConditionNOT
+                )
+            )
             % 2
             == 1
         )
