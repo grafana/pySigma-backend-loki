@@ -257,7 +257,7 @@ class LogQLBackend(TextQueryBackend):
         return cond_size
 
     def partition_rule(
-        self, rule: SigmaRule, partitions: int
+        self, condition: ParentChainMixin, partitions: int
     ) -> List[ParentChainMixin]:
         """Given a rule that is (probably) going to generate a query that is longer
         than the maximum query length for LogQL, break it into smaller conditions, by
@@ -271,45 +271,43 @@ class LogQLBackend(TextQueryBackend):
              - if we had multiple parsed_conditions, they each need processing
                separately
         """
-        new_conditions = []
-        for cond_ind in range(len(rule.detection.parsed_condition)):
-            for part_ind in range(partitions):
-                parsed_copy = copy.deepcopy(
-                    rule.detection.parsed_condition[cond_ind].parsed
+        new_conditions: List[ParentChainMixin] = []
+        for part_ind in range(partitions):
+            condition_copy = copy.deepcopy(condition)
+            # Find the top-OR and partition it
+            found_or = False
+            conditions = Deque[ParentChainMixin]()
+            conditions.append(condition_copy)
+            while conditions:
+                # breadth-first search the parse tree to find the highest OR
+                cond = conditions.popleft()
+                if isinstance(cond, ConditionOR):
+                    arg_count = len(cond.args)
+                    # If we need more partitions than arguments to the top OR, try with
+                    # just that many
+                    if arg_count < partitions:
+                        warn(
+                            f"Too few arguments to highest OR, reducing partition "
+                            f"count to {arg_count}",
+                        )
+                        return self.partition_rule(condition, arg_count)
+                    start = part_ind * int(arg_count / partitions)
+                    end = (part_ind + 1) * int(arg_count / partitions)
+                    cond.args = cond.args[start:end]
+                    found_or = True
+                    break
+                if isinstance(cond, (ConditionAND, ConditionNOT)):
+                    for arg in cond.args:
+                        conditions.append(arg)
+            if not found_or:
+                # No OR statement within the large query, so probably no way of
+                # dividing query
+                warn(
+                    "Cannot partition a rule that exceeds query length limits "
+                    "due to lack of ORs",
                 )
-                # Find the top-OR and partition it
-                found_or = False
-                conditions = Deque[ParentChainMixin]()
-                conditions.append(parsed_copy)
-                while conditions:
-                    # breadth-first search the parse tree to find the highest OR
-                    cond = conditions.popleft()
-                    if isinstance(cond, ConditionOR):
-                        arg_count = len(cond.args)
-                        # If we need more partitions than arguments to the top OR, give up
-                        if arg_count < partitions:
-                            warn(
-                                f"Too few arguments to highest OR, reducing partition "
-                                f"count to {arg_count}",
-                            )
-                            return self.partition_rule(rule, arg_count)
-                        start = part_ind * int(arg_count / partitions)
-                        end = (part_ind + 1) * int(arg_count / partitions)
-                        cond.args = cond.args[start:end]
-                        found_or = True
-                        break
-                    if isinstance(cond, (ConditionAND, ConditionNOT)):
-                        for arg in cond.args:
-                            conditions.append(arg)
-                if not found_or:
-                    # No OR statement within the large query, so probably no way of
-                    # dividing query
-                    warn(
-                        "Cannot partition a rule that exceeds query length limits "
-                        "due to lack of ORs",
-                    )
-                    return [cond.parsed for cond in rule.detection.parsed_condition]
-                new_conditions.append(parsed_copy)
+                return [condition]
+            new_conditions.append(condition_copy)
         return new_conditions
 
     # Overriding Sigma TextQueryBackend functionality as necessary
@@ -322,6 +320,8 @@ class LogQLBackend(TextQueryBackend):
         modifications for partitioning rules into smaller queries.
         """
         state = ConversionState()
+        attempted_conversion = False
+        attempt_shortening = False
         try:
             processing_pipeline = (
                 self.backend_processing_pipeline
@@ -336,27 +336,43 @@ class LogQLBackend(TextQueryBackend):
             state.processing_state = processing_pipeline.state
 
             conditions = [cond.parsed for cond in rule.detection.parsed_condition]
-            max_estimated_length = max(
-                self.estimate_query_length(cond) for cond in conditions
-            )
-            # Max LogQL query length is 5120, use 80% of that limit due to estimation
-            threshold_length = 4096
-            if max_estimated_length > threshold_length:
-                partitions = math.ceil(max_estimated_length / threshold_length)
-                conditions = self.partition_rule(rule, partitions)
+            shortened_conditions: List[ParentChainMixin] = []
+            final_queries: List[str] = []
 
-            error_state = "converting"
-            queries = [  # 2. Convert condition
-                self.convert_condition(cond, state) for cond in conditions
-            ]
+            threshold_length = 4096  # 80% of Loki limit (5120) due to query expansion
+            while not attempted_conversion or attempt_shortening:
+                if attempt_shortening:
+                    conditions = shortened_conditions
+                    attempt_shortening = False
 
-            error_state = "finalizing query for"
-            return [  # 3. Postprocess generated query
-                self.finalize_query(
-                    rule, query, index, state, output_format or self.default_format
-                )
-                for index, query in enumerate(queries)
-            ]
+                error_state = "converting"
+                queries = [  # 2. Convert condition
+                    self.convert_condition(cond, state) for cond in conditions
+                ]
+
+                error_state = "finalizing query for"
+                for index, query in enumerate(queries, start=len(final_queries)):
+                    final_query = self.finalize_query(
+                        rule, query, index, state, output_format or self.default_format
+                    )
+                    if len(final_query) < threshold_length:
+                        # If the query is within the threshold length, all is well
+                        final_queries.append(final_query)
+                    elif not attempted_conversion:
+                        # If this is the first pass, try to shorten the condition
+                        shortened_conditions.extend(
+                            self.partition_rule(
+                                conditions[index],
+                                math.ceil(len(final_query) / threshold_length),
+                            )
+                        )
+                        attempt_shortening = True
+                    else:
+                        # Otherwise, produce the query anyway?
+                        final_queries.append(final_query)
+                attempted_conversion = True
+            return final_queries
+
         except SigmaError as e:
             if self.collect_errors:
                 self.errors.append((rule, e))
