@@ -33,7 +33,7 @@ from yaml import dump
 
 
 @dataclass
-class LogQLDeferredUnboundExpression(DeferredQueryExpression):
+class LogQLDeferredUnboundStrExpression(DeferredQueryExpression):
     """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
 
     value: str
@@ -45,6 +45,41 @@ class LogQLDeferredUnboundExpression(DeferredQueryExpression):
 
     def finalize_expression(self) -> str:
         return f"{self.op} {self.value}"
+
+
+@dataclass
+class LogQLDeferredUnboundCIDRExpression(DeferredQueryExpression):
+    """'Defer' unbounded matching of CIDR to pipelined command **BEFORE** main search expression."""
+
+    ip: str
+    op: str = "|="  # default to matching
+
+    def negate(self) -> DeferredQueryExpression:
+        self.op = LogQLBackend.negated_line_filter_operator[self.op]
+        return self
+
+    def finalize_expression(self) -> str:
+        return f'{self.op} cidr("{self.ip}")'
+
+
+@dataclass
+class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
+    """'Defer' unbounded matching of regex to pipelined command **BEFORE** main search
+    expression."""
+
+    regexp: str
+    op: str = "|~"  # default to matching
+
+    def negate(self) -> DeferredQueryExpression:
+        self.op = LogQLBackend.negated_line_filter_operator[self.op]
+        return self
+
+    def finalize_expression(self) -> str:
+        if "`" in self.regexp:
+            value = '"' + SigmaRegularExpression(self.regexp).escape('"') + '"'
+        else:
+            value = "`" + self.regexp + "`"
+        return f"{self.op} {value}"
 
 
 @dataclass
@@ -462,7 +497,7 @@ class LogQLBackend(TextQueryBackend):
                             for _, cond in conditions
                         ]
                         if candidate_lfs and candidate_lfs[0] is not None:
-                            line_filter = LogQLDeferredUnboundExpression(
+                            line_filter = LogQLDeferredUnboundStrExpression(
                                 state,
                                 self.convert_value_str(
                                     SigmaString(candidate_lfs[0][0]), state
@@ -700,7 +735,7 @@ class LogQLBackend(TextQueryBackend):
         if cond.value.contains_special():
             cond.value = self.convert_wildcard_to_re(cond.value)
             return self.convert_condition_val_re(cond, state)
-        expr = LogQLDeferredUnboundExpression(
+        expr = LogQLDeferredUnboundStrExpression(
             state, self.convert_value_str(cond.value, state)
         )
         if self.is_negated(state):
@@ -711,7 +746,7 @@ class LogQLBackend(TextQueryBackend):
         self, cond: ConditionValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """Convert unbound numeric queries into deferred line filters."""
-        expr = LogQLDeferredUnboundExpression(state, cond.value)
+        expr = LogQLDeferredUnboundStrExpression(state, cond.value)
         if self.is_negated(state):
             expr.negate()
         return expr
@@ -720,7 +755,7 @@ class LogQLBackend(TextQueryBackend):
         self, cond: ConditionValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """Convert unbound regular expression queries into deferred line filters."""
-        expr = LogQLDeferredUnboundExpression(
+        expr = LogQLDeferredUnboundStrExpression(
             state, self.convert_value_re(cond.value, state), "|~"
         )
         if self.is_negated(state):
