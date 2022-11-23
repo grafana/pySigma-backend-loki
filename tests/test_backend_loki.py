@@ -597,6 +597,29 @@ def test_loki_field_name_leading_num(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_field_name_empty_whitespace_null(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+              title: Test
+              status: test
+              logsource:
+                  category: test_category
+                  product: test_product
+              detection:
+                  sel:
+                      "": valueA
+                      ~: valueB
+                      "   ": valueC
+                  condition: sel
+          """
+            )
+        )
+        == ['{job=~".+"} |= `valueA` |= `valueB` | logfmt | =`valueC`']
+    )
+
+
 def test_loki_field_name_invalid(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
