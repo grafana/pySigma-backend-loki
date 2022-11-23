@@ -320,7 +320,7 @@ class LogQLBackend(TextQueryBackend):
 
     def generate_candidate_line_filter(
         self, cond: ParentChainMixin, log_formatter: str
-    ) -> Union[tuple[str, bool], None]:
+    ) -> Union[Tuple[str, bool], None]:
         """Given a condition, attempt to find the longest string in queries that could
         be used as line filters, which should improve the overall performance of the
         generated Loki queries."""
@@ -435,7 +435,7 @@ class LogQLBackend(TextQueryBackend):
                 (index, cond.parsed)
                 for index, cond in enumerate(rule.detection.parsed_condition)
             ]
-            shortened_conditions: List[tuple[int, ParentChainMixin]] = []
+            shortened_conditions: List[Tuple[int, ParentChainMixin]] = []
             final_queries: List[str] = []
 
             threshold_length = 4096  # 80% of Loki limit (5120) due to query expansion
