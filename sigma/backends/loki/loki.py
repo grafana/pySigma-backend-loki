@@ -2,6 +2,7 @@ import copy
 import math
 import re
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from typing import Any, ClassVar, Deque, Dict, List, Optional, Pattern, Tuple, Union
 
 from sigma.conditions import (
@@ -18,7 +19,15 @@ from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.rule import SigmaLogSource, SigmaRule
-from sigma.types import SigmaCompareExpression, SigmaRegularExpression, SigmaString
+from sigma.types import (
+    SigmaBool,
+    SigmaCompareExpression,
+    SigmaCIDRExpression,
+    SigmaRegularExpression,
+    SigmaString,
+    SigmaNull,
+    SigmaNumber,
+)
 from warnings import warn
 from yaml import dump
 
@@ -172,7 +181,7 @@ class LogQLBackend(TextQueryBackend):
             "(?i)" + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
         )
 
-    def select_log_parser(self, logsource: SigmaLogSource):
+    def select_log_parser(self, logsource: SigmaLogSource) -> str:
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
         Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
         signatures."""
@@ -195,7 +204,7 @@ class LogQLBackend(TextQueryBackend):
         # default to logfmt - relevant for auditd, and many other applications
         return "logfmt"
 
-    def select_log_stream(self, logsource: SigmaLogSource):
+    def select_log_stream(self, logsource: SigmaLogSource) -> str:
         """Select a logstream based on the logsource information included within a rule and
         following the assumptions described in select_log_parser."""
         if logsource.product == "windows":
@@ -309,6 +318,94 @@ class LogQLBackend(TextQueryBackend):
             new_conditions.append(condition_copy)
         return new_conditions
 
+    def generate_candidate_line_filter(
+        self, cond: ParentChainMixin, log_formatter: str
+    ) -> Union[tuple[str, bool], None]:
+        """Given a condition, attempt to find the longest string in queries that could
+        be used as line filters, which should improve the overall performance of the
+        generated Loki queries."""
+        is_negated = self.is_negated_chain(cond)
+        if isinstance(cond, ConditionFieldEqualsValueExpression):
+            # Can only use negation of expressions if the log format includes the field
+            # name in the log line
+            if log_formatter == "logfmt" and isinstance(
+                cond.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
+            ):
+                value = "" if isinstance(cond.value, SigmaNull) else str(cond.value)
+                return (f"{cond.field}={value}", is_negated)
+            elif (
+                isinstance(cond.value, (SigmaString, SigmaNumber, SigmaBool))
+                and not is_negated
+            ):
+                return (str(cond.value), is_negated)
+            elif isinstance(cond.value, SigmaRegularExpression):
+                # TODO: if we strip leading flags ((?i) etc.), and split the RE up on
+                # metacharacters, we will generate valid substrings that could be used
+                # as line filters
+                return None
+            elif isinstance(cond.value, SigmaCIDRExpression):
+                # TODO: if we have an IPv4 address and a CIDR length % 8 = 0, we can
+                # truncate the IP to the appropriate . and use that as a partial match
+                return None
+            else:
+                # Can't necessarily assume the field will appear in the log file for an
+                # arbitary log format
+                return None
+        # AND clauses: any of the values could be true - so pick the longest one
+        if (isinstance(cond, ConditionAND) and not is_negated) or (
+            isinstance(cond, ConditionOR) and is_negated
+        ):
+            candidates = [
+                self.generate_candidate_line_filter(arg, log_formatter)
+                for arg in cond.args
+            ]
+            longest = None
+            for cand in candidates:
+                if cand is not None and (
+                    longest is None or len(cand[0]) > len(longest[0])
+                ):
+                    longest = cand
+            return longest
+        # OR clauses: all of the values must be possible, so we need either the LCS of
+        # them all, or (TODO?) a list of the values combined as a regular expression
+        elif (isinstance(cond, ConditionOR) and not is_negated) or (
+            isinstance(cond, ConditionAND) and is_negated
+        ):
+            candidates = [
+                self.generate_candidate_line_filter(arg, log_formatter)
+                for arg in cond.args
+            ]
+            any_negated = any(cand[1] for cand in candidates if cand)
+            # Ensure we don't create partial matches for negated filters (as they may
+            # catch otherwise valid log entries
+            if any_negated:
+                return None
+            matcher = None
+            match = None
+            for cand in candidates:
+                if cand:
+                    if matcher is None:
+                        matcher = SequenceMatcher(None, b=cand[0])
+                    else:
+                        matcher.set_seq1(cand[0])
+                        blo = match.b if match else 0
+                        bhi = match.b + match.size if match else len(matcher.b)
+                        match = matcher.find_longest_match(0, len(cand[0]), blo, bhi)
+                        if match.size == 0:
+                            return None
+            if matcher and match:
+                start = match.b
+                end = match.b + match.size
+                return (matcher.b[start:end], any_negated)
+            return None
+        elif isinstance(cond, ConditionNOT):
+            return self.generate_candidate_line_filter(cond.args[0], log_formatter)
+        else:  # pragma: no cover
+            # The above should cover all existing Sigma classes, but just in case...
+            raise SigmaError(
+                f"Unhandled type by Loki backend: {str(cond.__class__.__name__)}"
+            )
+
     # Overriding Sigma TextQueryBackend functionality as necessary
     def convert_rule(
         self, rule: SigmaRule, output_format: Optional[str] = None
@@ -334,8 +431,11 @@ class LogQLBackend(TextQueryBackend):
             processing_pipeline.apply(rule)  # 1. Apply transformations
             state.processing_state = processing_pipeline.state
 
-            conditions = [cond.parsed for cond in rule.detection.parsed_condition]
-            shortened_conditions: List[ParentChainMixin] = []
+            conditions = [
+                (index, cond.parsed)
+                for index, cond in enumerate(rule.detection.parsed_condition)
+            ]
+            shortened_conditions: List[tuple[int, ParentChainMixin]] = []
             final_queries: List[str] = []
 
             threshold_length = 4096  # 80% of Loki limit (5120) due to query expansion
@@ -346,11 +446,32 @@ class LogQLBackend(TextQueryBackend):
 
                 error_state = "converting"
                 queries = [  # 2. Convert condition
-                    self.convert_condition(cond, state) for cond in conditions
+                    (index, self.convert_condition(cond, state))
+                    for index, cond in conditions
                 ]
 
-                error_state = "finalizing query for"
-                for index, query in enumerate(queries, start=len(final_queries)):
+                for index, query in queries:
+                    if not state.has_deferred() and self.config.get(
+                        "add_line_filters", False
+                    ):
+                        # 2.5. Introduce line filters
+                        error_state = "introducing line filters"
+                        log_parser = self.select_log_parser(rule.logsource)
+                        candidate_lfs = [
+                            self.generate_candidate_line_filter(cond, log_parser)
+                            for _, cond in conditions
+                        ]
+                        if candidate_lfs and candidate_lfs[0] is not None:
+                            line_filter = LogQLDeferredUnboundExpression(
+                                state,
+                                self.convert_value_str(
+                                    SigmaString(candidate_lfs[0][0]), state
+                                ),
+                            )
+                            if candidate_lfs[0][1]:
+                                line_filter.negate()
+
+                    error_state = "finalizing query for"
                     final_query = self.finalize_query(
                         rule, query, index, state, output_format or self.default_format
                     )
@@ -360,8 +481,9 @@ class LogQLBackend(TextQueryBackend):
                     elif not attempted_conversion:
                         # If this is the first pass, try to shorten the condition
                         shortened_conditions.extend(
-                            self.partition_rule(
-                                conditions[index],
+                            (index, cond)
+                            for cond in self.partition_rule(
+                                conditions[index][1],
                                 math.ceil(len(final_query) / threshold_length),
                             )
                         )
