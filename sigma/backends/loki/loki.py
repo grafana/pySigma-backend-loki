@@ -218,11 +218,11 @@ class LogQLBackend(TextQueryBackend):
         """Implements the logic used by Loki to sanitize labels.
 
         See: https://github.com/grafana/loki/blob/main/pkg/logql/log/util.go#L21"""
-        # An empty key seems impossible to specify in Sigma, but left in for completeness
+        # pySigma treats null or empty fields as unbound expressions, rather than keys
         if key is None or len(key) == 0:  # pragma: no cover
             return ""
         key = key.strip()
-        if len(key) == 0:  # pragma: no cover
+        if len(key) == 0:
             return key
         if isprefix and key[0] >= "0" and key[0] <= "9":
             key = "_" + key
