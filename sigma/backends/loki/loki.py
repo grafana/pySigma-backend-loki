@@ -3,7 +3,19 @@ import math
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Any, ClassVar, Deque, Dict, List, Optional, Pattern, Tuple, Union
+from enum import Enum, auto
+from typing import (
+    Any,
+    ClassVar,
+    Deque,
+    Dict,
+    List,
+    NamedTuple,
+    Optional,
+    Pattern,
+    Tuple,
+    Union,
+)
 
 from sigma.conditions import (
     ConditionAND,
@@ -30,6 +42,29 @@ from sigma.types import (
 )
 from warnings import warn
 from yaml import dump
+
+
+class LogQLLogParser(
+    Enum
+):  # would be a little nicer as a StrEnum, requires Python 3.11
+    """The different log parsers available in LogQL.
+
+    See: https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression"""
+
+    JSON = "json"
+    LOGFMT = "logfmt"
+    PATTERN = "pattern"
+    REGEXP = "regexp"
+    UNPACK = "unpack"
+
+
+class LogQLDeferredType:
+    """The different types of deferred expressions that can be created by this backend"""
+
+    STR = auto()
+    CIDR = auto()
+    REGEXP = auto()
+    OR_STR = auto()
 
 
 @dataclass
@@ -100,6 +135,12 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         else:
             or_value = "`" + or_value + "`"
         return f"{self.op} {or_value}"
+
+
+LogQLLineFilterInfo = NamedTuple(
+    "LogQLLineFilterInfo",
+    [("value", str), ("negated", bool), ("deftype", auto)],
+)
 
 
 class LogQLBackend(TextQueryBackend):
@@ -216,7 +257,7 @@ class LogQLBackend(TextQueryBackend):
             "(?i)" + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
         )
 
-    def select_log_parser(self, logsource: SigmaLogSource) -> str:
+    def select_log_parser(self, logsource: SigmaLogSource) -> LogQLLogParser:
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
         Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
         signatures."""
@@ -235,9 +276,9 @@ class LogQLBackend(TextQueryBackend):
             #  - https://blog.e-mundo.de/post/painless-and-secure-windows-event-log-delivery-with-fluent-bit-loki-and-grafana/  # noqa: E501
             #  - https://www.elastic.co/guide/en/logstash/current/plugins-inputs-azure_event_hubs.html  # noqa: E501
             #  - https://docs.zeek.org/en/master/log-formats.html#zeek-json-format-logs
-            return "json"
+            return LogQLLogParser.JSON
         # default to logfmt - relevant for auditd, and many other applications
-        return "logfmt"
+        return LogQLLogParser.LOGFMT
 
     def select_log_stream(self, logsource: SigmaLogSource) -> str:
         """Select a logstream based on the logsource information included within a rule and
@@ -353,12 +394,9 @@ class LogQLBackend(TextQueryBackend):
             new_conditions.append(condition_copy)
         return new_conditions
 
-    # Rather than return a tuple of values, I'd really prefer to return a DeferredQueryExpression
-    # but because creating them automatically adds the DQE to the state.deferred, doing so would
-    # introduce additional complexity
     def generate_candidate_line_filter(
-        self, cond: ParentChainMixin, log_formatter: str
-    ) -> Union[Tuple[str, bool, str], None]:
+        self, cond: ParentChainMixin, log_parser: LogQLLogParser
+    ) -> Union[LogQLLineFilterInfo, None]:
         """Given a condition, attempt to find the longest string in queries that could
         be used as line filters, which should improve the overall performance of the
         generated Loki queries."""
@@ -366,22 +404,38 @@ class LogQLBackend(TextQueryBackend):
         if isinstance(cond, ConditionFieldEqualsValueExpression):
             # Can only use negation of expressions if the log format includes the field
             # name in the log line
-            if log_formatter == "logfmt" and isinstance(
+            if log_parser is LogQLLogParser.LOGFMT and isinstance(
                 cond.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
             ):
                 value = "" if isinstance(cond.value, SigmaNull) else str(cond.value)
-                return f"{cond.field}={value}", is_negated, "str"
+                return LogQLLineFilterInfo(
+                    value=f"{cond.field}={value}",
+                    negated=is_negated,
+                    deftype=LogQLDeferredType.STR,
+                )
             elif (
                 isinstance(cond.value, (SigmaString, SigmaNumber, SigmaBool))
                 and not is_negated
             ):
-                return str(cond.value), is_negated, "str"
+                return LogQLLineFilterInfo(
+                    value=str(cond.value),
+                    negated=is_negated,
+                    deftype=LogQLDeferredType.STR,
+                )
             elif isinstance(cond.value, SigmaRegularExpression):
                 # Could include field name if entries are logfmt and doesn't start with wildcard
-                return cond.value.regexp, is_negated, "regexp"
+                return LogQLLineFilterInfo(
+                    value=cond.value.regexp,
+                    negated=is_negated,
+                    deftype=LogQLDeferredType.REGEXP,
+                )
             elif isinstance(cond.value, SigmaCIDRExpression):
                 # Could include field name if entries are logfmt
-                return cond.value.cidr, is_negated, "cidr"
+                return LogQLLineFilterInfo(
+                    value=cond.value.cidr,
+                    negated=is_negated,
+                    deftype=LogQLDeferredType.CIDR,
+                )
             else:
                 # Can't necessarily assume the field will appear in the log file for an
                 # arbitary log format
@@ -391,13 +445,13 @@ class LogQLBackend(TextQueryBackend):
             isinstance(cond, ConditionOR) and is_negated
         ):
             candidates = [
-                self.generate_candidate_line_filter(arg, log_formatter)
+                self.generate_candidate_line_filter(arg, log_parser)
                 for arg in cond.args
             ]
             longest = None
             for cand in candidates:
                 if cand is not None and (
-                    longest is None or len(cand[0]) > len(longest[0])
+                    longest is None or len(cand.value) > len(longest.value)
                 ):
                     longest = cand
             return longest
@@ -407,10 +461,10 @@ class LogQLBackend(TextQueryBackend):
             isinstance(cond, ConditionAND) and is_negated
         ):
             candidates = [
-                self.generate_candidate_line_filter(arg, log_formatter)
+                self.generate_candidate_line_filter(arg, log_parser)
                 for arg in cond.args
             ]
-            any_negated = any(cand[1] for cand in candidates if cand)
+            any_negated = any(cand.negated for cand in candidates if cand)
             # Ensure we don't create partial matches for negated filters (as they may
             # catch otherwise valid log entries
             if any_negated:
@@ -419,23 +473,27 @@ class LogQLBackend(TextQueryBackend):
             match = None
             # Logic for strings
             for cand in candidates:
-                if cand and cand[2] == "str":
+                if cand and cand.deftype == LogQLDeferredType.STR:
                     if matcher is None:
-                        matcher = SequenceMatcher(None, b=cand[0])
+                        matcher = SequenceMatcher(None, b=cand.value)
                     else:
-                        matcher.set_seq1(cand[0])
+                        matcher.set_seq1(cand.value)
                         blo = match.b if match else 0
                         bhi = match.b + match.size if match else len(matcher.b)
-                        match = matcher.find_longest_match(0, len(cand[0]), blo, bhi)
+                        match = matcher.find_longest_match(0, len(cand.value), blo, bhi)
                         if match.size == 0:
                             return None
             if matcher and match:
                 start = match.b
                 end = match.b + match.size
-                return matcher.b[start:end], any_negated, "str"
+                return LogQLLineFilterInfo(
+                    value=matcher.b[start:end],
+                    negated=any_negated,
+                    deftype=LogQLDeferredType.STR,
+                )
             return None
         elif isinstance(cond, ConditionNOT):
-            return self.generate_candidate_line_filter(cond.args[0], log_formatter)
+            return self.generate_candidate_line_filter(cond.args[0], log_parser)
         else:  # pragma: no cover
             # The above should cover all existing Sigma classes, but just in case...
             raise SigmaError(
@@ -499,16 +557,16 @@ class LogQLBackend(TextQueryBackend):
                         ]
                         if candidate_lfs and candidate_lfs[0] is not None:
                             value, negated, def_type = candidate_lfs[0]
-                            if def_type == "str":
+                            if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
                                     state,
                                     self.convert_value_str(SigmaString(value), state),
                                 )
-                            elif def_type == "regexp":
+                            elif def_type is LogQLDeferredType.REGEXP:
                                 line_filter = LogQLDeferredUnboundRegexpExpression(
                                     state, value
                                 )
-                            elif def_type == "cidr":
+                            elif def_type is LogQLDeferredType.CIDR:
                                 line_filter = LogQLDeferredUnboundCIDRExpression(
                                     state, value
                                 )
@@ -839,7 +897,7 @@ class LogQLBackend(TextQueryBackend):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
-            query = "| " + self.select_log_parser(rule.logsource) + " | " + query
+            query = "| " + self.select_log_parser(rule.logsource).value + " | " + query
         elif query is None:
             query = ""
         if state.has_deferred():
