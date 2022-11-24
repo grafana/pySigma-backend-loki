@@ -59,7 +59,7 @@ class LogQLDeferredUnboundCIDRExpression(DeferredQueryExpression):
         return self
 
     def finalize_expression(self) -> str:
-        return f'{self.op} cidr("{self.ip}")'
+        return f'{self.op} ip("{self.ip}")'
 
 
 @dataclass
@@ -353,9 +353,12 @@ class LogQLBackend(TextQueryBackend):
             new_conditions.append(condition_copy)
         return new_conditions
 
+    # Rather than return a tuple of values, I'd really prefer to return a DeferredQueryExpression
+    # but because creating them automatically adds the DQE to the state.deferred, doing so would
+    # introduce additional complexity
     def generate_candidate_line_filter(
         self, cond: ParentChainMixin, log_formatter: str
-    ) -> Union[Tuple[str, bool], None]:
+    ) -> Union[Tuple[str, bool, str], None]:
         """Given a condition, attempt to find the longest string in queries that could
         be used as line filters, which should improve the overall performance of the
         generated Loki queries."""
@@ -367,21 +370,18 @@ class LogQLBackend(TextQueryBackend):
                 cond.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
             ):
                 value = "" if isinstance(cond.value, SigmaNull) else str(cond.value)
-                return (f"{cond.field}={value}", is_negated)
+                return f"{cond.field}={value}", is_negated, "str"
             elif (
                 isinstance(cond.value, (SigmaString, SigmaNumber, SigmaBool))
                 and not is_negated
             ):
-                return (str(cond.value), is_negated)
+                return str(cond.value), is_negated, "str"
             elif isinstance(cond.value, SigmaRegularExpression):
-                # TODO: if we strip leading flags ((?i) etc.), and split the RE up on
-                # metacharacters, we will generate valid substrings that could be used
-                # as line filters
-                return None
+                # Could include field name if entries are logfmt and doesn't start with wildcard
+                return cond.value.regexp, is_negated, "regexp"
             elif isinstance(cond.value, SigmaCIDRExpression):
-                # TODO: if we have an IPv4 address and a CIDR length % 8 = 0, we can
-                # truncate the IP to the appropriate . and use that as a partial match
-                return None
+                # Could include field name if entries are logfmt
+                return cond.value.cidr, is_negated, "cidr"
             else:
                 # Can't necessarily assume the field will appear in the log file for an
                 # arbitary log format
@@ -417,8 +417,9 @@ class LogQLBackend(TextQueryBackend):
                 return None
             matcher = None
             match = None
+            # Logic for strings
             for cand in candidates:
-                if cand:
+                if cand and cand[2] == "str":
                     if matcher is None:
                         matcher = SequenceMatcher(None, b=cand[0])
                     else:
@@ -431,7 +432,7 @@ class LogQLBackend(TextQueryBackend):
             if matcher and match:
                 start = match.b
                 end = match.b + match.size
-                return (matcher.b[start:end], any_negated)
+                return matcher.b[start:end], any_negated, "str"
             return None
         elif isinstance(cond, ConditionNOT):
             return self.generate_candidate_line_filter(cond.args[0], log_formatter)
@@ -497,13 +498,21 @@ class LogQLBackend(TextQueryBackend):
                             for _, cond in conditions
                         ]
                         if candidate_lfs and candidate_lfs[0] is not None:
-                            line_filter = LogQLDeferredUnboundStrExpression(
-                                state,
-                                self.convert_value_str(
-                                    SigmaString(candidate_lfs[0][0]), state
-                                ),
-                            )
-                            if candidate_lfs[0][1]:
+                            value, negated, def_type = candidate_lfs[0]
+                            if def_type == "str":
+                                line_filter = LogQLDeferredUnboundStrExpression(
+                                    state,
+                                    self.convert_value_str(SigmaString(value), state),
+                                )
+                            elif def_type == "regexp":
+                                line_filter = LogQLDeferredUnboundRegexpExpression(
+                                    state, value
+                                )
+                            elif def_type == "cidr":
+                                line_filter = LogQLDeferredUnboundCIDRExpression(
+                                    state, value
+                                )
+                            if negated:
                                 line_filter.negate()
 
                     error_state = "finalizing query for"

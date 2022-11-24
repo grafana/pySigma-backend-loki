@@ -75,7 +75,28 @@ def test_loki_lf_field_eq_wildcard(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)value.A`']
+        == ['{job=~".+"} |~ `(?i)value.A` | logfmt | fieldA=~`(?i)value.A`']
+    )
+
+
+def test_loki_lf_field_not_eq_wildcard(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA: value?A
+                condition: not sel
+        """
+            )
+        )
+        == ['{job=~".+"} !~ `(?i)value.A` | logfmt | fieldA!~`(?i)value.A`']
     )
 
 
@@ -127,7 +148,7 @@ def test_loki_lf_and_expression(loki_backend: LogQLBackend):
 
 # Must not introduce partial negations, since it would exclude valid log entries
 # such as: fieldA=good fieldB=good fieldC=value
-def test_lokii_lf_not_and_expression(loki_backend: LogQLBackend):
+def test_loki_lf_not_and_expression(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(
@@ -352,7 +373,7 @@ def test_loki_lf_all_contains_query(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=~`(?i).*valueA.*` '
+            '{job=~".+"} |~ `(?i).*valueA.*` | logfmt | fieldA=~`(?i).*valueA.*` '
             "and fieldA=~`(?i).*valueB.*`"
         ]
     )
@@ -398,7 +419,7 @@ def test_loki_lf_wildcard_single(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)va.ue`']
+        == ['{job=~".+"} |~ `(?i)va.ue` | logfmt | fieldA=~`(?i)va.ue`']
     )
 
 
@@ -419,7 +440,7 @@ def test_loki_lf_wildcard_multi(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)value.*`']
+        == ['{job=~".+"} |~ `(?i)value.*` | logfmt | fieldA=~`(?i)value.*`']
     )
 
 
@@ -442,7 +463,10 @@ def test_loki_lf_wildcard_escape(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$`']
+        == [
+            '{job=~".+"} |~ `(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$` | logfmt | '
+            "fieldA=~`(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$`"
+        ]
     )
 
 
@@ -487,7 +511,7 @@ def test_loki_lf_field_re_tilde(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~"value`A"']
+        == ['{job=~".+"} |~ "value`A" | logfmt | fieldA=~"value`A"']
     )
 
 
@@ -508,7 +532,7 @@ def test_loki_lf_field_re_tilde_double_quote(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~"v\\"alue`A"']
+        == ['{job=~".+"} |~ "v\\"alue`A" | logfmt | fieldA=~"v\\"alue`A"']
     )
 
 
@@ -529,7 +553,7 @@ def test_loki_lf_field_startswith(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)foo.*`']
+        == ['{job=~".+"} |~ `(?i)foo.*` | logfmt | fieldA=~`(?i)foo.*`']
     )
 
 
@@ -550,7 +574,7 @@ def test_loki_lf_field_endswith(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i).*bar`']
+        == ['{job=~".+"} |~ `(?i).*bar` | logfmt | fieldA=~`(?i).*bar`']
     )
 
 
@@ -571,7 +595,7 @@ def test_loki_lf_field_contains(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i).*ooba.*`']
+        == ['{job=~".+"} |~ `(?i).*ooba.*` | logfmt | fieldA=~`(?i).*ooba.*`']
     )
 
 
@@ -592,7 +616,32 @@ def test_loki_lf_cidr_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=ip("192.168.0.0/16")']
+        == [
+            '{job=~".+"} |= ip("192.168.0.0/16") | logfmt | fieldA=ip("192.168.0.0/16")'
+        ]
+    )
+
+
+def test_loki_lf_not_cidr_query(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cidr: 192.168.0.0/16
+                condition: not sel
+        """
+            )
+        )
+        == [
+            '{job=~".+"} != ip("192.168.0.0/16") | logfmt | fieldA!=ip("192.168.0.0/16")'
+        ]
     )
 
 
