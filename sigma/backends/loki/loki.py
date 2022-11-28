@@ -394,52 +394,120 @@ class LogQLBackend(TextQueryBackend):
             new_conditions.append(condition_copy)
         return new_conditions
 
+    def convert_field_expression_to_line_filter(
+        self,
+        expr: ConditionFieldEqualsValueExpression,
+        log_parser: LogQLLogParser,
+        is_negated: bool,
+    ) -> Optional[LogQLLineFilterInfo]:
+        """Given a field expression, attempt to convert it into a valid line filter
+        that can be added to a query to improve its performance without reducing the
+        number of results that will be produced by that query. Returns None if no such
+        filter can be created."""
+        # Can only use negation of expressions if the log format includes the field
+        # name in the log line
+        if log_parser is LogQLLogParser.LOGFMT and isinstance(
+            expr.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
+        ):
+            value = "" if isinstance(expr.value, SigmaNull) else str(expr.value)
+            return LogQLLineFilterInfo(
+                value=f"{expr.field}={value}",
+                negated=is_negated,
+                deftype=LogQLDeferredType.STR,
+            )
+        elif (
+            isinstance(expr.value, (SigmaString, SigmaNumber, SigmaBool))
+            and not is_negated
+        ):
+            return LogQLLineFilterInfo(
+                value=str(expr.value),
+                negated=is_negated,
+                deftype=LogQLDeferredType.STR,
+            )
+        elif isinstance(expr.value, SigmaRegularExpression):
+            # Could include field name if entries are logfmt and doesn't start with wildcard
+            return LogQLLineFilterInfo(
+                value=expr.value.regexp,
+                negated=is_negated,
+                deftype=LogQLDeferredType.REGEXP,
+            )
+        elif isinstance(expr.value, SigmaCIDRExpression):
+            # Could include field name if entries are logfmt
+            return LogQLLineFilterInfo(
+                value=expr.value.cidr,
+                negated=is_negated,
+                deftype=LogQLDeferredType.CIDR,
+            )
+        else:
+            # Can't necessarily assume the field will appear in the log file for an
+            # arbitary log format
+            return None
+
+    def find_longest_common_string_line_filter(
+        self,
+        candidates: List[Optional[LogQLLineFilterInfo]],
+        log_parser: LogQLLogParser,
+    ) -> Optional[LogQLLineFilterInfo]:
+        """Finds the longest line filter that will match all of the candidate line
+        filters provided, using difflib's SequenceMatcher to find the relevant
+        string. All candidate values cannot be None, must not be negated, and must be
+        string values."""
+        # If, for *any* of the candidates, no valid line filter was generated, they are
+        # negated, or they are not strings, we cannot ensure that the generated filter
+        # will necessarily catch all arguments and we must return no filter
+        any_issues = any(
+            (cand is None or cand.negated or cand.deftype is not LogQLDeferredType.STR)
+            for cand in candidates
+        )
+        if any_issues:
+            return None
+        matcher = None
+        match = None
+        # Finding the longest common substring of a list of strings, by repeatedly
+        # calling SequenceMatcher's find_longest_match. The 1st candidate is cached
+        # in the 2nd sequence (b), then following candidates are set as the 1st
+        # sequence (a). The longest match between a and b is then found, each time
+        # reducing the search region of b based on the previous match.
+        # See: https://docs.python.org/3/library/difflib.html#difflib.SequenceMatcher
+        for cand in candidates:
+            if matcher is None:
+                # First iteration: initialise sequence matcher with the first
+                # candidate as sequence 2
+                # mypy doesn't spot that the previous check will prevent cand = None
+                matcher = SequenceMatcher(None, b=cand.value)  # type: ignore
+            else:
+                # Subsequent iterations: use the current candidate as sequence 1
+                matcher.set_seq1(cand.value)
+                # If we've previously found a match, only use the current matched
+                # region in b for this search, otherwise use the whole string
+                blo = match.b if match else 0
+                bhi = match.b + match.size if match else len(matcher.b)
+                match = matcher.find_longest_match(0, len(cand.value), blo, bhi)
+                # If the current match length is 0, there was no common substring
+                # between all of the candidates found using this greedy strategy
+                if match.size == 0:
+                    return None
+        if matcher and match:
+            start = match.b
+            end = match.b + match.size
+            return LogQLLineFilterInfo(
+                value=matcher.b[start:end],
+                negated=False,
+                deftype=LogQLDeferredType.STR,
+            )
+        return None
+
     def generate_candidate_line_filter(
         self, cond: ParentChainMixin, log_parser: LogQLLogParser
-    ) -> Union[LogQLLineFilterInfo, None]:
+    ) -> Optional[LogQLLineFilterInfo]:
         """Given a condition, attempt to find the longest string in queries that could
         be used as line filters, which should improve the overall performance of the
         generated Loki queries."""
         is_negated = self.is_negated_chain(cond)
         if isinstance(cond, ConditionFieldEqualsValueExpression):
-            # Can only use negation of expressions if the log format includes the field
-            # name in the log line
-            if log_parser is LogQLLogParser.LOGFMT and isinstance(
-                cond.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
-            ):
-                value = "" if isinstance(cond.value, SigmaNull) else str(cond.value)
-                return LogQLLineFilterInfo(
-                    value=f"{cond.field}={value}",
-                    negated=is_negated,
-                    deftype=LogQLDeferredType.STR,
-                )
-            elif (
-                isinstance(cond.value, (SigmaString, SigmaNumber, SigmaBool))
-                and not is_negated
-            ):
-                return LogQLLineFilterInfo(
-                    value=str(cond.value),
-                    negated=is_negated,
-                    deftype=LogQLDeferredType.STR,
-                )
-            elif isinstance(cond.value, SigmaRegularExpression):
-                # Could include field name if entries are logfmt and doesn't start with wildcard
-                return LogQLLineFilterInfo(
-                    value=cond.value.regexp,
-                    negated=is_negated,
-                    deftype=LogQLDeferredType.REGEXP,
-                )
-            elif isinstance(cond.value, SigmaCIDRExpression):
-                # Could include field name if entries are logfmt
-                return LogQLLineFilterInfo(
-                    value=cond.value.cidr,
-                    negated=is_negated,
-                    deftype=LogQLDeferredType.CIDR,
-                )
-            else:
-                # Can't necessarily assume the field will appear in the log file for an
-                # arbitary log format
-                return None
+            return self.convert_field_expression_to_line_filter(
+                cond, log_parser, is_negated
+            )
         # AND clauses: any of the values could be true - so pick the longest one
         if (isinstance(cond, ConditionAND) and not is_negated) or (
             isinstance(cond, ConditionOR) and is_negated
@@ -462,54 +530,7 @@ class LogQLBackend(TextQueryBackend):
                 self.generate_candidate_line_filter(arg, log_parser)
                 for arg in cond.args
             ]
-            # If, for *any* of the candidates, no valid line filter was generated, they
-            # are negated, or they are not strings, we cannot ensure that the generated
-            # filter will necessarily catch all arguments and we must return no filter
-            any_issues = any(
-                (
-                    cand is None
-                    or cand.negated
-                    or cand.deftype is not LogQLDeferredType.STR
-                )
-                for cand in candidates
-            )
-            if any_issues:
-                return None
-            matcher = None
-            match = None
-            # Finding the longest common substring of a list of strings, by repeatedly
-            # calling SequenceMatcher's find_longest_match. The 1st candidate is cached
-            # in the 2nd sequence (b), then following candidates are set as the 1st
-            # sequence (a). The longest match between a and b is then found, each time
-            # reducing the search region of b based on the previous match.
-            # See: https://docs.python.org/3/library/difflib.html#difflib.SequenceMatcher
-            for cand in candidates:
-                if matcher is None:
-                    # First iteration: initialise sequence matcher with the first
-                    # element in sequence 2
-                    matcher = SequenceMatcher(None, b=cand.value)
-                else:
-                    # Subsequent iterations: use the current element in sequence 1
-                    matcher.set_seq1(cand.value)
-                    # If we've previously found a match, only use the current matched
-                    # region in b for this search, otherwise use the whole string
-                    blo = match.b if match else 0
-                    bhi = match.b + match.size if match else len(matcher.b)
-                    match = matcher.find_longest_match(0, len(cand.value), blo, bhi)
-                    # If the length of the current match is 0, there was no common
-                    # substring between all of the candidates found using this greedy
-                    # strategy
-                    if match.size == 0:
-                        return None
-            if matcher and match:
-                start = match.b
-                end = match.b + match.size
-                return LogQLLineFilterInfo(
-                    value=matcher.b[start:end],
-                    negated=False,
-                    deftype=LogQLDeferredType.STR,
-                )
-            return None
+            return self.find_longest_common_string_line_filter(candidates, log_parser)
         elif isinstance(cond, ConditionNOT):
             return self.generate_candidate_line_filter(cond.args[0], log_parser)
         else:  # pragma: no cover
