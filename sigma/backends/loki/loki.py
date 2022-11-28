@@ -450,9 +450,7 @@ class LogQLBackend(TextQueryBackend):
             ]
             longest = None
             for cand in candidates:
-                if cand is not None and (
-                    longest is None or len(cand.value) > len(longest.value)
-                ):
+                if cand and (longest is None or len(cand.value) > len(longest.value)):
                     longest = cand
             return longest
         # OR clauses: all of the values must be possible, so we need either the LCS of
@@ -464,31 +462,51 @@ class LogQLBackend(TextQueryBackend):
                 self.generate_candidate_line_filter(arg, log_parser)
                 for arg in cond.args
             ]
-            any_negated = any(cand.negated for cand in candidates if cand)
-            # Ensure we don't create partial matches for negated filters (as they may
-            # catch otherwise valid log entries
-            if any_negated:
+            # If, for *any* of the candidates, no valid line filter was generated, they
+            # are negated, or they are not strings, we cannot ensure that the generated
+            # filter will necessarily catch all arguments and we must return no filter
+            any_issues = any(
+                (
+                    cand is None
+                    or cand.negated
+                    or cand.deftype is not LogQLDeferredType.STR
+                )
+                for cand in candidates
+            )
+            if any_issues:
                 return None
             matcher = None
             match = None
-            # Logic for strings
+            # Finding the longest common substring of a list of strings, by repeatedly
+            # calling SequenceMatcher's find_longest_match. The 1st candidate is cached
+            # in the 2nd sequence (b), then following candidates are set as the 1st
+            # sequence (a). The longest match between a and b is then found, each time
+            # reducing the search region of b based on the previous match.
+            # See: https://docs.python.org/3/library/difflib.html#difflib.SequenceMatcher
             for cand in candidates:
-                if cand and cand.deftype == LogQLDeferredType.STR:
-                    if matcher is None:
-                        matcher = SequenceMatcher(None, b=cand.value)
-                    else:
-                        matcher.set_seq1(cand.value)
-                        blo = match.b if match else 0
-                        bhi = match.b + match.size if match else len(matcher.b)
-                        match = matcher.find_longest_match(0, len(cand.value), blo, bhi)
-                        if match.size == 0:
-                            return None
+                if matcher is None:
+                    # First iteration: initialise sequence matcher with the first
+                    # element in sequence 2
+                    matcher = SequenceMatcher(None, b=cand.value)
+                else:
+                    # Subsequent iterations: use the current element in sequence 1
+                    matcher.set_seq1(cand.value)
+                    # If we've previously found a match, only use the current matched
+                    # region in b for this search, otherwise use the whole string
+                    blo = match.b if match else 0
+                    bhi = match.b + match.size if match else len(matcher.b)
+                    match = matcher.find_longest_match(0, len(cand.value), blo, bhi)
+                    # If the length of the current match is 0, there was no common
+                    # substring between all of the candidates found using this greedy
+                    # strategy
+                    if match.size == 0:
+                        return None
             if matcher and match:
                 start = match.b
                 end = match.b + match.size
                 return LogQLLineFilterInfo(
                     value=matcher.b[start:end],
-                    negated=any_negated,
+                    negated=False,
                     deftype=LogQLDeferredType.STR,
                 )
             return None
