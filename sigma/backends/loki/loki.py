@@ -521,8 +521,8 @@ class LogQLBackend(TextQueryBackend):
                 if cand and (longest is None or len(cand.value) > len(longest.value)):
                     longest = cand
             return longest
-        # OR clauses: all of the values must be possible, so we need either the LCS of
-        # them all, or (TODO?) a list of the values combined as a regular expression
+        # OR clauses: all of the values must be possible, so we can use the LCS of
+        # them all
         elif (isinstance(cond, ConditionOR) and not is_negated) or (
             isinstance(cond, ConditionAND) and is_negated
         ):
@@ -530,6 +530,8 @@ class LogQLBackend(TextQueryBackend):
                 self.generate_candidate_line_filter(arg, log_parser)
                 for arg in cond.args
             ]
+            # The longest common substring of all the arguments is permissible as a
+            # line filter, as every candidate must contain at least that string
             return self.find_longest_common_string_line_filter(candidates, log_parser)
         elif isinstance(cond, ConditionNOT):
             return self.generate_candidate_line_filter(cond.args[0], log_parser)
@@ -564,6 +566,11 @@ class LogQLBackend(TextQueryBackend):
             processing_pipeline.apply(rule)  # 1. Apply transformations
             state.processing_state = processing_pipeline.state
 
+            # When finalising a query from a condition, the index it is associated with
+            # is the index of the parsed_condition from the rule detection. As this
+            # code may partition one or more of these conditions into multiple
+            # conditions, we explicitly associate them together here so the
+            # relationship can be maintained throughout.
             conditions = [
                 (index, cond.parsed)
                 for index, cond in enumerate(rule.detection.parsed_condition)
@@ -622,7 +629,7 @@ class LogQLBackend(TextQueryBackend):
                     elif not attempted_conversion:
                         # If this is the first pass, try to shorten the condition
                         shortened_conditions.extend(
-                            (index, cond)
+                            (index, cond)  # Ensure the index-cond remain associated
                             for cond in self.partition_rule(
                                 conditions[index][1],
                                 math.ceil(len(final_query) / threshold_length),
@@ -630,7 +637,7 @@ class LogQLBackend(TextQueryBackend):
                         )
                         attempt_shortening = True
                     else:
-                        # Otherwise, produce the query anyway?
+                        # Otherwise, produce the query anyway
                         final_queries.append(final_query)
                 attempted_conversion = True
             return final_queries

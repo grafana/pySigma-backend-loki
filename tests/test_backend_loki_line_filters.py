@@ -171,6 +171,13 @@ def test_loki_lf_not_and_expression(loki_backend: LogQLBackend):
 
 
 def test_loki_lf_or_expression(loki_backend: LogQLBackend):
+    """Test that, when an OR condition contains a common substring in all arguments,
+    the substring will be used as a line filter.
+
+    In this case, we know: the parser is logfmt and therefore a log entry of interest
+    should contain at least fieldA=valueA or fieldB=valueB. It means it will contain at
+    the very least =value (the longest common substring between those two values) and
+    hence we can use it as a line filter."""
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(
