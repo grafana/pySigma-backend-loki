@@ -20,6 +20,13 @@ parser.add_argument(
     "one or more signatures (incl. sub-folders)",
 )
 parser.add_argument(
+    "-a",
+    "--add-line-filters",
+    action="store_true",
+    help="Attempt to add a single line filter to queries that otherwise lack any, to help improve "
+    "the overall performance of the query when being run on Loki.",
+)
+parser.add_argument(
     "-c",
     "--counts",
     action="store_true",
@@ -67,7 +74,10 @@ args = parser.parse_args()
 
 rule_path = args.signature_path
 
-backend = LogQLBackend(processing_pipeline=loki_log_parser())
+backend = LogQLBackend(
+    processing_pipeline=loki_log_parser(), add_line_filters=args.add_line_filters
+)
+
 counters: Dict[str, Any] = {
     "parse_error": 0,
     "convert_error": 0,
