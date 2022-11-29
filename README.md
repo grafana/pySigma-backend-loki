@@ -37,8 +37,6 @@ To get started developing/testing pySigma-backend-loki, these steps may help you
 These features are currently either WIP or are planned to be implemented in the near future.
 
 * Various processing pipelines for other applications and log sources
-* Some generated queries are too large for Loki - such rules could be factored into multiple queries
-* Analysing a rule's searches to identify line filters that could improve the query performance
 * Generating more accurate log stream selectors based on logsource
 * Translate field names in Sigma signatures into relevant labels for Loki using pipelines
 
