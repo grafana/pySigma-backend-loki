@@ -1,1 +1,1 @@
-from .loki import loki_log_parser  # noqa: F401
+from .loki import loki_grafana_logfmt  # noqa: F401

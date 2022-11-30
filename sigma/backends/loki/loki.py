@@ -149,10 +149,10 @@ class LogQLBackend(TextQueryBackend):
     https://grafana.com/docs/loki/latest/logql/log_queries/"""
 
     # The backend generates grouping if required
-    name: ClassVar[str] = "Loki backend"
+    name: ClassVar[str] = "Grafana Loki"
     formats: Dict[str, str] = {
         "default": "Plain Loki queries",
-        "ruler": "'ruler' output format",
+        "ruler": "Loki 'ruler' output format for generating alerts",
     }
 
     negated_line_filter_operator: ClassVar[Dict[str, str]] = {

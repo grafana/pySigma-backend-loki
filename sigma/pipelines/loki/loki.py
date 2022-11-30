@@ -2,9 +2,9 @@ from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import FieldMappingTransformation
 
 
-def loki_log_parser() -> ProcessingPipeline:
+def loki_grafana_logfmt() -> ProcessingPipeline:
     return ProcessingPipeline(
-        name="Loki log parser pipeline",
+        name="Loki Grafana logfmt field names",
         priority=20,
         items=[
             ProcessingItem(

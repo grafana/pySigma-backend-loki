@@ -1,10 +1,10 @@
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
-from sigma.pipelines.loki import loki_log_parser
+from sigma.pipelines.loki import loki_grafana_logfmt
 
 
 def test_loki_grafana_pipeline():
-    pipeline = loki_log_parser()
+    pipeline = loki_grafana_logfmt()
     backend = LogQLBackend(processing_pipeline=pipeline)
     sigma_rule = SigmaCollection.from_yaml(
         """

@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
-from sigma.pipelines.loki import loki_log_parser
+from sigma.pipelines.loki import loki_grafana_logfmt
 from sigma.rule import SigmaDetection, SigmaError
 
 parser = argparse.ArgumentParser(
@@ -75,7 +75,7 @@ args = parser.parse_args()
 rule_path = args.signature_path
 
 backend = LogQLBackend(
-    processing_pipeline=loki_log_parser(), add_line_filters=args.add_line_filters
+    processing_pipeline=loki_grafana_logfmt(), add_line_filters=args.add_line_filters
 )
 
 counters: Dict[str, Any] = {
