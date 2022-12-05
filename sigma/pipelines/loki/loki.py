@@ -78,7 +78,7 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
                 identifier="loki_promtail_sysmon_message_parser",
                 transformation=SetLokiParserTransformation(
                     'json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
-                    '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}="${2}" "}}` '  # noqa: E501
+                    '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
                     "| logfmt"
                 ),
                 rule_conditions=[

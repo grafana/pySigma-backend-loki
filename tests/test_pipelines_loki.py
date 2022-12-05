@@ -50,6 +50,6 @@ def test_windows_grafana_pipeline():
     assert loki_rule == [
         '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
         '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
-        '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}="${2}" "}}` '  # noqa: E501
+        '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
         "| logfmt | Image=~`(?i).*\\.exe` and event_id=1"
     ]
