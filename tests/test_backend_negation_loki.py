@@ -226,6 +226,36 @@ def test_loki_not_all_query(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_not_all_bracket_query(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA:
+                        - valueA
+                        - valueB
+                filter:
+                    fieldB|all:
+                        - valueC
+                        - valueD
+                condition: sel and not filter
+        """
+            )
+        )
+        == [
+            '{job=~".+"} | logfmt | (fieldA=`valueA` or fieldA=`valueB`) and '
+            "(fieldB!=`valueC` or fieldB!=`valueD`)"
+        ]
+    )
+
+
 def test_loki_not_base64_query(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(

@@ -711,13 +711,20 @@ class LogQLBackend(TextQueryBackend):
         """As this implements negation by changing the sub-tree and swapping ANDs and ORs,
         the precedence rules for such operators also needs to be flipped."""
         outer_class = outer.__class__
-        if inner.__class__ in self.precedence and outer_class in self.precedence:
-            if self.is_negated_chain(outer):
+        inner_class = inner.__class__
+        if inner_class is ConditionNOT:
+            # We need to peek inside a NOT to check whether the precedence rules apply
+            # A ConditionNOT should contain at most one argument
+            if len(inner.args) == 1:
+                inner = inner.args[0]
+                inner_class = inner.__class__
+        if inner_class in self.precedence and outer_class in self.precedence:
+            if self.is_negated_chain(inner):
                 # At this point, we have an odd number of NOTs in the parent chain, outer
                 # will have been inverted, but inner will not yet been inverted, and we
                 # know inner is either an AND or an OR
                 inner_class = (
-                    ConditionAND if inner.__class__ == ConditionOR else ConditionOR
+                    ConditionAND if inner_class == ConditionOR else ConditionOR
                 )
                 return self.precedence.index(inner_class) <= self.precedence.index(
                     outer_class
