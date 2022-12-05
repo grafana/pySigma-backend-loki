@@ -41,17 +41,44 @@ def loki_grafana_logfmt() -> ProcessingPipeline:
     )
 
 
-def loki_windows_sysmon_message_parser() -> ProcessingPipeline:
+def loki_promtail_sysmon_message() -> ProcessingPipeline:
     return ProcessingPipeline(
-        name="Loki Windows Sysmon Message Parser",
+        name="Loki Promtail Windows Sysmon Message Parser",
         priority=20,
         items=[
             ProcessingItem(
-                identifier="loki_sysmon_message_parsing",
+                identifier="loki_promtail_sysmon_field_mapping",
+                # Using the fieldnames in loki/clients/pkg/promtail/targets/windows/format.go
+                transformation=FieldMappingTransformation(
+                    {
+                        "Source": "source",
+                        "Channel": "channel",
+                        "Computer": "computer",
+                        "EventID": "event_id",
+                        "Version": "version",
+                        "Level": "level",
+                        "Task": "task",
+                        "Opcode": "opCode",
+                        "LevelText": "levelText",
+                        "TaskText": "taskText",
+                        "OpcodeText": "opCodeText",
+                        "Keywords": "keywords",
+                        "TimeCreated": "timeCreated",
+                        "EventRecordID": "eventRecordID",
+                        "Correlation": "correlation",
+                        "Execution": "execution",
+                        "Security": "security",
+                        "UserData": "user_data",
+                        "EventData": "event_data",
+                        "Message": "message",
+                    }
+                ),
+            ),
+            ProcessingItem(
+                identifier="loki_promtail_sysmon_message_parser",
                 transformation=SetLokiParserTransformation(
-                    "json"
-                    '| label_format Message=`{{ .message | replace "\\" "\\\\" | replace """ "\\"" }}`'  # noqa: E501
-                    '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\r]*|$))(\r\n|$)" .Message "${1}="${2}" "}}`'  # noqa: E501
+                    'json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
+                    '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}="${2}" "}}` '  # noqa: E501
                     "| logfmt"
                 ),
                 rule_conditions=[
@@ -60,6 +87,6 @@ def loki_windows_sysmon_message_parser() -> ProcessingPipeline:
                         service="sysmon",
                     )
                 ],
-            )
+            ),
         ],
     )

@@ -7,7 +7,8 @@ from typing import Any, Dict
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
-from sigma.pipelines.loki import loki_grafana_logfmt
+from sigma.pipelines.sysmon import sysmon_pipeline
+from sigma.pipelines.loki import loki_grafana_logfmt, loki_promtail_sysmon_message
 from sigma.rule import SigmaDetection, SigmaError
 
 parser = argparse.ArgumentParser(
@@ -57,6 +58,12 @@ parser.add_argument(
     "will look for a rules/bad.log file within the path specified in tests)",
 )
 parser.add_argument(
+    "-u",
+    "--unique",
+    action="store_true",
+    help="Print the unique types and messages of errors that occur during the process",
+)
+parser.add_argument(
     "-v",
     "--validate",
     action="store_true",
@@ -64,18 +71,26 @@ parser.add_argument(
     "stdout denotes a successful validation",
 )
 parser.add_argument(
-    "-u",
-    "--unique",
+    "-w",
+    "--windows",
     action="store_true",
-    help="Print the unique types and messages of errors that occur during the process",
+    help="Use Windows sysmon pipelines",
 )
+
 
 args = parser.parse_args()
 
 rule_path = args.signature_path
 
+pipeline = (
+    sysmon_pipeline() + loki_promtail_sysmon_message()
+    if args.windows
+    else loki_grafana_logfmt()
+)
+
 backend = LogQLBackend(
-    processing_pipeline=loki_grafana_logfmt(), add_line_filters=args.add_line_filters
+    processing_pipeline=pipeline,
+    add_line_filters=args.add_line_filters,
 )
 
 counters: Dict[str, Any] = {
