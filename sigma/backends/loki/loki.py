@@ -57,6 +57,9 @@ class LogQLLogParser(
     REGEXP = "regexp"
     UNPACK = "unpack"
 
+    def __str__(self):
+        return self.value
+
 
 class LogQLDeferredType:
     """The different types of deferred expressions that can be created by this backend"""
@@ -257,13 +260,15 @@ class LogQLBackend(TextQueryBackend):
             "(?i)" + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
         )
 
-    def select_log_parser(self, logsource: SigmaLogSource) -> LogQLLogParser:
+    def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
         Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
         signatures."""
+        if "loki_parser" in rule.custom_attributes:
+            return rule.custom_attributes["loki_parser"]
         # TODO: this currently supports two commonly used formats -
         # more advanced parser formats would be required/more efficient for other sources
-        if logsource.product in ("windows", "azure", "zeek"):
+        if rule.logsource.product in ("windows", "azure", "zeek"):
             # Most Windows log data comes from EventLog, and both Promtail and FluentD
             # exporters produce JSON output for Loki.
             # Azure log data also arrives in Loki in JSON format, via the Logstash exporter
@@ -397,7 +402,7 @@ class LogQLBackend(TextQueryBackend):
     def convert_field_expression_to_line_filter(
         self,
         expr: ConditionFieldEqualsValueExpression,
-        log_parser: LogQLLogParser,
+        log_parser: Union[str, LogQLLogParser],
         is_negated: bool,
     ) -> Optional[LogQLLineFilterInfo]:
         """Given a field expression, attempt to convert it into a valid line filter
@@ -446,7 +451,7 @@ class LogQLBackend(TextQueryBackend):
     def find_longest_common_string_line_filter(
         self,
         candidates: List[Optional[LogQLLineFilterInfo]],
-        log_parser: LogQLLogParser,
+        log_parser: Union[str, LogQLLogParser],
     ) -> Optional[LogQLLineFilterInfo]:
         """Finds the longest line filter that will match all of the candidate line
         filters provided, using difflib's SequenceMatcher to find the relevant
@@ -498,7 +503,7 @@ class LogQLBackend(TextQueryBackend):
         return None
 
     def generate_candidate_line_filter(
-        self, cond: ParentChainMixin, log_parser: LogQLLogParser
+        self, cond: ParentChainMixin, log_parser: Union[str, LogQLLogParser]
     ) -> Optional[LogQLLineFilterInfo]:
         """Given a condition, attempt to find the longest string in queries that could
         be used as line filters, which should improve the overall performance of the
@@ -596,7 +601,7 @@ class LogQLBackend(TextQueryBackend):
                     ):
                         # 2.5. Introduce line filters
                         error_state = "introducing line filters"
-                        log_parser = self.select_log_parser(rule.logsource)
+                        log_parser = self.select_log_parser(rule)
                         candidate_lfs = [
                             self.generate_candidate_line_filter(cond, log_parser)
                             for _, cond in conditions
@@ -950,7 +955,7 @@ class LogQLBackend(TextQueryBackend):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
-            query = "| " + self.select_log_parser(rule.logsource).value + " | " + query
+            query = f"| {str(self.select_log_parser(rule))} | {query}"
         elif query is None:
             query = ""
         if state.has_deferred():

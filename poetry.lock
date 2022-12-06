@@ -229,6 +229,17 @@ pyparsing = ">=3.0.7,<4.0.0"
 pyyaml = ">=6.0,<7.0"
 
 [[package]]
+name = "pysigma-pipeline-sysmon"
+version = "1.0.1"
+description = "pySigma Sysmon processing pipelines"
+category = "main"
+optional = false
+python-versions = ">=3.8,<4.0"
+
+[package.dependencies]
+pysigma = ">=0.8.1,<0.9.0"
+
+[[package]]
 name = "pytest"
 version = "7.2.0"
 description = "pytest: simple powerful testing with Python"
@@ -319,7 +330,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "a5fd8f6720aa91f28ba0cdfba01176044d063bc246040b30e824849f16ffe363"
+content-hash = "a5cb266da85e160274b50096db3bd4a58593e3a9b6f60a5922247885027d4bea"
 
 [metadata.files]
 attrs = [
@@ -496,6 +507,10 @@ pyparsing = [
 pysigma = [
     {file = "pySigma-0.8.9.tar.gz", hash = "sha256:01230e6ca9ff37aeb389377cad3451e817137cfde9242487a441a243a1498915"},
     {file = "pysigma-0.8.9-py3-none-any.whl", hash = "sha256:df2738fe41e28e4578beac5d265f2400616184148335aefc3474b886f5ab62b7"},
+]
+pysigma-pipeline-sysmon = [
+    {file = "pysigma-pipeline-sysmon-1.0.1.tar.gz", hash = "sha256:843f7b34b3a61005007720a9896fcec346b8a2d0587ceb1bb3d288757fe3496a"},
+    {file = "pysigma_pipeline_sysmon-1.0.1-py3-none-any.whl", hash = "sha256:d9070fb35aeff85e19d258327ca8fb7c6c9f577f07288e54b6705fad346bf2c9"},
 ]
 pytest = [
     {file = "pytest-7.2.0-py3-none-any.whl", hash = "sha256:892f933d339f068883b6fd5a459f03d85bfcb355e4981e146d2c7616c21fef71"},
