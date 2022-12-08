@@ -992,8 +992,8 @@ class LogQLBackend(TextQueryBackend):
         alert = self.field_replace_pattern.sub("_", rule.title).strip("_")
         ruler = {
             "alert": alert,
-            "annotations": {"message": rule.title, "summary": rule.description},
-            "expr": query,
+            "annotations": {"description": rule.title, "summary": rule.description},
+            "expr": f"sum(count_over_time({query} [1m])) or vector(0) > 0",
             "labels": {},
         }
         if rule.level:
