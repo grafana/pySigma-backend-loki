@@ -3,11 +3,11 @@
 This guide assumes you have:
 * One or more systems that are generating **log data**
 * One or more [Sigma rules](https://github.com/SigmaHQ/sigma/tree/master/rules) that you wish identify in that log data through **queries**
-* (Optionally) One of more Sigma rules that you want to receive **alerts** for when it matches incoming log entries
+* (Optionally) One of more Sigma rules that you want to receive **alerts** for when it matches incoming log entries (WIP)
 
 ## Grafana Loki set-up
 
-1. Install, configure and start [Grafana](https://grafana.com/docs/grafana/latest/#installing-grafana) and [Loki](https://grafana.com/docs/loki/latest/installation/)
+1. Install, configure and start [Grafana](https://grafana.com/docs/grafana/latest/#installing-grafana) and [Grafana Loki](https://grafana.com/docs/loki/latest/installation/)
   * Ensure that your Grafana instance and Loki instances are connected, and that Loki is configured as a data source
   * Don't want to host these yourself? Try [Grafana Cloud](https://grafana.com/docs/grafana-cloud/quickstart/)
 2. Install [Promtail](https://grafana.com/docs/loki/latest/clients/promtail/installation/) and [configure it](https://grafana.com/docs/loki/latest/clients/promtail/configuration/) to scrape the log data from the target system and send it on to your Loki instance
@@ -38,7 +38,6 @@ poetry install
 ## Rule conversion - queries
 
 With both Loki and Sigma setup, you can start converting Sigma rules into Loki queries. Use git to clone the [Sigma rules repository](https://github.com/SigmaHQ/sigma/):
-
 ```
 git clone https://github.com/SigmaHQ/sigma.git
 ```
@@ -58,8 +57,10 @@ A similar process is used when querying Windows System Monitor (sysmon) event da
 sigma convert -t loki sigma/rules/windows/sysmon/ -p sysmon -p loki\_promtail\_sysmon
 ```
 
+The sigma-cli tool does not support some rules that include deprecated Sigma functionality - use the `-s` flag to ignore those rules.
+
 You will likely need to ingest a wider range of log data than the two examples shown above - [contributions of or suggestions for new pipelines](https://github.com/grafana/pySigma-backend-loki/issues) are more than welcome.
 
 ## Rule conversion - alerts
 
-TODO: explain how to use the ruler format
+Coming soon!
