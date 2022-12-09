@@ -14,6 +14,8 @@ It supports the following output formats:
 Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
 * loki\_log\_parser: converts field names to logfmt labels used by Grafana
+* loki\_promtail\_sysmon\_message: parse and adjust field names for Windows sysmon data produced by promtail
+  * Note: most rules lack the `sysmon` service tag, and hence this pipeline should be used in combination with the [generic sysmon pipeline](https://github.com/SigmaHQ/pySigma-pipeline-sysmon)
 
 This backend is currently maintained by:
 
