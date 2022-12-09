@@ -1092,8 +1092,8 @@ def test_loki_ruler_output(loki_backend: LogQLBackend):
   rules:
   - alert: test_signature
     annotations:
-      description: test signature
-      summary: testing
+      description: testing
+      summary: test signature
     expr: sum(count_over_time({job=~".+"} |= `anything` [1m])) or vector(0) > 0
     labels:
       severity: low
