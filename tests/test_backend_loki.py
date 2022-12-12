@@ -701,7 +701,120 @@ def test_loki_unbound_re_wildcard(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i)va.ue.*`']
+        == ['{job=~".+"} |~ `(?i)va.ue`']
+    )
+
+
+def test_loki_unbound_strip_outer_wildcards(loki_backend: LogQLBackend):
+    """
+    As a line filter implicitly includes leading/trailing wildcards if there are no
+    line start/end metacharacters, we can remove them from a pattern without issue.
+    Note: this is also a workaround for grafana/loki#7837
+    """
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywordA:
+                    - '*valueA*'
+                keywordB:
+                    - '*valueB'
+                keywordC:
+                    - 'valueC*'
+                keywordD:
+                    - '**' # this would achieve nothing in Loki - should be dropped
+                condition: all of keyword*
+        """
+            )
+        )
+        == ['{job=~".+"} |~ `(?i)valueA` |~ `(?i)valueB` |~ `(?i)valueC`']
+    )
+
+
+def test_loki_unbound_re_strip_outer_wildcards(loki_backend: LogQLBackend):
+    """
+    As per test_loki_unbound_strip_outer_wildcards, but with a regex rather than using
+    wildcards.
+    """
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywordA:
+                    '|re': '.*valueA.*'
+                keywordB:
+                    '|re': '.*valueB'
+                keywordC:
+                    '|re': 'valueC.*'
+                keywordD:
+                    '|re': '.*.*'
+                condition: all of keyword*
+        """
+            )
+        )
+        == ['{job=~".+"} |~ `valueA` |~ `valueB` |~ `valueC`']
+    )
+
+
+def test_loki_unbound_re_wildcard_no_strip(loki_backend: LogQLBackend):
+    """
+    Test that an unbound regular expression with leading/trailing wildcards and line
+    start/end metacharacters does not strip the wildcards.
+    """
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    '|re': '^.*value.*$'
+                condition: keywords
+        """
+            )
+        )
+        == ['{job=~".+"} |~ `^.*value.*$`']
+    )
+
+
+def test_loki_unbound_re_at_least_one_no_strip(loki_backend: LogQLBackend):
+    """
+    Test that "at least one" wildcards are also not stripped (since line filters do
+    not ensure that condition).
+    """
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    '|re': '.+value.+'
+                condition: keywords
+        """
+            )
+        )
+        == ['{job=~".+"} |~ `.+value.+`']
     )
 
 

@@ -899,6 +899,20 @@ class LogQLBackend(TextQueryBackend):
         self, cond: ConditionValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """Convert unbound regular expression queries into deferred line filters."""
+        # Strip outer zero-length wildcards (.*), as they are implicit in a Loki line filter
+        # Use a RE to determine if the RE starts and/or ends with .* (ignoring flags ^(?.+))
+        outer_wildcards = re.match(
+            "^(\\(\\?.+\\))?(\\.\\*)?(.*?)(\\.\\*$)?$", cond.value.regexp
+        )
+        if not outer_wildcards:
+            return None
+        if outer_wildcards.group(2) or outer_wildcards.group(4):
+            # If there's no value between these wildcards, we can ignore the filter
+            if len(outer_wildcards.group(3)) > 0:
+                flag = outer_wildcards.group(1) or ""
+                cond.value.regexp = flag + outer_wildcards.group(3)
+            else:
+                return None
         expr = LogQLDeferredUnboundStrExpression(
             state, self.convert_value_re(cond.value, state), "|~"
         )
