@@ -750,6 +750,28 @@ def test_loki_or_unbound(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_or_unbound_wildcard(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    - '*valueA'
+                    - 'valueB*'
+                condition: keywords
+        """
+            )
+        )
+        == ['{job=~".+"} |~ `(?i).*valueA|valueB.*`']
+    )
+
+
 def test_loki_or_unbound_tilde_double_quote(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(

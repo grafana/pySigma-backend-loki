@@ -124,7 +124,7 @@ class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
 class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
     """'Defer' unbounded OR matching to pipelined command **BEFORE** main search expression."""
 
-    exprs: List[str]
+    exprs: List[Union[SigmaString, SigmaRegularExpression]]
     op: str = "|~"  # default to matching
 
     def negate(self) -> DeferredQueryExpression:
@@ -132,7 +132,21 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         return self
 
     def finalize_expression(self) -> str:
-        or_value = "|".join((re.escape(str(val)) for val in self.exprs))
+        case_insensitive = any(
+            val.regexp.startswith("(?i)")
+            for val in self.exprs
+            if isinstance(val, SigmaRegularExpression)
+        )
+        or_value = "|".join(
+            (
+                re.escape(str(val))
+                if isinstance(val, SigmaString)
+                else re.sub("^\\(\\?i\\)", "", val.regexp)
+                for val in self.exprs
+            )
+        )
+        if case_insensitive:
+            or_value = "(?i)" + or_value
         if "`" in or_value:
             or_value = '"' + SigmaRegularExpression(or_value).escape('"') + '"'
         else:
@@ -780,7 +794,12 @@ class LogQLBackend(TextQueryBackend):
                     )
                     if self.is_negated(state):
                         unbound_deferred_or.negate()
-                unbound_deferred_or.exprs.append(arg.value)
+                if arg.value.contains_special():
+                    unbound_deferred_or.exprs.append(
+                        self.convert_wildcard_to_re(arg.value)
+                    )
+                else:
+                    unbound_deferred_or.exprs.append(arg.value)
             elif unbound_deferred_or is not None:
                 raise SigmaFeatureNotSupportedByBackendError(
                     "Operator 'or' not supported by the backend for unbound conditions combined "
