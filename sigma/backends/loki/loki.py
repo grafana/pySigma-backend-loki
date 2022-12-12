@@ -902,16 +902,18 @@ class LogQLBackend(TextQueryBackend):
         # Strip outer zero-length wildcards (.*), as they are implicit in a Loki line filter
         # Use a RE to determine if the RE starts and/or ends with .* (ignoring flags ^(?.+))
         outer_wildcards = re.match(
-            "^(\\(\\?.+\\))?(\\.\\*)?(.*?)(\\.\\*$)?$", cond.value.regexp
+            "^(\\(\\?.+\\))?(\\.\\*)?(.*?)(\\.\\*)?$", cond.value.regexp
         )
+        # Ignoring optional captures, this regex resolves to ^(.*?)$ - which should
+        # capture all possible inputs, but we should check just-in-case
         if not outer_wildcards:
-            return None
+            return None  # pragma: no cover
         if outer_wildcards.group(2) or outer_wildcards.group(4):
-            # If there's no value between these wildcards, we can ignore the filter
             if len(outer_wildcards.group(3)) > 0:
                 flag = outer_wildcards.group(1) or ""
                 cond.value.regexp = flag + outer_wildcards.group(3)
             else:
+                # If there's no value between these wildcards, we can ignore the filter
                 return None
         expr = LogQLDeferredUnboundStrExpression(
             state, self.convert_value_re(cond.value, state), "|~"
