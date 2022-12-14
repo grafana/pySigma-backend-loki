@@ -382,7 +382,7 @@ def test_loki_not_wildcard_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} !~ `(?i)va.ue.*`']
+        == ['{job=~".+"} !~ `(?i)va.ue`']
     )
 
 
@@ -483,12 +483,12 @@ def test_loki_not_unbound_re_wildcard(loki_backend: LogQLBackend):
                 product: test_product
             detection:
                 keywords:
-                    value*
+                    '|re': 'value.*'
                 condition: not keywords
         """
             )
         )
-        == ['{job=~".+"} !~ `(?i)value.*`']
+        == ['{job=~".+"} !~ `value`']
     )
 
 
@@ -621,7 +621,7 @@ def test_loki_not_unbound_wildcard(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} !~ `(?i)value.*`']
+        == ['{job=~".+"} !~ `(?i)value`']
     )
 
 
