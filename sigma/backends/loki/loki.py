@@ -897,21 +897,22 @@ class LogQLBackend(TextQueryBackend):
 
     def convert_condition_val_re(
         self, cond: ConditionValueExpression, state: ConversionState
-    ) -> Union[str, DeferredQueryExpression]:
+    ) -> Union[None, str, DeferredQueryExpression]:
         """Convert unbound regular expression queries into deferred line filters."""
         # Strip outer zero-length wildcards (.*), as they are implicit in a Loki line filter
         # Use a RE to determine if the RE starts and/or ends with .* (ignoring flags ^(?.+))
         outer_wildcards = re.match(
-            "^(\\(\\?.+\\))?(\\.\\*)?(.*?)(\\.\\*)?$", cond.value.regexp
+            "^(?P<flag>\\(\\?.+\\))?(?P<lead>\\.\\*)?(?P<body>.*?)(?P<trail>\\.\\*)?$",
+            cond.value.regexp,
         )
         # Ignoring optional captures, this regex resolves to ^(.*?)$ - which should
         # capture all possible inputs, but we should check just-in-case
         if not outer_wildcards:
             return None  # pragma: no cover
-        if outer_wildcards.group(2) or outer_wildcards.group(4):
-            if len(outer_wildcards.group(3)) > 0:
-                flag = outer_wildcards.group(1) or ""
-                cond.value.regexp = flag + outer_wildcards.group(3)
+        if outer_wildcards.group("lead") or outer_wildcards.group("trail"):
+            if len(outer_wildcards.group("body")) > 0:
+                flag = outer_wildcards.group("flag") or ""
+                cond.value.regexp = flag + outer_wildcards.group("body")
             else:
                 # If there's no value between these wildcards, we can ignore the filter
                 return None
