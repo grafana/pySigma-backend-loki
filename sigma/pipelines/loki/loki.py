@@ -31,6 +31,7 @@ def loki_grafana_logfmt() -> ProcessingPipeline:
                         "User": "uname",
                         "c-ip": "remote_addr",
                         "c-uri": "path",
+                        "cs-uri-query": "path",
                         "client_ip": "remote_addr",
                         "cs-method": "method",
                         "sc-status": "status",
