@@ -279,8 +279,8 @@ class LogQLBackend(TextQueryBackend):
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
         Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
         signatures."""
-        if str(LokiCustomAttrs.PARSER) in rule.custom_attributes:
-            return rule.custom_attributes[str(LokiCustomAttrs.PARSER)]
+        if LokiCustomAttrs.PARSER.value in rule.custom_attributes:
+            return rule.custom_attributes[LokiCustomAttrs.PARSER.value]
         # TODO: this currently supports two commonly used formats -
         # more advanced parser formats would be required/more efficient for other sources
         if rule.logsource.product in ("windows", "azure", "zeek"):
@@ -303,8 +303,8 @@ class LogQLBackend(TextQueryBackend):
     def select_log_stream(self, rule: SigmaRule) -> str:
         """Select a logstream based on the logsource information included within a rule and
         following the assumptions described in select_log_parser."""
-        if str(LokiCustomAttrs.LOGSOURCE_SELECTION) in rule.custom_attributes:
-            return rule.custom_attributes[str(LokiCustomAttrs.LOGSOURCE_SELECTION)]
+        if LokiCustomAttrs.LOGSOURCE_SELECTION.value in rule.custom_attributes:
+            return rule.custom_attributes[LokiCustomAttrs.LOGSOURCE_SELECTION.value]
         logsource = rule.logsource
         if logsource.product == "windows":
             return '{job=~"eventlog|winlog|windows|fluentbit.*"}'

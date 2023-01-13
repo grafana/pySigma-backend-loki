@@ -13,9 +13,6 @@ class LokiCustomAttrs(Enum):
     PARSER = "loki_parser"
     LOGSOURCE_SELECTION = "logsource_loki_selection"
 
-    def __str__(self):
-        return self.value
-
 
 @dataclass
 class SetLokiParserTransformation(Transformation):
@@ -26,7 +23,7 @@ class SetLokiParserTransformation(Transformation):
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes[str(LokiCustomAttrs.PARSER)] = self.parser
+        rule.custom_attributes[LokiCustomAttrs.PARSER.value] = self.parser
 
 
 @dataclass
@@ -43,7 +40,7 @@ class SetLokiStreamSelectionTransform(Transformation):
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
         rule.custom_attributes[
-            str(LokiCustomAttrs.LOGSOURCE_SELECTION)
+            LokiCustomAttrs.LOGSOURCE_SELECTION.value
         ] = self.selection
 
 
