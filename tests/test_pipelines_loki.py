@@ -29,7 +29,8 @@ def test_loki_grafana_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~".+"} | logfmt | (path=`/a/path/to/something` or path=`/a/different/path`) and status=200'
+        '{job=~".+"} | logfmt | (path=`/a/path/to/something` or path=`/a/different/path`)'
+        " and status=200"
     ]
 
 
