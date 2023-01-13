@@ -13,13 +13,13 @@ It supports the following output formats:
 
 It includes new Loki-specific pipeline transformations:
 
-* `SetLokiStreamSelectionTransform`: adds a `logsource_loki_selection` custom attribute to a rule, which should contain a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector)  that will be used in the generated query
+* `SetLokiStreamSelectionTransform`: adds a `logsource_loki_selection` custom attribute to a rule, which should contain a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector) that will be used in the generated query
 * `SetLokiParserTransformation`: adds a `loki_parser` custom attribute to a rule, which should contain a [parser expression](https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression) that will be used in the generated query
 
 Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
-* loki\_log\_parser: converts field names to logfmt labels used by Grafana
-* loki\_promtail\_sysmon\_message: parse and adjust field names for Windows sysmon data produced by promtail
+* `loki_log_parser`: converts field names to logfmt labels used by Grafana
+* `loki_promtail_sysmon_message`: parse and adjust field names for Windows sysmon data produced by promtail
   * Note: most rules lack the `sysmon` service tag, and hence this pipeline should be used in combination with the [generic sysmon pipeline](https://github.com/SigmaHQ/pySigma-pipeline-sysmon)
 
 This backend is currently maintained by:
