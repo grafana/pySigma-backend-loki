@@ -8,8 +8,13 @@ This is the Loki backend for pySigma. It provides the package `sigma.backends.lo
 
 It supports the following output formats:
 
-* default: plain Loki LogQL queries
-* ruler: creates Loki LogQL queries in the ruler (YAML) format for generating alerts
+* `default`: plain Loki LogQL queries
+* `ruler`: creates Loki LogQL queries in the ruler (YAML) format for generating alerts
+
+It includes new Loki-specific pipeline transformations:
+
+* `SetLokiStreamSelectionTransform`: adds a `logsource_loki_selection` custom attribute to a rule, which should contain a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector)  that will be used in the generated query
+* `SetLokiParserTransformation`: adds a `loki_parser` custom attribute to a rule, which should contain a [parser expression](https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression) that will be used in the generated query
 
 Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
