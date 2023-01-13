@@ -17,15 +17,17 @@ def test_loki_grafana_pipeline():
                 product: test
                 service: test
             detection:
+                sel-path:
+                    - c-uri: /a/path/to/something
+                    - cs-uri-query: /a/different/path
                 sel:
-                    c-uri: /a/path/to/something
                     sc-status: 200
-                condition: sel
+                condition: all of sel*
         """
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~".+"} | logfmt | path=`/a/path/to/something` and status=200'
+        '{job=~".+"} | logfmt | (path=`/a/path/to/something` or path=`/a/different/path`) and status=200'
     ]
 
 
