@@ -30,6 +30,7 @@ from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
+from sigma.pipelines.loki import LokiCustomAttrs
 from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaBool,
@@ -278,8 +279,8 @@ class LogQLBackend(TextQueryBackend):
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
         Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
         signatures."""
-        if "loki_parser" in rule.custom_attributes:
-            return rule.custom_attributes["loki_parser"]
+        if LokiCustomAttrs.PARSER in rule.custom_attributes:
+            return rule.custom_attributes[LokiCustomAttrs.PARSER]
         # TODO: this currently supports two commonly used formats -
         # more advanced parser formats would be required/more efficient for other sources
         if rule.logsource.product in ("windows", "azure", "zeek"):
@@ -302,8 +303,8 @@ class LogQLBackend(TextQueryBackend):
     def select_log_stream(self, rule: SigmaRule) -> str:
         """Select a logstream based on the logsource information included within a rule and
         following the assumptions described in select_log_parser."""
-        if "logsource_loki_selection" in rule.custom_attributes:
-            return rule.custom_attributes["logsource_loki_selection"]
+        if LokiCustomAttrs.LOGSOURCE_SELECTION in rule.custom_attributes:
+            return rule.custom_attributes[LokiCustomAttrs.LOGSOURCE_SELECTION]
         logsource = rule.logsource
         if logsource.product == "windows":
             return '{job=~"eventlog|winlog|windows|fluentbit.*"}'

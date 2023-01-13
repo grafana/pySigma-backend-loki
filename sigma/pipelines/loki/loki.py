@@ -1,8 +1,20 @@
 from dataclasses import dataclass
+from enum import Enum
 from sigma.rule import SigmaRule
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import Transformation, FieldMappingTransformation
+
+
+class LokiCustomAttrs(Enum):
+    """The different custom attributes used by pipelines to store additional Loki-specific
+    functionality."""
+
+    PARSER = "loki_parser"
+    LOGSOURCE_SELECTION = "logsource_loki_selection"
+
+    def __str__(self):
+        return self.value
 
 
 @dataclass
@@ -14,7 +26,7 @@ class SetLokiParserTransformation(Transformation):
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes["loki_parser"] = self.parser
+        rule.custom_attributes[LokiCustomAttrs.PARSER] = self.parser
 
 
 @dataclass
@@ -30,7 +42,7 @@ class SetLokiStreamSelectionTransform(Transformation):
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes["logsource_loki_selection"] = self.selection
+        rule.custom_attributes[LokiCustomAttrs.LOGSOURCE_SELECTION] = self.selection
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
