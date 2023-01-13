@@ -100,7 +100,7 @@ def test_loki_logsource_selection_pipeline():
             ProcessingItem(
                 identifier="set_loki_logsource_selection",
                 transformation=SetLokiStreamSelectionTransform(
-                    {"job": "mylogs", "filename|re": ".*[\\d]+.log$"}
+                    "{job=`mylogs`,filename=~`.*[\\d]+.log$`}"
                 ),
             )
         ],
@@ -121,5 +121,5 @@ def test_loki_logsource_selection_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{job=`mylogs`, filename=~`.*[\\d]+.log$`} | logfmt | msg=`testing`"
+        "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=`testing`"
     ]

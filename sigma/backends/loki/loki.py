@@ -30,7 +30,7 @@ from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
-from sigma.rule import SigmaLogSource, SigmaRule
+from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaBool,
     SigmaCompareExpression,
@@ -299,9 +299,12 @@ class LogQLBackend(TextQueryBackend):
         # default to logfmt - relevant for auditd, and many other applications
         return LogQLLogParser.LOGFMT
 
-    def select_log_stream(self, logsource: SigmaLogSource) -> str:
+    def select_log_stream(self, rule: SigmaRule) -> str:
         """Select a logstream based on the logsource information included within a rule and
         following the assumptions described in select_log_parser."""
+        if "logsource_loki_selection" in rule.custom_attributes:
+            return rule.custom_attributes["logsource_loki_selection"]
+        logsource = rule.logsource
         if logsource.product == "windows":
             return '{job=~"eventlog|winlog|windows|fluentbit.*"}'
         if logsource.product == "azure":
@@ -1009,7 +1012,7 @@ class LogQLBackend(TextQueryBackend):
             )
             query = query + f' | line_format "{line_fmt_fields}"'
         # Select an appropriate source based on the logsource
-        query = self.select_log_stream(rule.logsource) + " " + query
+        query = self.select_log_stream(rule) + " " + query
         return super().finalize_query(rule, query, index, state, output_format)
 
     def finalize_query_default(
