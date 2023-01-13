@@ -3,6 +3,7 @@ from sigma.collection import SigmaCollection
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
     SetLokiParserTransformation,
+    SetLokiStreamSelectionTransform,
     loki_grafana_logfmt,
     loki_promtail_sysmon_message,
 )
@@ -89,3 +90,36 @@ def test_loki_parser_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == ['{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=`testing`']
+
+
+def test_loki_logsource_selection_pipeline():
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="set_loki_logsource_selection",
+                transformation=SetLokiStreamSelectionTransform(
+                    "{job=`mylogs`,filename=~`.*[\\d]+.log$`}"
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    msg: testing
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=`testing`"
+    ]

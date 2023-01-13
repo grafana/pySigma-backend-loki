@@ -30,7 +30,8 @@ from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
-from sigma.rule import SigmaLogSource, SigmaRule
+from sigma.pipelines.loki import LokiCustomAttrs
+from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaBool,
     SigmaCompareExpression,
@@ -278,8 +279,8 @@ class LogQLBackend(TextQueryBackend):
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
         Currently defaults to logfmt, but will use the json parser for Windows, Azure and Zeek
         signatures."""
-        if "loki_parser" in rule.custom_attributes:
-            return rule.custom_attributes["loki_parser"]
+        if LokiCustomAttrs.PARSER.value in rule.custom_attributes:
+            return rule.custom_attributes[LokiCustomAttrs.PARSER.value]
         # TODO: this currently supports two commonly used formats -
         # more advanced parser formats would be required/more efficient for other sources
         if rule.logsource.product in ("windows", "azure", "zeek"):
@@ -299,9 +300,12 @@ class LogQLBackend(TextQueryBackend):
         # default to logfmt - relevant for auditd, and many other applications
         return LogQLLogParser.LOGFMT
 
-    def select_log_stream(self, logsource: SigmaLogSource) -> str:
+    def select_log_stream(self, rule: SigmaRule) -> str:
         """Select a logstream based on the logsource information included within a rule and
         following the assumptions described in select_log_parser."""
+        if LokiCustomAttrs.LOGSOURCE_SELECTION.value in rule.custom_attributes:
+            return rule.custom_attributes[LokiCustomAttrs.LOGSOURCE_SELECTION.value]
+        logsource = rule.logsource
         if logsource.product == "windows":
             return '{job=~"eventlog|winlog|windows|fluentbit.*"}'
         if logsource.product == "azure":
@@ -1009,7 +1013,7 @@ class LogQLBackend(TextQueryBackend):
             )
             query = query + f' | line_format "{line_fmt_fields}"'
         # Select an appropriate source based on the logsource
-        query = self.select_log_stream(rule.logsource) + " " + query
+        query = self.select_log_stream(rule) + " " + query
         return super().finalize_query(rule, query, index, state, output_format)
 
     def finalize_query_default(

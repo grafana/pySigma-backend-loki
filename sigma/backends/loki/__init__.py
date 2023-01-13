@@ -1,1 +1,4 @@
-from .loki import LogQLBackend  # noqa: F401
+from .loki import LogQLBackend
+
+
+__all__ = ("LogQLBackend",)

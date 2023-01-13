@@ -1150,6 +1150,29 @@ def test_loki_very_long_query_too_few_or_args(loki_backend: LogQLBackend):
         assert len(test) == 2 and all(len(query) > 5120 for query in test)
 
 
+def test_loki_custom_attrs(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            logsource_loki_selection: '{job=`test`}'
+            detection:
+                sel:
+                    fieldA: valueA
+                condition: sel
+            loki_parser: pattern `<ip> <ts> <msg>`
+        """
+            )
+        )
+        == ["{job=`test`} | pattern `<ip> <ts> <msg>` | fieldA=`valueA`"]
+    )
+
+
 # Tests for unimplemented/unsupported features
 def test_loki_unbound_or_field(loki_backend: LogQLBackend):
     with pytest.raises(SigmaFeatureNotSupportedByBackendError):
