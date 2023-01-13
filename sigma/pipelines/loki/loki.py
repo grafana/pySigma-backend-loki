@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Dict
 from sigma.rule import SigmaRule
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
@@ -15,6 +16,32 @@ class SetLokiParserTransformation(Transformation):
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
         rule.custom_attributes["loki_parser"] = self.parser
+
+
+@dataclass
+class SetLokiStreamSelectionTransform(Transformation):
+    """Sets the custom dictionary attribute `logsource-loki-selection` to define a more precise
+    stream selector for Loki. Those values are interpreted as a single map Search-Identifier is
+    within a `detection` attribute (restricted to no undefined fields and only permitting the
+    `re` and `contains` modifiers).
+
+    Example selection:
+        {"job": "mylogs", "filename|re": ".*[\\d]+.log$"}
+
+    Output Rule YAML:
+        logsource-loki-selection:
+          job: mylogs
+          filename|re: .*[\\d]+.log$
+
+    Output LogQL stream selector:
+        {job=`mylogs`,filename=~`.*[\\d]+.log$`}
+    """
+
+    selection: Dict[str, str]
+
+    def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
+        super().apply(pipeline, rule)
+        rule.custom_attributes["logsource-loki-selection"] = self.selection
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
