@@ -20,16 +20,16 @@ class SetLokiParserTransformation(Transformation):
 
 @dataclass
 class SetLokiStreamSelectionTransform(Transformation):
-    """Sets the custom dictionary attribute `logsource-loki-selection` to define a more precise
-    stream selector for Loki. Those values are interpreted as a single map Search-Identifier is
+    """Sets the custom map attribute `logsource_loki_selection` to define a more precise stream
+    selector for Loki. Those values are interpreted as a single map Search-Identifier is
     within a `detection` attribute (restricted to no undefined fields and only permitting the
-    `re` and `contains` modifiers).
+    `contains`, `re`, `endswith`, `startswith`  modifiers).
 
     Example selection:
         {"job": "mylogs", "filename|re": ".*[\\d]+.log$"}
 
     Output Rule YAML:
-        logsource-loki-selection:
+        logsource_loki_selection:
           job: mylogs
           filename|re: .*[\\d]+.log$
 
@@ -41,7 +41,7 @@ class SetLokiStreamSelectionTransform(Transformation):
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes["logsource-loki-selection"] = self.selection
+        rule.custom_attributes["logsource_loki_selection"] = self.selection
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
