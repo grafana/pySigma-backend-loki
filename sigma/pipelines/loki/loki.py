@@ -26,7 +26,7 @@ class SetLokiParserTransformation(Transformation):
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes[LokiCustomAttrs.PARSER] = self.parser
+        rule.custom_attributes[str(LokiCustomAttrs.PARSER)] = self.parser
 
 
 @dataclass
@@ -42,7 +42,9 @@ class SetLokiStreamSelectionTransform(Transformation):
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes[LokiCustomAttrs.LOGSOURCE_SELECTION] = self.selection
+        rule.custom_attributes[
+            str(LokiCustomAttrs.LOGSOURCE_SELECTION)
+        ] = self.selection
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
