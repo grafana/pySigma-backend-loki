@@ -11,10 +11,10 @@ It supports the following output formats:
 * `default`: plain Loki LogQL queries
 * `ruler`: creates Loki LogQL queries in the ruler (YAML) format for generating alerts
 
-It includes new Loki-specific pipeline transformations:
+It includes the following pipeline transformations:
 
-* `SetLokiStreamSelectionTransform`: adds a `logsource_loki_selection` custom attribute to a rule, which should contain a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector) that will be used in the generated query
-* `SetLokiParserTransformation`: adds a `loki_parser` custom attribute to a rule, which should contain a [parser expression](https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression) that will be used in the generated query
+* `SetCustomAttributeTransformation`: adds a specified custom attribute to a rule, which can be used to introduce a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector) or [parser expression](https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression) into the generated query
+  * The `sigma.pipelines.loki.LokiCustomAttributes` enum contains the relevant custom attribute names used by the backend
 
 Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
