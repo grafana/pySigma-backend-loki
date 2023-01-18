@@ -131,3 +131,48 @@ def test_loki_logsource_selection_pipeline():
     assert loki_rule == [
         "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=`testing`"
     ]
+
+
+def test_processing_pipeline_custom_attribute_from_dict():
+    pipeline_dict = {
+        "name": "Testing Custom Pipeline",
+        "vars": {},
+        "priority": 10,
+        "transformations": [
+            {
+                "id": "custom_pipeline_dict",
+                "type": "set_custom_attribute",
+                "rule_conditions": [{"type": "logsource", "category": "web"}],
+                "detection_item_conditions": [
+                    {"type": "match_string", "cond": "any", "pattern": "test"}
+                ],
+                "field_name_conditions": [
+                    {"type": "include_fields", "fields": ["fieldA", "fieldB"]}
+                ],
+                "rule_cond_op": "or",
+                "detection_item_cond_op": "or",
+                "field_name_cond_op": "or",
+                "rule_cond_not": True,
+                "detection_item_cond_not": True,
+                "field_name_cond_not": True,
+                "attribute": "loki_parser",
+                "value": "json",
+            }
+        ],
+    }
+    processing_pipeline = ProcessingPipeline.from_dict(pipeline_dict)
+    assert processing_pipeline is not None
+    assert processing_pipeline.priority == int(pipeline_dict["priority"])
+    assert len(processing_pipeline.items) == len(pipeline_dict["transformations"])
+    processing_item = processing_pipeline.items[0]
+    assert processing_item is not None
+    assert processing_item.transformation is not None
+    assert isinstance(processing_item.transformation, SetCustomAttributeTransformation)
+    assert (
+        processing_item.transformation.attribute
+        == pipeline_dict["transformations"][0]["attribute"]
+    )
+    assert (
+        processing_item.transformation.value
+        == pipeline_dict["transformations"][0]["value"]
+    )
