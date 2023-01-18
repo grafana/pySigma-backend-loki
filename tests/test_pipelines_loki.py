@@ -1,12 +1,18 @@
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
+from sigma.processing.transformations import transformations
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
-    SetLokiParserTransformation,
-    SetLokiStreamSelectionTransform,
+    LokiCustomAttributes,
+    SetCustomAttributeTransformation,
     loki_grafana_logfmt,
     loki_promtail_sysmon_message,
 )
+
+
+def test_transformations_contains_custom_attribute():
+    assert "set_custom_attribute" in transformations
+    assert transformations["set_custom_attribute"] == SetCustomAttributeTransformation
 
 
 def test_loki_grafana_pipeline():
@@ -68,8 +74,9 @@ def test_loki_parser_pipeline():
         items=[
             ProcessingItem(
                 identifier="set_loki_parser_pattern",
-                transformation=SetLokiParserTransformation(
-                    parser="pattern `<ip> <ts> <msg>`"
+                transformation=SetCustomAttributeTransformation(
+                    attribute=LokiCustomAttributes.PARSER.value,
+                    value="pattern `<ip> <ts> <msg>`",
                 ),
             )
         ],
@@ -99,8 +106,9 @@ def test_loki_logsource_selection_pipeline():
         items=[
             ProcessingItem(
                 identifier="set_loki_logsource_selection",
-                transformation=SetLokiStreamSelectionTransform(
-                    "{job=`mylogs`,filename=~`.*[\\d]+.log$`}"
+                transformation=SetCustomAttributeTransformation(
+                    attribute=LokiCustomAttributes.LOGSOURCE_SELECTION.value,
+                    value="{job=`mylogs`,filename=~`.*[\\d]+.log$`}",
                 ),
             )
         ],

@@ -1,12 +1,17 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 from sigma.rule import SigmaRule
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
-from sigma.processing.transformations import Transformation, FieldMappingTransformation
+from sigma.processing.transformations import (
+    transformations,
+    Transformation,
+    FieldMappingTransformation,
+)
 
 
-class LokiCustomAttrs(Enum):
+class LokiCustomAttributes(Enum):
     """The different custom attributes used by pipelines to store additional Loki-specific
     functionality."""
 
@@ -15,33 +20,19 @@ class LokiCustomAttrs(Enum):
 
 
 @dataclass
-class SetLokiParserTransformation(Transformation):
-    """Sets the relevant parser for the log data in the custom_attributes for an
-    applicable rule."""
+class SetCustomAttributeTransformation(Transformation):
+    """Sets an arbitrary custom attribute on a rule, that will be used during processing."""
 
-    parser: str
-
-    def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
-        super().apply(pipeline, rule)
-        rule.custom_attributes[LokiCustomAttrs.PARSER.value] = self.parser
-
-
-@dataclass
-class SetLokiStreamSelectionTransform(Transformation):
-    """Sets the custom attribute `logsource_loki_selection` to define a more precise stream
-    selector for Loki.
-
-    Example selection:
-        {job=`mylogs`,filename=~`.*[\\d]+.log$`}
-    """
-
-    selection: str
+    attribute: str
+    value: Any
 
     def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
         super().apply(pipeline, rule)
-        rule.custom_attributes[
-            LokiCustomAttrs.LOGSOURCE_SELECTION.value
-        ] = self.selection
+        rule.custom_attributes[self.attribute] = self.value
+
+
+# Update pySigma transformations to include the above
+transformations["set_custom_attribute"] = SetCustomAttributeTransformation
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
@@ -104,10 +95,11 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
             ),
             ProcessingItem(
                 identifier="loki_promtail_sysmon_message_parser",
-                transformation=SetLokiParserTransformation(
-                    'json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
+                transformation=SetCustomAttributeTransformation(
+                    attribute=LokiCustomAttributes.PARSER.value,
+                    value='json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
                     '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
-                    "| logfmt"
+                    "| logfmt",
                 ),
                 rule_conditions=[
                     LogsourceCondition(
