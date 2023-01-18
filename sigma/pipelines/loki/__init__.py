@@ -1,16 +1,14 @@
 from .loki import (
-    LokiCustomAttrs,
-    SetLokiParserTransformation,
-    SetLokiStreamSelectionTransform,
+    LokiCustomAttributes,
+    SetCustomAttributeTransformation,
     loki_grafana_logfmt,
     loki_promtail_sysmon_message,
 )
 
 
 __all__ = (
-    "LokiCustomAttrs",
-    "SetLokiParserTransformation",
-    "SetLokiStreamSelectionTransform",
+    "LokiCustomAttributes",
+    "SetCustomAttributeTransformation",
     "loki_grafana_logfmt",
     "loki_promtail_sysmon_message",
 )
