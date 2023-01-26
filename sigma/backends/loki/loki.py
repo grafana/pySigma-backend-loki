@@ -14,6 +14,7 @@ from typing import (
     Optional,
     Pattern,
     Tuple,
+    Type,
     Union,
 )
 
@@ -25,6 +26,7 @@ from sigma.conditions import (
     ConditionOR,
     ConditionValueExpression,
     ParentChainMixin,
+    SigmaCondition,
 )
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
@@ -263,6 +265,26 @@ class LogQLBackend(TextQueryBackend):
     deferred_start: ClassVar[str] = ""
     deferred_separator: ClassVar[str] = " "
     deferred_only_query: ClassVar[str] = ""
+
+    # Indexed by: the class being converted, the type of value being stored, and whether it is or is not negated
+    # Note: this probably won't work for all cases (e.g., numeric comparisons)
+    operators: ClassVar[Dict[Type[ParentChainMixin], Dict[Type[SigmaType], Dict[bool, str]]]] = {
+        ConditionFieldEqualsValueExpression: {
+            SigmaNull: {False: "=", True: "!="},
+            SigmaString: {False: "=", True: "!="},
+            SigmaNumber: {False: "=", True: "!="},
+            SigmaBool: {False: "=", True: "!="},
+            SigmaRegularExpression: {False: "=~", True: "!~"}, 
+            SigmaCIDRExpression: {False: "=", True: "!="},
+        },
+        ConditionValueExpression {
+            SigmaString: {False: "|=", True: "!="},
+            SigmaNumber: {False: "|=", True: "!="},
+            SigmaBool: {False: "|=", True: "!="},
+            SigmaRegularExpression: {False: "|~", True: "!~"}, 
+            SigmaCIDRExpression: {False: "|=", True: "!="},
+        }
+    }
 
     # Loki-specific functions
     # When converting values to regexes, we need to escape the string to prevent use of
@@ -566,6 +588,45 @@ class LogQLBackend(TextQueryBackend):
                 f"Unhandled type by Loki backend: {str(cond.__class__.__name__)}"
             )
 
+    def update_parsed_conditions(
+        self, condition: ParentChainMixin, negated: bool = False
+    ) -> ParentChainMixin:
+        """Do a depth-first recursive search of the parsed items and update conditions
+        to meet LogQL's structural requirements."""
+        if isinstance(
+            condition,
+            (ConditionFieldEqualsValueExpression, ConditionValueExpression),
+        ):
+            if (
+                isinstance(condition.value, SigmaString)
+                and condition.value.contains_special()
+            ):
+                condition.value = self.convert_wildcard_to_re(condition.value)
+            # Negate comparison appropriately
+            # NOTE: the negated property does not exist on the above classes,
+            # so using setattr to set it dynamically
+            setattr(condition, "negated", negated)
+        if isinstance(condition, ConditionItem):
+            if isinstance(condition, ConditionNOT):
+                negated = not negated
+                # Remove the ConditionNOT as the parent
+                condition.args[0].parent = condition.parent
+                return self.update_parsed_conditions(condition.args[0], negated)
+            elif isinstance(condition, (ConditionAND, ConditionOR)):
+                if negated:
+                    if isinstance(condition, ConditionAND):
+                        newcond = ConditionOR(condition.args, condition.source)
+                    elif isinstance(condition, ConditionOR):
+                        newcond = ConditionAND(condition.args, condition.source)
+                    # Update the parent references to reflect the new structure
+                    newcond.parent = condition.parent
+                    for i in range(len(condition.args)):
+                        condition.args[i].parent = newcond
+                        condition.args[i] = self.update_parsed_conditions(
+                            condition.args[i], negated
+                        )
+        return condition
+
     # Overriding Sigma TextQueryBackend functionality as necessary
     def convert_rule(
         self, rule: SigmaRule, output_format: Optional[str] = None
@@ -591,13 +652,18 @@ class LogQLBackend(TextQueryBackend):
             processing_pipeline.apply(rule)  # 1. Apply transformations
             state.processing_state = processing_pipeline.state
 
+            # 1.5. Apply Loki parse tree changes BEFORE attempting to convert a rule
+            # Changes include:
+            #  - Removing NOT clauses and replacing them with negated children
+            #  - Replacing all string equality checks that include wildcards into regular
+            #    expressions
             # When finalising a query from a condition, the index it is associated with
             # is the index of the parsed_condition from the rule detection. As this
             # code may partition one or more of these conditions into multiple
             # conditions, we explicitly associate them together here so the
             # relationship can be maintained throughout.
             conditions = [
-                (index, cond.parsed)
+                (index, self.update_parsed_conditions(cond.parsed))
                 for index, cond in enumerate(rule.detection.parsed_condition)
             ]
             shortened_conditions: List[Tuple[int, ParentChainMixin]] = []
