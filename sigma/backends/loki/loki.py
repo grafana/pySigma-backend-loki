@@ -202,7 +202,7 @@ class LogQLBackend(TextQueryBackend):
         "!~": "|~",
     }
 
-    currentTemplates: ClassVar[Union[bool, None]] = None
+    current_templates: ClassVar[Union[bool, None]] = None
     # Leave this to be set by the below function
     eq_token: ClassVar[str]
     field_null_expression: ClassVar[str]
@@ -212,12 +212,12 @@ class LogQLBackend(TextQueryBackend):
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
 
     @staticmethod
-    def setExpressionTemplates(negated: bool) -> None:
+    def set_expression_templates(negated: bool) -> None:
         """When converting field expressions, the TextBackend class uses the below
         variables to format the rule. As LogQL applies negation directly via
         expressions, we need to dynamically update these depending on whether the
         expression was negated or not."""
-        if negated == LogQLBackend.currentTemplates:
+        if negated == LogQLBackend.current_templates:
             return  # nothing to do!
         if not negated:
             LogQLBackend.eq_token = "="
@@ -242,7 +242,7 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GTE: "<",
             }
         # Cache the state of these variables so we don't keep setting them needlessly
-        LogQLBackend.currentTemplates = negated
+        LogQLBackend.current_templates = negated
 
     # LogQL does not support wildcards, but we convert them to regular expressions
     # Character used as multi-character wildcard (replaced with .*)
@@ -788,7 +788,7 @@ class LogQLBackend(TextQueryBackend):
         """Adjust the expression templates based on whether the condition is negated,
         prior to converting it. Not required for convert_condition_val, as they use
         deferred expressions, which use a different approach."""
-        LogQLBackend.setExpressionTemplates(getattr(cond, "negated", False))
+        LogQLBackend.set_expression_templates(getattr(cond, "negated", False))
         return super().convert_condition_field_eq_val(cond, state)
 
     def convert_condition_val_str(
@@ -846,7 +846,7 @@ class LogQLBackend(TextQueryBackend):
         """Select appropriate condition to join together field values and push down
         negation"""
         is_negated = getattr(cond, "negated", False)
-        LogQLBackend.setExpressionTemplates(is_negated)
+        LogQLBackend.set_expression_templates(is_negated)
         exprs = [
             ConditionFieldEqualsValueExpression(cond.field, value)
             for value in cond.value.values
