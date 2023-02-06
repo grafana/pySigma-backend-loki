@@ -172,6 +172,7 @@ class LogQLBackend(TextQueryBackend):
         "default": "Plain Loki queries",
         "ruler": "Loki 'ruler' output format for generating alerts",
     }
+    requires_pipeline: ClassVar[bool] = False
 
     # Operator precedence: tuple of Condition{AND,OR} in order of precedence.
     # LogQL lacks a NOT operator - is replicated by applying De Morgan's laws instead
