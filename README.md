@@ -39,6 +39,19 @@ To get started developing/testing pySigma-backend-loki, these steps may help you
 6. (Optional) If you wish to validate the generated rules using sigma\_backend\_tester.py, install
    [LogCLI](https://grafana.com/docs/loki/latest/tools/logcli/)
 
+## Releasing
+
+To release new versions of pySigma-backend-loki, we use GitHub actions to update PyPI. When the main branch is in state that is ready to release, the process is as follows:
+
+1. Determine the correct version number using the [Semantic Versioning](https://semver.org/) methodology. All version numbers should be in the format `\d+\.\d+\.\d+(-[0-9A-Za-z-]+)?`
+2. Update [pyproject.toml](https://github.com/grafana/pySigma-backend-loki/blob/main/pyproject.toml) with the new version number
+3. Commit and push the change to GitHub, and validate that the GitHub actions tests pass
+4. Create a signed tag for the release, named the version number prefixed with a v, e.g., `git tag --sign --message="Release vX.X.X" vX.X.X`
+5. Push the tag to GitHub, e.g., `git push --tags`, and validate that the release to the test instance of PyPI is successful
+6. Run `poetry build` to produce distributable versions in `dist/`
+7. Create a release in GitHub against the appropriate tag. If the version number starts with `v0`, or ends with `-alpha/beta` etc., mark it as a pre-release, and attach the distributable files to the release
+8. Validate that the release to PyPI GitHub action is successful
+
 ## Work in progress
 
 These features are currently either WIP or are planned to be implemented in the near future.
