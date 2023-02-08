@@ -64,6 +64,7 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
     return ProcessingPipeline(
         name="Loki Promtail Windows Sysmon Message Parser",
         priority=20,
+        allowed_backends=["loki"],
         items=[
             ProcessingItem(
                 identifier="loki_promtail_sysmon_field_mapping",
