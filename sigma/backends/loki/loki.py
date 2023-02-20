@@ -31,6 +31,7 @@ from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.pipelines.loki import LokiCustomAttributes
+from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaBool,
@@ -263,6 +264,18 @@ class LogQLBackend(TextQueryBackend):
     deferred_start: ClassVar[str] = ""
     deferred_separator: ClassVar[str] = " "
     deferred_only_query: ClassVar[str] = ""
+
+    # Loki-specific functionality
+    add_line_filters: ClassVar[bool] = False
+
+    def __init__(
+        self,
+        processing_pipeline: Optional[ProcessingPipeline] = None,
+        collect_errors: bool = False,
+        add_line_filters: bool = False,
+    ):
+        super().__init__(processing_pipeline, collect_errors)
+        self.add_line_filters = add_line_filters
 
     # Loki-specific functions
     # When converting values to regexes, we need to escape the string to prevent use of
@@ -637,9 +650,7 @@ class LogQLBackend(TextQueryBackend):
                 ]
 
                 for index, query in queries:
-                    if not state.has_deferred() and self.config.get(
-                        "add_line_filters", False
-                    ):
+                    if not state.has_deferred() and self.add_line_filters:
                         # 2.5. Introduce line filters
                         error_state = "introducing line filters"
                         log_parser = self.select_log_parser(rule)
