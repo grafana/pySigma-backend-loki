@@ -266,7 +266,7 @@ class LogQLBackend(TextQueryBackend):
     deferred_only_query: ClassVar[str] = ""
 
     # Loki-specific functionality
-    add_line_filters: ClassVar[bool] = False
+    add_line_filters: bool = False
 
     def __init__(
         self,
