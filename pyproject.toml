@@ -20,7 +20,7 @@ pysigma-pipeline-sysmon = "^1.0.1"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.3"
 pytest-cov = "^4.0.0"
-coverage = "^6.5.0"
+coverage = ">=6.5,<8.0"
 mypy = "^0.991"
 pytest-mypy = "^0.10.1"
 types-pyyaml = "6.0.12.2"
