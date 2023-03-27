@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+poetry check
+poetry lock
+poetry install
+poetry run black --check .
+poetry run mypy --explicit-package-bases .
+poetry run flake8 .
