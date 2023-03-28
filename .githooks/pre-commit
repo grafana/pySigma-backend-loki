@@ -1,8 +1,37 @@
 #!/usr/bin/env sh
 
-poetry check
-poetry lock
-poetry install
-poetry run black --check .
-poetry run mypy --explicit-package-bases .
-poetry run flake8 .
+RESULT=0
+
+test () {
+		output=$($1 2>&1)
+		result=$?
+		if [ "$result" -eq "0" ]; then
+				echo "✅ PASS: $1"	
+		else
+				echo "❌ FAIL: $1"
+				echo "$output"
+				RESULT=1
+		fi
+}
+
+CHANGED_FILES=$(git diff --name-only --cached --diff-filter=ACMR)
+if [ -z "$CHANGED_FILES" ]; then
+		echo "No files to commit, no checks run"
+		exit 1
+fi
+
+POETRY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep --extended-regexp "(pyproject\.toml|poetry\.lock)")
+if [ -n "$POETRY_CHANGED_FILES" ]; then
+		test "poetry check"
+		test "poetry lock"
+		test "poetry install"
+fi
+
+PY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep "\.py$")
+if [ -n "$PY_CHANGED_FILES" ]; then
+		test "poetry run black --check $PY_CHANGED_FILES"
+		test "poetry run mypy --explicit-package-bases $PY_CHANGED_FILES"
+		test "poetry run flake8 $PY_CHANGED_FILES"
+fi
+
+exit $RESULT
