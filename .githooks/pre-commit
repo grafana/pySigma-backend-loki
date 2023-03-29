@@ -2,7 +2,7 @@
 
 RESULT=0
 
-test () {
+check () {
 		output=$($1 2>&1)
 		result=$?
 		if [ "$result" -eq "0" ]; then
@@ -20,18 +20,19 @@ if [ -z "$CHANGED_FILES" ]; then
 		exit 0
 fi
 
-POETRY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep --extended-regexp "(pyproject\.toml|poetry\.lock)")
+POETRY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep --extended-regexp "^(pyproject\.toml|poetry\.lock)$")
 if [ -n "$POETRY_CHANGED_FILES" ]; then
-		test "poetry check"
-		test "poetry lock"
-		test "poetry install"
+		check "poetry check"
+		check "poetry lock --check"
+		check "poetry install"
 fi
 
 PY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep "\.py$")
 if [ -n "$PY_CHANGED_FILES" ]; then
-		test "poetry run black --check $PY_CHANGED_FILES"
-		test "poetry run mypy --explicit-package-bases $PY_CHANGED_FILES"
-		test "poetry run flake8 $PY_CHANGED_FILES"
+		PY_CHANGED_FILES_ARGS=$(echo "$PY_CHANGED_FILES" | tr '\n' ' ')
+		check "poetry run black --check $PY_CHANGED_FILES_ARGS"
+		check "poetry run mypy --explicit-package-bases $PY_CHANGED_FILES_ARGS"
+		check "poetry run flake8 $PY_CHANGED_FILES_ARGS"
 fi
 
 exit $RESULT
