@@ -611,6 +611,7 @@ class LogQLBackend(TextQueryBackend):
         state = ConversionState()
         attempted_conversion = False
         attempt_shortening = False
+        error_state = "initialising"
         try:
             processing_pipeline = (
                 self.backend_processing_pipeline
