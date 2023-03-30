@@ -38,6 +38,10 @@ To get started developing/testing pySigma-backend-loki, these steps may help you
 5. Check it all works by running `poetry run pytest`
 6. (Optional) If you wish to validate the generated rules using sigma\_backend\_tester.py, install
    [LogCLI](https://grafana.com/docs/loki/latest/tools/logcli/)
+7. (Optional, but recommended) To enable the Git hooks, run the following command from the root directory of the repository:
+```sh
+git config --local core.hooksPath .githooks/
+```
 
 ## Releasing
 
