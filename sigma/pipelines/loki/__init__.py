@@ -5,8 +5,14 @@ from .loki import (
     loki_promtail_sysmon_message,
 )
 
+__all__ = (
+    "LokiCustomAttributes",
+    "SetCustomAttributeTransformation",
+    "loki_grafana_logfmt",
+    "loki_promtail_sysmon_message",
+)
 
 pipelines = {
-    "loki": loki_grafana_logfmt,
-    "generic": loki_promtail_sysmon_message,
+    "loki_grafana_logfmt": loki_grafana_logfmt,
+    "loki_promtail_sysmon": loki_promtail_sysmon_message,
 }
