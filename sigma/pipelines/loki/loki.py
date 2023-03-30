@@ -39,6 +39,7 @@ def loki_grafana_logfmt() -> ProcessingPipeline:
     return ProcessingPipeline(
         name="Loki Grafana logfmt field names",
         priority=20,
+        allowed_backends=frozenset({"loki"}),
         items=[
             ProcessingItem(
                 identifier="loki_grafana_field_mapping",
@@ -64,7 +65,7 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
     return ProcessingPipeline(
         name="Loki Promtail Windows Sysmon Message Parser",
         priority=20,
-        allowed_backends=["loki"],
+        allowed_backends=frozenset({"loki"}),
         items=[
             ProcessingItem(
                 identifier="loki_promtail_sysmon_field_mapping",
