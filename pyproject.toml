@@ -23,7 +23,7 @@ pytest-cov = "^4.0.0"
 coverage = "^7.2.1"
 mypy = "^1.0.1"
 pytest-mypy = "^0.10.1"
-types-pyyaml = "6.0.12.8"
+types-pyyaml = "6.0.12.9"
 flake8 = "^5.0.4"
 black = "^23.1.0"
 
