@@ -7,6 +7,7 @@ from sigma.pipelines.loki import (
     SetCustomAttributeTransformation,
     loki_grafana_logfmt,
     loki_promtail_sysmon_message,
+    loki_okta_system_log_json,
 )
 
 
@@ -64,6 +65,33 @@ def test_windows_grafana_pipeline():
         '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
         '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
         "| logfmt | Image=~`(?i).*\\.exe` and event_id=1"
+    ]
+
+
+def test_okta_json_pipeline():
+    pipeline = loki_okta_system_log_json()
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: okta
+                service: okta
+            detection:
+                sel:
+                    eventType:
+                        - policy.lifecycle.update
+                        - policy.lifecycle.delete
+                    legacyeventtype: 'core.user_auth.login_failed'
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        '{job=~".+"} | json | (event_eventType=`policy.lifecycle.update` or '
+        "event_eventType=`policy.lifecycle.delete`) and "
+        "event_legacyEventType=`core.user_auth.login_failed`"
     ]
 
 

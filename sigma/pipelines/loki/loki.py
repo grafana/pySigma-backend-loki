@@ -7,6 +7,7 @@ from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
     transformations,
     Transformation,
+    AddFieldnamePrefixTransformation,
     FieldMappingTransformation,
 )
 
@@ -107,6 +108,89 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
                     LogsourceCondition(
                         product="windows",
                         service="sysmon",
+                    )
+                ],
+            ),
+        ],
+    )
+
+
+def loki_okta_system_log_json() -> ProcessingPipeline:
+    return ProcessingPipeline(
+        name="Loki Okta System Log json",
+        priority=20,
+        allowed_backends=frozenset({"loki"}),
+        items=[
+            ProcessingItem(
+                identifier="loki_okta_event_json_formatter",
+                transformation=SetCustomAttributeTransformation(
+                    attribute=LokiCustomAttributes.PARSER.value,
+                    value="json",
+                ),
+                rule_conditions=[
+                    LogsourceCondition(
+                        product="okta",
+                        service="okta",
+                    )
+                ],
+            ),
+            ProcessingItem(
+                identifier="loki_okta_field_name_mapping",
+                # Transform event fields names that should be camelCase
+                # See https://developer.okta.com/docs/reference/api/system-log/#logevent-object-annotated-example  # noqa: E501
+                transformation=FieldMappingTransformation(
+                    {
+                        v.lower(): v
+                        for v in [
+                            "eventType",
+                            "legacyEventType",
+                            "displayMessage",
+                            "actor_alternateId",
+                            "actor_displayName",
+                            "client_userAgent_rawUserAgent",
+                            "client_userAgent_os",
+                            "client_userAgent_browser",
+                            "client_geographicalContext_geolocation_lat",
+                            "client_geographicalContext_geolocation_lon",
+                            "client_geographicalContext_city",
+                            "client_geographicalContext_state",
+                            "client_geographicalContext_country",
+                            "client_geographicalContext_postalCode",
+                            "client_ipAddress",
+                            "debugContext_debugData_requestUri",
+                            "debugContext_debugData_originalPrincipal_id",
+                            "debugContext_debugData_originalPrincipal_type",
+                            "debugContext_debugData_originalPrincipal_alternateId",
+                            "debugContext_debugData_originalPrincipal_displayName",
+                            "authenticationContext_authenticationProvider",
+                            "authenticationContext_credentialProvider",
+                            "authenticationContext_credentialType",
+                            "authenticationContext_issuer_id",
+                            "authenticationContext_issuer_type",
+                            "authenticationContext_externalSessionId",
+                            "authenticationContext_interface",
+                            "securityContext_asNumber",
+                            "securityContext_asOrg",
+                            "securityContext_isp",
+                            "securityContext_domain",
+                            "securityContext_isProxy",
+                        ]
+                    }
+                ),
+                rule_conditions=[
+                    LogsourceCondition(
+                        product="okta",
+                        service="okta",
+                    )
+                ],
+            ),
+            ProcessingItem(
+                identifier="loki_okta_field_event_prefix",
+                transformation=AddFieldnamePrefixTransformation("event_"),
+                rule_conditions=[
+                    LogsourceCondition(
+                        product="okta",
+                        service="okta",
                     )
                 ],
             ),
