@@ -84,6 +84,7 @@ def test_okta_json_pipeline():
                         - policy.lifecycle.update
                         - policy.lifecycle.delete
                     legacyeventtype: 'core.user_auth.login_failed'
+                    displaymessage: 'Failed login to Okta'
                 condition: sel
         """
     )
@@ -91,7 +92,8 @@ def test_okta_json_pipeline():
     assert loki_rule == [
         '{job=~".+"} | json | (event_eventType=`policy.lifecycle.update` or '
         "event_eventType=`policy.lifecycle.delete`) and "
-        "event_legacyEventType=`core.user_auth.login_failed`"
+        "event_legacyEventType=`core.user_auth.login_failed` and "
+        "event_displayMessage=`Failed login to Okta`"
     ]
 
 
