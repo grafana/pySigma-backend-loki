@@ -163,6 +163,7 @@ def loki_okta_system_log_json() -> ProcessingPipeline:
                             "debugContext_debugData_originalPrincipal_alternateId",
                             "debugContext_debugData_originalPrincipal_displayName",
                             "authenticationContext_authenticationProvider",
+                            "authenticationContext_authenticationStep",
                             "authenticationContext_credentialProvider",
                             "authenticationContext_credentialType",
                             "authenticationContext_issuer_id",
