@@ -12,7 +12,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.9.6"
+pysigma = "^0.9.8"
 pysigma-pipeline-sysmon = "^1.0.1"
 
 [tool.poetry.dev-dependencies]
@@ -20,7 +20,7 @@ pysigma-pipeline-sysmon = "^1.0.1"
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.3.1"
 pytest-cov = "^4.0.0"
-coverage = "^7.2.3"
+coverage = "^7.2.5"
 mypy = "^1.2.0"
 pytest-mypy = "^0.10.1"
 types-pyyaml = "6.0.12.9"
