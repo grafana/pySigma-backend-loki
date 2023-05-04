@@ -431,6 +431,28 @@ def test_loki_not_cidr_query(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_not_unbound_case_sensitive(loki_backend: LogQLBackend):
+    loki_backend.case_insensitive = False
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keywords:
+                    value
+                condition: not keywords
+        """
+            )
+        )
+        == ['{job=~".+"} != `value`']
+    )
+
+
 def test_loki_not_unbound(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
