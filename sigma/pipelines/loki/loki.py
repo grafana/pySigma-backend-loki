@@ -62,7 +62,7 @@ def loki_grafana_logfmt() -> ProcessingPipeline:
     )
 
 
-def loki_promtail_sysmon_message() -> ProcessingPipeline:
+def loki_promtail_sysmon() -> ProcessingPipeline:
     return ProcessingPipeline(
         name="Loki Promtail Windows Sysmon Message Parser",
         priority=20,
@@ -97,7 +97,7 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
                 ),
             ),
             ProcessingItem(
-                identifier="loki_promtail_sysmon_message_parser",
+                identifier="loki_promtail_sysmon_parser",
                 transformation=SetCustomAttributeTransformation(
                     attribute=LokiCustomAttributes.PARSER.value,
                     value='json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
@@ -115,7 +115,7 @@ def loki_promtail_sysmon_message() -> ProcessingPipeline:
     )
 
 
-def loki_okta_system_log_json() -> ProcessingPipeline:
+def loki_okta_system_log() -> ProcessingPipeline:
     return ProcessingPipeline(
         name="Loki Okta System Log json",
         priority=20,

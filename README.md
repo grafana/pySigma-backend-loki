@@ -19,9 +19,9 @@ It includes the following pipeline transformations in `sigma.pipelines.loki`:
 Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
 * `loki_log_parser`: converts field names to logfmt labels used by Grafana
-* `loki_promtail_sysmon_message`: parse and adjust field names for Windows sysmon data produced by promtail
+* `loki_promtail_sysmon`: parse and adjust field names for Windows sysmon data produced by promtail
   * Note: most rules lack the `sysmon` service tag, and hence this pipeline should be used in combination with the [generic sysmon pipeline](https://github.com/SigmaHQ/pySigma-pipeline-sysmon)
-* `loki_okta_system_log_json`: parse the Okta System Log event json, adjusting field-names appropriately
+* `loki_okta_system_log`: parse the Okta System Log event json, adjusting field-names appropriately
 
 This backend is currently maintained by:
 
