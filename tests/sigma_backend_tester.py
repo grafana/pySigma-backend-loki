@@ -8,7 +8,7 @@ from typing import Any, Dict
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.pipelines.sysmon import sysmon_pipeline
-from sigma.pipelines.loki import loki_grafana_logfmt, loki_promtail_sysmon_message
+from sigma.pipelines.loki import loki_grafana_logfmt, loki_promtail_sysmon
 from sigma.rule import SigmaDetection, SigmaError
 
 parser = argparse.ArgumentParser(
@@ -83,7 +83,7 @@ args = parser.parse_args()
 rule_path = args.signature_path
 
 pipeline = (
-    sysmon_pipeline() + loki_promtail_sysmon_message()
+    sysmon_pipeline() + loki_promtail_sysmon()
     if args.windows
     else loki_grafana_logfmt()
 )

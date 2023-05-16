@@ -6,8 +6,8 @@ from sigma.pipelines.loki import (
     LokiCustomAttributes,
     SetCustomAttributeTransformation,
     loki_grafana_logfmt,
-    loki_promtail_sysmon_message,
-    loki_okta_system_log_json,
+    loki_promtail_sysmon,
+    loki_okta_system_log,
 )
 
 
@@ -43,7 +43,7 @@ def test_loki_grafana_pipeline():
 
 
 def test_windows_grafana_pipeline():
-    pipeline = loki_promtail_sysmon_message()
+    pipeline = loki_promtail_sysmon()
     backend = LogQLBackend(processing_pipeline=pipeline)
     sigma_rule = SigmaCollection.from_yaml(
         """
@@ -69,7 +69,7 @@ def test_windows_grafana_pipeline():
 
 
 def test_okta_json_pipeline():
-    pipeline = loki_okta_system_log_json()
+    pipeline = loki_okta_system_log()
     backend = LogQLBackend(processing_pipeline=pipeline)
     sigma_rule = SigmaCollection.from_yaml(
         """
