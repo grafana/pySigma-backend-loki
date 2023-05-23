@@ -300,12 +300,15 @@ class LogQLBackend(TextQueryBackend):
     # non-wildcard metacharacters
     # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive,
     # we need to do the same for *ALL* string values and prepend with (?i)
-    def convert_str_to_re(self, value: SigmaString) -> SigmaRegularExpression:
+    def convert_str_to_re(
+        self, value: SigmaString, case_insensitive: bool = True
+    ) -> SigmaRegularExpression:
         """Convert a SigmaString into a regular expression, replacing any
         wildcards with equivalent regular expression operators, and enforcing
         case-insensitive matching"""
         return SigmaRegularExpression(
-            "(?i)" + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
+            ("(?i)" if case_insensitive else "")
+            + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
         )
 
     def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
@@ -836,6 +839,17 @@ class LogQLBackend(TextQueryBackend):
             cond.value = self.convert_str_to_re(cond.value)
             return super().convert_condition_field_eq_val_re(cond, state)
         return super().convert_condition_field_eq_val_str(cond, state)
+
+    def convert_condition_field_eq_val_str_case_sensitive(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """If the cased modifier is combined with startswith/endswith/contains
+        modifiers, Sigma introduces wildcards that are then not handled correctly
+        by Loki. So, in those cases, we convert the string to a regular expression."""
+        if cond.value.contains_special():
+            cond.value = self.convert_str_to_re(cond.value, False)
+            return super().convert_condition_field_eq_val_re(cond, state)
+        return super().convert_condition_field_eq_val_str_case_sensitive(cond, state)
 
     def convert_condition_val_str(
         self, cond: ConditionValueExpression, state: ConversionState
