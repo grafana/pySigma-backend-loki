@@ -35,6 +35,7 @@ from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaBool,
+    SigmaCasedString,
     SigmaCompareExpression,
     SigmaCIDRExpression,
     SigmaRegularExpression,
@@ -139,7 +140,11 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         # or if any of the regexes are case insensitive
         # TODO: can we make this more precise?
         case_insensitive = any(
-            (isinstance(val, SigmaString) and self.case_insensitive)
+            (
+                isinstance(val, SigmaString)
+                and self.case_insensitive
+                and not isinstance(val, SigmaCasedString)
+            )
             or (
                 isinstance(val, SigmaRegularExpression)
                 and val.regexp.startswith("(?i)")
@@ -219,6 +224,7 @@ class LogQLBackend(TextQueryBackend):
     cidr_expression: ClassVar[str]
     compare_op_expression: ClassVar[str]
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
+    case_sensitive_match_expression: ClassVar[str]
 
     @staticmethod
     def set_expression_templates(negated: bool) -> None:
@@ -239,6 +245,7 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GT: ">",
                 SigmaCompareExpression.CompareOperators.GTE: ">=",
             }
+            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
         else:
             LogQLBackend.eq_token = "!="
             LogQLBackend.field_null_expression = "{field}!=``"
@@ -250,6 +257,7 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GT: "<=",
                 SigmaCompareExpression.CompareOperators.GTE: "<",
             }
+            LogQLBackend.case_sensitive_match_expression = "{field}!={value}"
         # Cache the state of these variables so we don't keep setting them needlessly
         LogQLBackend.current_templates = negated
 
@@ -579,8 +587,10 @@ class LogQLBackend(TextQueryBackend):
             condition,
             (ConditionFieldEqualsValueExpression, ConditionValueExpression),
         ):
-            if isinstance(condition.value, SigmaString) and (
-                self.case_insensitive or condition.value.contains_special()
+            if (
+                isinstance(condition.value, SigmaString)
+                and (self.case_insensitive or condition.value.contains_special())
+                and not isinstance(condition.value, SigmaCasedString)
             ):
                 condition.value = self.convert_str_to_re(condition.value)
         if isinstance(condition, ConditionItem):
