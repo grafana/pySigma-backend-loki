@@ -500,14 +500,14 @@ diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
 name = "pysigma"
-version = "0.9.9"
+version = "0.9.11"
 description = "Sigma rule processing and conversion tools"
 category = "main"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "pysigma-0.9.9-py3-none-any.whl", hash = "sha256:00a947fc87c7848c6c5a2944ad7691714c430ac7f4bc0a75d6c380b79b926958"},
-    {file = "pysigma-0.9.9.tar.gz", hash = "sha256:76be26e3324e81c198303205edacfc8649bb4b15fa2c7ba260897c3f7e05bc26"},
+    {file = "pysigma-0.9.11-py3-none-any.whl", hash = "sha256:a7fda2108e2d37e6b3862aa4f9b3e52c6b1ed92c67a8eb83b77709b099d53044"},
+    {file = "pysigma-0.9.11.tar.gz", hash = "sha256:f0df5d44a00c0794422338b348ad1df1b9791175b6f38a0eeeff0a08ee0f29a4"},
 ]
 
 [package.dependencies]
@@ -650,14 +650,14 @@ files = [
 
 [[package]]
 name = "requests"
-version = "2.30.0"
+version = "2.31.0"
 description = "Python HTTP for Humans."
 category = "main"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "requests-2.30.0-py3-none-any.whl", hash = "sha256:10e94cc4f3121ee6da529d358cdaeaff2f1c409cd377dbc72b825852f2f7e294"},
-    {file = "requests-2.30.0.tar.gz", hash = "sha256:239d7d4458afcb28a692cdd298d87542235f4ca8d36d03a15bfc128a6559a2f4"},
+    {file = "requests-2.31.0-py3-none-any.whl", hash = "sha256:58cd2187c01e70e6e26505bca751777aa9f2ee0b7f4300988b709f44e013003f"},
+    {file = "requests-2.31.0.tar.gz", hash = "sha256:942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1"},
 ]
 
 [package.dependencies]
@@ -696,14 +696,14 @@ files = [
 
 [[package]]
 name = "typing-extensions"
-version = "4.5.0"
+version = "4.6.0"
 description = "Backported and Experimental Type Hints for Python 3.7+"
 category = "dev"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "typing_extensions-4.5.0-py3-none-any.whl", hash = "sha256:fb33085c39dd998ac16d1431ebc293a8b3eedd00fd4a32de0ff79002c19511b4"},
-    {file = "typing_extensions-4.5.0.tar.gz", hash = "sha256:5cb5f4a79139d699607b3ef622a1dedafa84e115ab0024e0d9c044a9479ca7cb"},
+    {file = "typing_extensions-4.6.0-py3-none-any.whl", hash = "sha256:6ad00b63f849b7dcc313b70b6b304ed67b2b2963b3098a33efe18056b1a9a223"},
+    {file = "typing_extensions-4.6.0.tar.gz", hash = "sha256:ff6b238610c747e44c268aa4bb23c8c735d665a63726df3f9431ce707f2aa768"},
 ]
 
 [[package]]
@@ -727,4 +727,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "d6290cf9f0416d072e9b679c9ce1fa6d643e228a347c9f5e90eac35aae4a6188"
+content-hash = "24f46fdac3a2faa6e3c229c5cfb518e711f5cb9bac69dbb4002f6bd623a2e84c"
