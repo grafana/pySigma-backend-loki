@@ -536,6 +536,69 @@ def test_loki_field_contains(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_field_cased_startswith(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased|startswith: foo
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`foo.*`']
+    )
+
+
+def test_loki_field_cased_endswith(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased|endswith: bar
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`.*bar`']
+    )
+
+
+def test_loki_field_cased_contains(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased|contains: ooba
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`.*ooba.*`']
+    )
+
+
 def test_loki_cidr_query(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
