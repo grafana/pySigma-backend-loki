@@ -954,6 +954,8 @@ class LogQLBackend(TextQueryBackend):
             "expr": f"sum(count_over_time({query} [1m])) or vector(0) > 0",
             "labels": {},
         }
+        if rule.author:
+            ruler["annotations"]["author"] = rule.author
         if rule.level:
             ruler["labels"]["severity"] = rule.level.name.lower()  # type: ignore
         return ruler
