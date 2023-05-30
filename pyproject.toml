@@ -12,7 +12,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.9.9"
+pysigma = "==0.9.9"
 pysigma-pipeline-sysmon = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
