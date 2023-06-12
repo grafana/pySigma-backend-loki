@@ -35,6 +35,7 @@ from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
 from sigma.types import (
     SigmaBool,
+    SigmaCasedString,
     SigmaCompareExpression,
     SigmaCIDRExpression,
     SigmaRegularExpression,
@@ -139,7 +140,11 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         # or if any of the regexes are case insensitive
         # TODO: can we make this more precise?
         case_insensitive = any(
-            (isinstance(val, SigmaString) and self.case_insensitive)
+            (
+                isinstance(val, SigmaString)
+                and self.case_insensitive
+                and not isinstance(val, SigmaCasedString)
+            )
             or (
                 isinstance(val, SigmaRegularExpression)
                 and val.regexp.startswith("(?i)")
@@ -219,6 +224,7 @@ class LogQLBackend(TextQueryBackend):
     cidr_expression: ClassVar[str]
     compare_op_expression: ClassVar[str]
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
+    case_sensitive_match_expression: ClassVar[str]
 
     @staticmethod
     def set_expression_templates(negated: bool) -> None:
@@ -239,6 +245,7 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GT: ">",
                 SigmaCompareExpression.CompareOperators.GTE: ">=",
             }
+            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
         else:
             LogQLBackend.eq_token = "!="
             LogQLBackend.field_null_expression = "{field}!=``"
@@ -250,6 +257,7 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GT: "<=",
                 SigmaCompareExpression.CompareOperators.GTE: "<",
             }
+            LogQLBackend.case_sensitive_match_expression = "{field}!={value}"
         # Cache the state of these variables so we don't keep setting them needlessly
         LogQLBackend.current_templates = negated
 
@@ -292,12 +300,15 @@ class LogQLBackend(TextQueryBackend):
     # non-wildcard metacharacters
     # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive,
     # we need to do the same for *ALL* string values and prepend with (?i)
-    def convert_str_to_re(self, value: SigmaString) -> SigmaRegularExpression:
+    def convert_str_to_re(
+        self, value: SigmaString, case_insensitive: bool = True
+    ) -> SigmaRegularExpression:
         """Convert a SigmaString into a regular expression, replacing any
         wildcards with equivalent regular expression operators, and enforcing
         case-insensitive matching"""
         return SigmaRegularExpression(
-            "(?i)" + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
+            ("(?i)" if case_insensitive else "")
+            + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
         )
 
     def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
@@ -579,8 +590,10 @@ class LogQLBackend(TextQueryBackend):
             condition,
             (ConditionFieldEqualsValueExpression, ConditionValueExpression),
         ):
-            if isinstance(condition.value, SigmaString) and (
-                self.case_insensitive or condition.value.contains_special()
+            if (
+                isinstance(condition.value, SigmaString)
+                and (self.case_insensitive or condition.value.contains_special())
+                and not isinstance(condition.value, SigmaCasedString)
             ):
                 condition.value = self.convert_str_to_re(condition.value)
         if isinstance(condition, ConditionItem):
@@ -826,6 +839,17 @@ class LogQLBackend(TextQueryBackend):
             cond.value = self.convert_str_to_re(cond.value)
             return super().convert_condition_field_eq_val_re(cond, state)
         return super().convert_condition_field_eq_val_str(cond, state)
+
+    def convert_condition_field_eq_val_str_case_sensitive(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """If the cased modifier is combined with startswith/endswith/contains
+        modifiers, Sigma introduces wildcards that are then not handled correctly
+        by Loki. So, in those cases, we convert the string to a regular expression."""
+        if cond.value.contains_special():
+            cond.value = self.convert_str_to_re(cond.value, False)
+            return super().convert_condition_field_eq_val_re(cond, state)
+        return super().convert_condition_field_eq_val_str_case_sensitive(cond, state)
 
     def convert_condition_val_str(
         self, cond: ConditionValueExpression, state: ConversionState

@@ -365,6 +365,50 @@ def test_loki_wildcard_escape(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_cased_query(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased: fooBAR
+                    fieldB: fooBAR
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=`fooBAR` and fieldB=~`(?i)fooBAR`']
+    )
+
+
+def test_loki_cased_unbound_query(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    '|cased': fooBAR
+                    fieldB: fooBAR
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} |= `fooBAR` | logfmt | fieldB=~`(?i)fooBAR`']
+    )
+
+
 def test_loki_regex_query(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
@@ -489,6 +533,69 @@ def test_loki_field_contains(loki_backend: LogQLBackend):
             )
         )
         == ['{job=~".+"} | logfmt | fieldA=~`(?i).*ooba.*`']
+    )
+
+
+def test_loki_field_cased_startswith(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased|startswith: foo
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`foo.*`']
+    )
+
+
+def test_loki_field_cased_endswith(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased|endswith: bar
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`.*bar`']
+    )
+
+
+def test_loki_field_cased_contains(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased|contains: ooba
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`.*ooba.*`']
     )
 
 

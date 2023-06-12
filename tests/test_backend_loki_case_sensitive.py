@@ -363,6 +363,30 @@ def test_loki_wildcard_escape(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_cased_query(loki_backend: LogQLBackend):
+    """Note: given we are already generating case-sensitive queries with this configuration,
+    the cased modifier should have no effect"""
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|cased: fooBAR
+                    fieldB: fooBAR
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=`fooBAR` and fieldB=`fooBAR`']
+    )
+
+
 def test_loki_regex_query(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
