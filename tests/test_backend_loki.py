@@ -1297,7 +1297,8 @@ def test_loki_ruler_author_output(loki_backend: LogQLBackend):
       author: test author
       description: testing
       summary: test signature
-    expr: sum(count_over_time({job=~".+"} |= `anything` [1m])) or vector(0) > 0
+    expr: sum(count_over_time({job=~".+"} |~ `(?i)anything` [1m])) or vector(0) >
+      0
     labels:
       severity: low
 """
