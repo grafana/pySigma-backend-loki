@@ -128,16 +128,23 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
 
     exprs: List[Union[SigmaString, SigmaRegularExpression]]
     op: str = "|~"  # default to matching
+    case_insensitive: bool = True
 
     def negate(self) -> DeferredQueryExpression:
         self.op = LogQLBackend.negated_line_filter_operator[self.op]
         return self
 
     def finalize_expression(self) -> str:
+        # This makes the regex case insensitive if any values are SigmaStrings
+        # or if any of the regexes are case insensitive
+        # TODO: can we make this more precise?
         case_insensitive = any(
-            val.regexp.startswith("(?i)")
+            (isinstance(val, SigmaString) and self.case_insensitive)
+            or (
+                isinstance(val, SigmaRegularExpression)
+                and val.regexp.startswith("(?i)")
+            )
             for val in self.exprs
-            if isinstance(val, SigmaRegularExpression)
         )
         or_value = "|".join(
             (
@@ -267,23 +274,28 @@ class LogQLBackend(TextQueryBackend):
 
     # Loki-specific functionality
     add_line_filters: bool = False
+    case_insensitive: bool = True
 
     def __init__(
         self,
         processing_pipeline: Optional[ProcessingPipeline] = None,
         collect_errors: bool = False,
         add_line_filters: bool = False,
+        case_insensitive: bool = True,
     ):
         super().__init__(processing_pipeline, collect_errors)
         self.add_line_filters = add_line_filters
+        self.case_insensitive = case_insensitive
 
     # Loki-specific functions
     # When converting values to regexes, we need to escape the string to prevent use of
     # non-wildcard metacharacters
     # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive,
-    # we also prepend with (?i)
-    def convert_wildcard_to_re(self, value: SigmaString) -> SigmaRegularExpression:
-        """Convert a SigmaString value that contains wildcards into a regular expression"""
+    # we need to do the same for *ALL* string values and prepend with (?i)
+    def convert_str_to_re(self, value: SigmaString) -> SigmaRegularExpression:
+        """Convert a SigmaString into a regular expression, replacing any
+        wildcards with equivalent regular expression operators, and enforcing
+        case-insensitive matching"""
         return SigmaRegularExpression(
             "(?i)" + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
         )
@@ -555,6 +567,10 @@ class LogQLBackend(TextQueryBackend):
 
         - LogQL does not support wildcards in strings, so we convert them instead to
           regular expressions
+        - LogQL does case sensitive searches by default, but Sigma strings are case
+          insensitive, so to be fully spec compliant, we have to convert them into
+          regular expressions with a leading (?i) flag
+          - Can be disabled by setting the instance variable case_insensitive to False
         - LogQL does not support NOT operators, so we use De Morgan's law to push the
           negation down the tree (flipping ANDs and ORs and swapping operators, i.e.,
           = becomes !=, etc.)
@@ -563,11 +579,10 @@ class LogQLBackend(TextQueryBackend):
             condition,
             (ConditionFieldEqualsValueExpression, ConditionValueExpression),
         ):
-            if (
-                isinstance(condition.value, SigmaString)
-                and condition.value.contains_special()
+            if isinstance(condition.value, SigmaString) and (
+                self.case_insensitive or condition.value.contains_special()
             ):
-                condition.value = self.convert_wildcard_to_re(condition.value)
+                condition.value = self.convert_str_to_re(condition.value)
         if isinstance(condition, ConditionItem):
             if isinstance(condition, ConditionNOT):
                 negated = not negated
@@ -736,7 +751,7 @@ class LogQLBackend(TextQueryBackend):
             ):
                 if unbound_deferred_or is None:
                     unbound_deferred_or = LogQLDeferredOrUnboundExpression(
-                        state, [], "|~"
+                        state, [], "|~", self.case_insensitive
                     )
                     if getattr(cond, "negated", False):
                         unbound_deferred_or.negate()
@@ -803,6 +818,14 @@ class LogQLBackend(TextQueryBackend):
         deferred expressions, which use a different approach."""
         LogQLBackend.set_expression_templates(getattr(cond, "negated", False))
         return super().convert_condition_field_eq_val(cond, state)
+
+    def convert_condition_field_eq_val_str(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        if self.case_insensitive and len(cond.value) > 0:
+            cond.value = self.convert_str_to_re(cond.value)
+            return super().convert_condition_field_eq_val_re(cond, state)
+        return super().convert_condition_field_eq_val_str(cond, state)
 
     def convert_condition_val_str(
         self, cond: ConditionValueExpression, state: ConversionState

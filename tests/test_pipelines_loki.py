@@ -37,8 +37,8 @@ def test_loki_grafana_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~".+"} | logfmt | (path=`/a/path/to/something` or path=`/a/different/path`)'
-        " and status=200"
+        '{job=~".+"} | logfmt | (path=~`(?i)/a/path/to/something`'
+        " or path=~`(?i)/a/different/path`) and status=200"
     ]
 
 
@@ -90,10 +90,10 @@ def test_okta_json_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~".+"} | json | (event_eventType=`policy.lifecycle.update` or '
-        "event_eventType=`policy.lifecycle.delete`) and "
-        "event_legacyEventType=`core.user_auth.login_failed` and "
-        "event_displayMessage=`Failed login to Okta`"
+        '{job=~".+"} | json | (event_eventType=~`(?i)policy\\.lifecycle\\.update` or '
+        "event_eventType=~`(?i)policy\\.lifecycle\\.delete`) and "
+        "event_legacyEventType=~`(?i)core\\.user_auth\\.login_failed` and "
+        "event_displayMessage=~`(?i)Failed\\ login\\ to\\ Okta`"
     ]
 
 
@@ -126,7 +126,7 @@ def test_loki_parser_pipeline():
         """
     )
     loki_rule = backend.convert(sigma_rule)
-    assert loki_rule == ['{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=`testing`']
+    assert loki_rule == ['{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)testing`']
 
 
 def test_loki_logsource_selection_pipeline():
@@ -159,7 +159,7 @@ def test_loki_logsource_selection_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=`testing`"
+        "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=~`(?i)testing`"
     ]
 
 

@@ -10,7 +10,7 @@ from sigma.collection import SigmaCollection
 
 @pytest.fixture
 def loki_backend():
-    return LogQLBackend(add_line_filters=True, case_insensitive=False)
+    return LogQLBackend(add_line_filters=True)
 
 
 # Testing line filters introduction
@@ -31,12 +31,10 @@ def test_loki_lf_field_eq(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA`']
+        == ['{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)valueA`']
     )
 
 
-# In this context, a full negation of fieldA=valueA would be acceptable to include
-# however the likely performance benefit is not obvious
 def test_loki_field_not_eq(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
@@ -54,7 +52,7 @@ def test_loki_field_not_eq(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} != `fieldA=valueA` | logfmt | fieldA!=`valueA`']
+        == ['{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)valueA`']
     )
 
 
@@ -141,7 +139,8 @@ def test_loki_lf_and_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA` and fieldB=`valueB`'
+            '{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)valueA` '
+            "and fieldB=~`(?i)valueB`"
         ]
     )
 
@@ -166,18 +165,11 @@ def test_loki_lf_not_and_expression(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!=`valueA` or fieldB!=`valueB`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)valueA` or fieldB!~`(?i)valueB`']
     )
 
 
 def test_loki_lf_or_expression(loki_backend: LogQLBackend):
-    """Test that, when an OR condition contains a common substring in all arguments,
-    the substring will be used as a line filter.
-
-    In this case, we know: the parser is logfmt and therefore a log entry of interest
-    should contain at least fieldA=valueA or fieldB=valueB. It means it will contain at
-    the very least =value (the longest common substring between those two values) and
-    hence we can use it as a line filter."""
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(
@@ -196,7 +188,7 @@ def test_loki_lf_or_expression(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `=value` | logfmt | fieldA=`valueA` or fieldB=`valueB`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)valueA` or fieldB=~`(?i)valueB`']
     )
 
 
@@ -220,7 +212,8 @@ def test_loki_lf_not_or_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} != `fieldA=valueA` | logfmt | fieldA!=`valueA` and fieldB!=`valueB`'
+            '{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)valueA` and '
+            "fieldB!~`(?i)valueB`"
         ]
     )
 
@@ -245,7 +238,8 @@ def test_loki_lf_or_no_filter_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | aaaa=`bbbb` or cccc=`dddd`'
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | aaaa=~`(?i)bbbb` '
+            "or cccc=~`(?i)dddd`"
         ]
     )
 
@@ -273,8 +267,8 @@ def test_loki_lf_and_or_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |= `fieldA=valueA` | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and '
-            "(fieldB=`valueB1` or fieldB=`valueB2`)"
+            '{job=~".+"} | logfmt | (fieldA=~`(?i)valueA1` or fieldA=~`(?i)valueA2`) and '
+            "(fieldB=~`(?i)valueB1` or fieldB=~`(?i)valueB2`)"
         ]
     )
 
@@ -301,8 +295,8 @@ def test_loki_lf_or_and_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or '
-            "fieldA=`valueA2` and fieldB=`valueB2`"
+            '{job=~".+"} | logfmt | fieldA=~`(?i)valueA1` and fieldB=~`(?i)valueB1` or '
+            "fieldA=~`(?i)valueA2` and fieldB=~`(?i)valueB2`"
         ]
     )
 
@@ -329,8 +323,8 @@ def test_loki_lf_in_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |= `fieldA=value` | logfmt | fieldA=`valueA` or fieldA=`valueB` '
-            "or fieldA=`valueC`"
+            '{job=~".+"} | logfmt | fieldA=~`(?i)valueA` or fieldA=~`(?i)valueB` '
+            "or fieldA=~`(?i)valueC`"
         ]
     )
 
@@ -355,7 +349,8 @@ def test_loki_lf_all_query(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA` and fieldA=`valueB`'
+            '{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)valueA` and '
+            "fieldA=~`(?i)valueB`"
         ]
     )
 
@@ -496,7 +491,7 @@ def test_loki_lf_regex_query(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |= `fieldB=foo` | logfmt | fieldA=~`foo.*bar` and fieldB=`foo`'
+            '{job=~".+"} |~ `foo.*bar` | logfmt | fieldA=~`foo.*bar` and fieldB=~`(?i)foo`'
         ]
     )
 
@@ -669,7 +664,7 @@ def test_loki_lf_base64_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `fieldA=dmFsdWU=` | logfmt | fieldA=`dmFsdWU=`']
+        == ['{job=~".+"} |~ `(?i)dmFsdWU=` | logfmt | fieldA=~`(?i)dmFsdWU=`']
     )
 
 
@@ -691,7 +686,8 @@ def test_loki_lf_base64offset_query(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=`dmFsdW` or fieldA=`ZhbHVl` or fieldA=`2YWx1Z`'
+            '{job=~".+"} | logfmt | fieldA=~`(?i)dmFsdW` or fieldA=~`(?i)ZhbHVl` or '
+            "fieldA=~`(?i)2YWx1Z`"
         ]
     )
 
@@ -713,7 +709,7 @@ def test_loki_lf_field_name_with_whitespace(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} |= `field name=value` | logfmt | field_name=`value`']
+        == ['{job=~".+"} |~ `(?i)value` | logfmt | field_name=~`(?i)value`']
     )
 
 
@@ -734,7 +730,7 @@ def test_loki_lf_field_name_leading_num(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} |= `0field=value` | logfmt | _0field=`value`']
+        == ['{job=~".+"} |~ `(?i)value` | logfmt | _0field=~`(?i)value`']
     )
 
 
@@ -755,7 +751,7 @@ def test_loki_lf_field_name_invalid(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} |= `field.name@A-Z=value` | logfmt | field_name_A_Z=`value`']
+        == ['{job=~".+"} |~ `(?i)value` | logfmt | field_name_A_Z=~`(?i)value`']
     )
 
 
@@ -779,7 +775,7 @@ def test_loki_lf_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `value` | logfmt | fieldA=`valueA`']
+        == ['{job=~".+"} |~ `(?i)value` | logfmt | fieldA=~`(?i)valueA`']
     )
 
 
@@ -804,7 +800,9 @@ def test_loki_lf_and_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `valueA` |= `valueB` | logfmt | fieldA=`valueA`']
+        == [
+            '{job=~".+"} |~ `(?i)valueA` |~ `(?i)valueB` | logfmt | fieldA=~`(?i)valueA`'
+        ]
     )
 
 
@@ -828,7 +826,7 @@ def test_loki_lf_or_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `valueA|valueB` | logfmt | fieldA=`valueA`']
+        == ['{job=~".+"} |~ `(?i)valueA|valueB` | logfmt | fieldA=~`(?i)valueA`']
     )
 
 
@@ -851,7 +849,8 @@ def test_loki_lf_windows_logsource(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} |= `value` | json | key1_key2=`value`'
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} |~ `(?i)value` | json | '
+            "key1_key2=~`(?i)value`"
         ]
     )
 
@@ -873,7 +872,7 @@ def test_loki_lf_azure_logsource(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job="logstash"} |= `value` | json | key1_key2=`value`']
+        == ['{job="logstash"} |~ `(?i)value` | json | key1_key2=~`(?i)value`']
     )
 
 
@@ -904,8 +903,10 @@ def test_loki_lf_very_long_query_or(loki_backend: LogQLBackend):
     test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
     assert (
         len(test) > 1
-        and all(f"{long_field}=`valueA`" in q for q in test)
-        and all(f"|= `{long_field}=valueA` |" in q for q in test)
+        and all(
+            "|~ `(?i)valueA` |" in q and f"{long_field}=~`(?i)valueA`" in q
+            for q in test
+        )
         and all(len(q) < 5120 for q in test)
     )
 
@@ -926,6 +927,8 @@ def test_loki_lf_very_long_query_or_right_filters(loki_backend: LogQLBackend):
             """
     test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
     assert len(test) > 1 and all(
-        re.match("|= `field([AB])=value\1{4000}` | .* | field\1=`value\1{4000}`", q)
+        re.match(
+            "|= `field([AB])=value\1{4000}` | .* | field\1=~`(\\?i)value\1{4000}`", q
+        )
         for q in test
     )
