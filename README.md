@@ -23,10 +23,10 @@ Further, it contains the processing pipelines in `sigma.pipelines.loki`:
   * Note: most rules lack the `sysmon` service tag, and hence this pipeline should be used in combination with the [generic sysmon pipeline](https://github.com/SigmaHQ/pySigma-pipeline-sysmon)
 * `loki_okta_system_log`: parse the Okta System Log event json, adjusting field-names appropriately
 
-When converting rules into queries, it has two optional arguments:
+When converting rules into queries, the backend has two optional arguments:
 
-* `add_line_filters` (boolean, default: False): attempts to infer and add new line filters to queries that do not already have line filters, to help [improve Loki query performance](https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression)
-* `case_insensitive` (boolean, default: True): controls the case-sensitivity of generated queries being case-sensitive (<=v0.8.0 behavior) or case-insensitive (>=v0.9.0 behavior, and in accordance with [the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/Sigma_specification.md#general)), trading off Loki query performance vs. potentially missing data with unexpected casing
+* `add_line_filters` (boolean, default: `False`): if `True`, attempts to infer and add new line filters to queries without line filters, to [improve Loki query performance](https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression)
+* `case_insensitive` (boolean, default: `True`): if `False`, defaults to generating case-sensitive query filters, instead of case-insensitive filters that [the Sigma specification expects](https://github.com/SigmaHQ/sigma-specification/blob/main/Sigma_specification.md#general)), trading between Loki query performance vs. potentially missing data with unexpected casing
 
 This backend is currently maintained by:
 
