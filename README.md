@@ -26,7 +26,7 @@ Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 When converting rules into queries, the backend has two optional arguments:
 
 * `add_line_filters` (boolean, default: `False`): if `True`, attempts to infer and add new line filters to queries without line filters, to [improve Loki query performance](https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression)
-* `case_insensitive` (boolean, default: `True`): if `False`, defaults to generating case-sensitive query filters, instead of case-insensitive filters that [the Sigma specification expects](https://github.com/SigmaHQ/sigma-specification/blob/main/Sigma_specification.md#general)), trading between Loki query performance vs. potentially missing data with unexpected casing
+* `case_insensitive` (boolean, default: `True`): if `False`, defaults to generating case-sensitive query filters, instead of case-insensitive filters that [the Sigma specification expects](https://github.com/SigmaHQ/sigma-specification/blob/main/Sigma_specification.md#general), trading between Loki query performance and potentially missing data with unexpected casing
 
 This backend is currently maintained by:
 
