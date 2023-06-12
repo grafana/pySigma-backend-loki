@@ -1372,3 +1372,41 @@ def test_loki_ruler_output(loki_backend: LogQLBackend):
       severity: low
 """
     )
+
+
+def test_loki_ruler_author_output(loki_backend: LogQLBackend):
+    """Test for output format ruler."""
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: test signature
+            status: test
+            author: test author
+            level: low
+            description: testing
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keyword:
+                    anything
+                condition: keyword
+        """
+            ),
+            "ruler",
+        )
+        == """groups:
+- name: Sigma rules
+  rules:
+  - alert: test_signature
+    annotations:
+      author: test author
+      description: testing
+      summary: test signature
+    expr: sum(count_over_time({job=~".+"} |~ `(?i)anything` [1m])) or vector(0) >
+      0
+    labels:
+      severity: low
+"""
+    )
