@@ -181,6 +181,7 @@ class LogQLBackend(TextQueryBackend):
 
     # The backend generates grouping if required
     name: ClassVar[str] = "Grafana Loki"
+    identifier: ClassVar[str] = "loki"
     formats: Dict[str, str] = {
         "default": "Plain Loki queries",
         "ruler": "Loki 'ruler' output format for generating alerts",
