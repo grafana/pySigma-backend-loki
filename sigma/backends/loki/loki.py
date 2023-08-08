@@ -289,8 +289,8 @@ class LogQLBackend(TextQueryBackend):
         self,
         processing_pipeline: Optional[ProcessingPipeline] = None,
         collect_errors: bool = False,
-        add_line_filters: bool | str = False,
-        case_insensitive: bool | str = True,
+        add_line_filters: Union[bool, str] = False,
+        case_insensitive: Union[bool, str] = True,
     ):
         super().__init__(processing_pipeline, collect_errors)
         if isinstance(add_line_filters, bool):
