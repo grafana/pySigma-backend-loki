@@ -1410,3 +1410,31 @@ def test_loki_ruler_author_output(loki_backend: LogQLBackend):
       severity: low
 """
     )
+
+
+def test_backend_options(loki_backend: LogQLBackend):
+    # Check defaults
+    assert not loki_backend.add_line_filters
+    assert loki_backend.case_insensitive
+    # Check bool and string options for each boolean argument
+    alf_backend_bool_true = LogQLBackend(add_line_filters=True)
+    alf_backend_bool_false = LogQLBackend(add_line_filters=False)
+    assert alf_backend_bool_true.add_line_filters
+    assert not alf_backend_bool_false.add_line_filters
+    alf_backend_str_true = LogQLBackend(add_line_filters="true")
+    alf_backend_str_false = LogQLBackend(add_line_filters="false")
+    assert alf_backend_str_true.add_line_filters
+    assert not alf_backend_str_false.add_line_filters
+    ci_backend_bool_true = LogQLBackend(case_insensitive=True)
+    ci_backend_bool_false = LogQLBackend(case_insensitive=False)
+    assert ci_backend_bool_true.case_insensitive
+    assert not ci_backend_bool_false.case_insensitive
+    ci_backend_str_true = LogQLBackend(case_insensitive="true")
+    ci_backend_str_false = LogQLBackend(case_insensitive="false")
+    assert ci_backend_str_true.case_insensitive
+    assert not ci_backend_str_false.case_insensitive
+    # Check unrecognised argument
+    try:
+        LogQLBackend(unrecognise_argument=True)  # type: ignore[call-arg]
+    except Exception as ex:
+        assert isinstance(ex, TypeError)
