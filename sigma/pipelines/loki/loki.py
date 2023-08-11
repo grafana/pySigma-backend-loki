@@ -1,12 +1,15 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
-from sigma.rule import SigmaRule
+from typing import Any, List
+from sigma.modifiers import modifier_mapping
+from sigma.rule import SigmaRule, SigmaDetectionItem
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
+from sigma.exceptions import SigmaConfigurationError
 from sigma.processing.transformations import (
     transformations,
     Transformation,
+    DetectionItemTransformation,
     AddFieldnamePrefixTransformation,
     FieldMappingTransformation,
 )
@@ -32,8 +35,33 @@ class SetCustomAttributeTransformation(Transformation):
         rule.custom_attributes[self.attribute] = self.value
 
 
+@dataclass
+class AddModifiersTransformation(DetectionItemTransformation):
+    """Adds modifier(s) (e.g., "contains", "endswith", etc.)  to existing field(s)."""
+
+    modifiers: List[str]
+
+    def __post_init__(self):
+        for modifier in self.modifiers:
+            if modifier not in modifier_mapping:
+                raise SigmaConfigurationError(
+                    f"The modifier '{self.modifiers}' is not a valid modifier"
+                )
+
+    def apply_detection_item(
+        self, detection_item: SigmaDetectionItem
+    ) -> SigmaDetectionItem:
+        modifier_classes = [modifier_mapping[mod] for mod in self.modifiers]
+        previous_modifiers = detection_item.modifiers
+        detection_item.modifiers = modifier_classes
+        detection_item.apply_modifiers()
+        detection_item.modifiers = previous_modifiers + modifier_classes
+        return detection_item
+
+
 # Update pySigma transformations to include the above
 transformations["set_custom_attribute"] = SetCustomAttributeTransformation
+transformations["add_modifiers"] = AddModifiersTransformation
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:

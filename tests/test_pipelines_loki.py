@@ -1,10 +1,12 @@
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
+from sigma.processing.conditions import IncludeFieldCondition
 from sigma.processing.transformations import transformations
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
     LokiCustomAttributes,
     SetCustomAttributeTransformation,
+    AddModifiersTransformation,
     loki_grafana_logfmt,
     loki_promtail_sysmon,
     loki_okta_system_log,
@@ -14,6 +16,11 @@ from sigma.pipelines.loki import (
 def test_transformations_contains_custom_attribute():
     assert "set_custom_attribute" in transformations
     assert transformations["set_custom_attribute"] == SetCustomAttributeTransformation
+
+
+def test_transformations_contains_add_field_modifier():
+    assert "add_modifiers" in transformations
+    assert transformations["add_modifiers"] == AddModifiersTransformation
 
 
 def test_loki_grafana_pipeline():
@@ -206,3 +213,116 @@ def test_processing_pipeline_custom_attribute_from_dict():
         processing_item.transformation.value
         == pipeline_dict["transformations"][0]["value"]
     )
+
+
+def test_add_modifier_transformation():
+    pipeline = ProcessingPipeline(
+        name="Test add modifier transformation",
+        priority=100,
+        items=[
+            ProcessingItem(
+                identifier="add_modifier",
+                transformation=AddModifiersTransformation(modifiers=["contains"]),
+                field_name_conditions=[
+                    IncludeFieldCondition(
+                        fields=["msg"],
+                    )
+                ],
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    msg: testing
+                    ip|cidr: 1.2.0.0/16
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        '{job=~".+"} | logfmt | msg=~`(?i).*testing.*` and ip=ip("1.2.0.0/16")'
+    ]
+
+
+def test_add_modifier_existing_transformation():
+    pipeline = ProcessingPipeline(
+        name="Test add modifier transformation",
+        priority=100,
+        items=[
+            ProcessingItem(
+                identifier="add_modifier",
+                transformation=AddModifiersTransformation(modifiers=["contains"]),
+                field_name_conditions=[
+                    IncludeFieldCondition(
+                        fields=["msg"],
+                    )
+                ],
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    msg|base64: testing
+                    ip|cidr: 1.2.0.0/16
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        '{job=~".+"} | logfmt | msg=~`(?i).*dGVzdGluZw==.*` and ip=ip("1.2.0.0/16")'
+    ]
+
+
+def test_add_multiple_modifiers_transformation():
+    pipeline = ProcessingPipeline(
+        name="Test adding multiple modifiers",
+        priority=100,
+        items=[
+            ProcessingItem(
+                identifier="add_modifier",
+                transformation=AddModifiersTransformation(
+                    modifiers=["base64", "endswith"]
+                ),
+                field_name_conditions=[
+                    IncludeFieldCondition(
+                        fields=["msg"],
+                    )
+                ],
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    msg: testing
+                    ip|cidr: 1.2.0.0/16
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        '{job=~".+"} | logfmt | msg=~`(?i).*dGVzdGluZw==` and ip=ip("1.2.0.0/16")'
+    ]
