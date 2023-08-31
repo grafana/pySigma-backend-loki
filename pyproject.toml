@@ -3,16 +3,17 @@ name = "pySigma-backend-loki"
 version = "0.9.1"
 description = "pySigma Loki backend"
 readme = "README.md"
-authors = ["Nick Moore <nicholas.moore@grafana.com>", "Mostafa Moradian <mostafa.moradian@grafana.com>"]
+authors = [
+    "Nick Moore <nicholas.moore@grafana.com>",
+    "Mostafa Moradian <mostafa.moradian@grafana.com>",
+]
 license = "AGPL-3.0-only"
 repository = "https://github.com/grafana/pySigma-backend-loki"
-packages = [
-    { include = "sigma" }
-]
+packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.9.11"
+pysigma = "^0.10.4"
 pysigma-pipeline-sysmon = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
