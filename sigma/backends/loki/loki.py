@@ -648,7 +648,7 @@ class LogQLBackend(TextQueryBackend):
         attempt_shortening = False
         error_state = "initialising"
         try:
-            processing_pipeline = (
+            self.last_processing_pipeline = (
                 self.backend_processing_pipeline
                 + self.processing_pipeline
                 + self.output_format_processing_pipeline[
@@ -657,8 +657,8 @@ class LogQLBackend(TextQueryBackend):
             )
 
             error_state = "applying processing pipeline on"
-            processing_pipeline.apply(rule)  # 1. Apply transformations
-            state.processing_state = processing_pipeline.state
+            self.last_processing_pipeline.apply(rule)  # 1. Apply transformations
+            state.processing_state = self.last_processing_pipeline.state
 
             # 1.5. Apply Loki parse tree changes BEFORE attempting to convert a rule
             # When finalising a query from a condition, the index it is associated with
