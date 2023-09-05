@@ -62,6 +62,7 @@ To release new versions of pySigma-backend-loki, we use GitHub actions to update
 6. Run `poetry build` to produce distributable versions in `dist/`
 7. Create a release in GitHub against the appropriate tag. If the version number starts with `v0`, or ends with `-alpha/beta` etc., mark it as a pre-release, and attach the distributable files to the release
 8. Validate that the release to PyPI GitHub action is successful
+9. If this release supports a new minor or major version of `pySigma`, do a pull request on the [pySigma-plugin-directory](https://github.com/SigmaHQ/pySigma-plugin-directory) to reflect that
 
 ## Work in progress
 
