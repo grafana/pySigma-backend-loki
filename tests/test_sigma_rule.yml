@@ -1,0 +1,14 @@
+title: Test Sigma File
+id: b9030a45-f041-49b5-a948-841c097a6dc7
+status: test
+description: A testing file to check basic sigma conversion functionality
+references:
+  - https://github.com/SigmaHQ/sigma-specification/blob/main/Sigma_specification.md
+author: kelnage
+date: 2023/09/04
+logsource:
+  category: testing
+detection:
+  test:
+    file_name: field_value
+  condition: test
