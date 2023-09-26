@@ -293,6 +293,10 @@ class LogQLBackend(TextQueryBackend):
         case_insensitive: Union[bool, str] = True,
     ):
         super().__init__(processing_pipeline, collect_errors)
+        self.last_processing_pipeline: Optional[
+            ProcessingPipeline
+        ] = processing_pipeline
+
         if isinstance(add_line_filters, bool):
             self.add_line_filters = add_line_filters
         else:
