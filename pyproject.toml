@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pySigma-backend-loki"
-version = "0.10.0"
+version = "0.10.1"
 description = "pySigma Loki backend"
 readme = "README.md"
 authors = [
@@ -13,7 +13,7 @@ packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.10.4"
+pysigma = "^0.10.5"
 pysigma-pipeline-sysmon = "^1.0.3"
 
 [tool.poetry.group.dev.dependencies]
