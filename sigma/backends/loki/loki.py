@@ -707,7 +707,9 @@ class LogQLBackend(TextQueryBackend):
                             if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
                                     states[index],
-                                    self.convert_value_str(SigmaString(value), states[index]),
+                                    self.convert_value_str(
+                                        SigmaString(value), states[index]
+                                    ),
                                 )
                             elif def_type is LogQLDeferredType.REGEXP:
                                 line_filter = LogQLDeferredUnboundRegexpExpression(
@@ -722,7 +724,11 @@ class LogQLBackend(TextQueryBackend):
 
                     error_state = "finalizing query for"
                     final_query = self.finalize_query(
-                        rule, query, index, states[index], output_format or self.default_format
+                        rule,
+                        query,
+                        index,
+                        states[index],
+                        output_format or self.default_format,
                     )
                     if len(final_query) < threshold_length:
                         # If the query is within the threshold length, all is well

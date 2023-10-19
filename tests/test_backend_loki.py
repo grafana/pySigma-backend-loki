@@ -1113,7 +1113,7 @@ def test_loki_list_condition(loki_backend: LogQLBackend):
                     - Word3
                 sel3:
                     - Word4
-                condition: 
+                condition:
                   - sel1
                   - sel2
                   - sel3
@@ -1123,9 +1123,10 @@ def test_loki_list_condition(loki_backend: LogQLBackend):
         == [
             '{job=~".+"} |~ `(?i)Word1`',
             '{job=~".+"} |~ `(?i)Word2|Word3`',
-            '{job=~".+"} |~ `(?i)Word4`'
+            '{job=~".+"} |~ `(?i)Word4`',
         ]
     )
+
 
 # Testing specific logsources and other Sigma features
 def test_loki_windows_logsource(loki_backend: LogQLBackend):
