@@ -647,7 +647,6 @@ class LogQLBackend(TextQueryBackend):
         estimated length of a generated query, and updating the parse tree
         appropriately.
         """
-        state = ConversionState()
         attempted_conversion = False
         attempt_shortening = False
         error_state = "initialising"
@@ -662,7 +661,12 @@ class LogQLBackend(TextQueryBackend):
 
             error_state = "applying processing pipeline on"
             self.last_processing_pipeline.apply(rule)  # 1. Apply transformations
-            state.processing_state = self.last_processing_pipeline.state
+            states = [
+                ConversionState(
+                    processing_state=dict(self.last_processing_pipeline.state)
+                )
+                for _ in rule.detection.parsed_condition
+            ]
 
             # 1.5. Apply Loki parse tree changes BEFORE attempting to convert a rule
             # When finalising a query from a condition, the index it is associated with
@@ -685,12 +689,12 @@ class LogQLBackend(TextQueryBackend):
 
                 error_state = "converting"
                 queries = [  # 2. Convert condition
-                    (index, self.convert_condition(cond, state))
+                    (index, self.convert_condition(cond, states[index]))
                     for index, cond in conditions
                 ]
 
                 for index, query in queries:
-                    if not state.has_deferred() and self.add_line_filters:
+                    if not states[index].has_deferred() and self.add_line_filters:
                         # 2.5. Introduce line filters
                         error_state = "introducing line filters"
                         log_parser = self.select_log_parser(rule)
@@ -702,23 +706,29 @@ class LogQLBackend(TextQueryBackend):
                             value, negated, def_type = candidate_lfs[0]
                             if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
-                                    state,
-                                    self.convert_value_str(SigmaString(value), state),
+                                    states[index],
+                                    self.convert_value_str(
+                                        SigmaString(value), states[index]
+                                    ),
                                 )
                             elif def_type is LogQLDeferredType.REGEXP:
                                 line_filter = LogQLDeferredUnboundRegexpExpression(
-                                    state, value
+                                    states[index], value
                                 )
                             elif def_type is LogQLDeferredType.CIDR:
                                 line_filter = LogQLDeferredUnboundCIDRExpression(
-                                    state, value
+                                    states[index], value
                                 )
                             if negated:
                                 line_filter.negate()
 
                     error_state = "finalizing query for"
                     final_query = self.finalize_query(
-                        rule, query, index, state, output_format or self.default_format
+                        rule,
+                        query,
+                        index,
+                        states[index],
+                        output_format or self.default_format,
                     )
                     if len(final_query) < threshold_length:
                         # If the query is within the threshold length, all is well

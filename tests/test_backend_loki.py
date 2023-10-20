@@ -1093,6 +1093,41 @@ def test_loki_field_and_unbound_group_expression(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_list_condition(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Title
+            id: 8bcaaeff-3fe4-4793-9fcc-9a61acec6290
+            description: Short Description
+            author: Your Name
+            date: 2023/06/27
+            logsource:
+                category: application
+            detection:
+                sel1:
+                    - Word1
+                sel2:
+                    - Word2
+                    - Word3
+                sel3:
+                    - Word4
+                condition:
+                  - sel1
+                  - sel2
+                  - sel3
+        """
+            )
+        )
+        == [
+            '{job=~".+"} |~ `(?i)Word1`',
+            '{job=~".+"} |~ `(?i)Word2|Word3`',
+            '{job=~".+"} |~ `(?i)Word4`',
+        ]
+    )
+
+
 # Testing specific logsources and other Sigma features
 def test_loki_windows_logsource(loki_backend: LogQLBackend):
     assert (
