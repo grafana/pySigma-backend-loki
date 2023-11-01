@@ -1237,9 +1237,7 @@ def test_loki_collect_not_supported_errors(loki_backend: LogQLBackend):
         """
     )
     loki_backend.convert(rules)
-    # FIXME: Odd issue with pytest where running just this file generates one
-    # error, but when running many test files it generates 2 identical errors?
-    assert len(loki_backend.errors) > 1
+    assert len(loki_backend.errors) == 1
     assert any(
         isinstance(e, SigmaFeatureNotSupportedByBackendError) and r == rules[0]
         for (r, e) in loki_backend.errors
