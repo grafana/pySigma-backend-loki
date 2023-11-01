@@ -33,7 +33,8 @@ class SetCustomAttributeTransformation(Transformation):
 
 
 # Update pySigma transformations to include the above
-transformations["set_custom_attribute"] = SetCustomAttributeTransformation
+# mypy type: ignore required due to incorrect type annotation on the transformations dict
+transformations["set_custom_attribute"] = SetCustomAttributeTransformation  # type: ignore
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
