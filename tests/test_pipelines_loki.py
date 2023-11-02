@@ -144,13 +144,15 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "client.geographicalcontext.geolocation.lat",
             [
-                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lat=~`(?i)test_value`'
+                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lat=~`(?i)test_v'
+                "alue`"
             ],
         ),
         (
             "client.geographicalcontext.geolocation.lon",
             [
-                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lon=~`(?i)test_value`'
+                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lon=~`(?i)test_v'
+                "alue`"
             ],
         ),
         (
@@ -190,25 +192,29 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "debugcontext.debugdata.originalprincipal.id",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_id=~`(?i)test_value`'
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_id=~`(?i)test_'
+                "value`"
             ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.type",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_type=~`(?i)test_value`'
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_type=~`(?i)tes'
+                "t_value`"
             ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.alternateid",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_alternateId=~`(?i)test_value`'
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_alternateId=~`'
+                "(?i)test_value`"
             ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.displayname",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_displayName=~`(?i)test_value`'
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_displayName=~`'
+                "(?i)test_value`"
             ],
         ),
         (
@@ -220,25 +226,29 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "debugcontext.debugdata.logonlysecuritydata",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_logOnlySecurityData=~`(?i)test_value`'
+                '{job=~".+"} | json | event_debugContext_debugData_logOnlySecurityData=~`(?i)test_v'
+                "alue`"
             ],
         ),
         (
             "authenticationcontext.authenticationprovider",
             [
-                '{job=~".+"} | json | event_authenticationContext_authenticationProvider=~`(?i)test_value`'
+                '{job=~".+"} | json | event_authenticationContext_authenticationProvider=~`(?i)test'
+                "_value`"
             ],
         ),
         (
             "authenticationcontext.authenticationstep",
             [
-                '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)test_value`'
+                '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)test_val'
+                "ue`"
             ],
         ),
         (
             "authenticationcontext.credentialprovider",
             [
-                '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)test_value`'
+                '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)test_val'
+                "ue`"
             ],
         ),
         (
@@ -262,7 +272,8 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "authenticationcontext.externalsessionid",
             [
-                '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)test_value`'
+                '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)test_valu'
+                "e`"
             ],
         ),
         (
