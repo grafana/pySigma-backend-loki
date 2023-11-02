@@ -96,6 +96,7 @@ def test_okta_json_pipeline():
         "event_displayMessage=~`(?i)Failed\\ login\\ to\\ Okta`"
     ]
 
+
 def test_okta_json_pipeline_exclusive_exhaustive():
     pipeline = loki_okta_system_log()
     backend = LogQLBackend(processing_pipeline=pipeline)
@@ -114,137 +115,193 @@ def test_okta_json_pipeline_exclusive_exhaustive():
 
     rules = [
         ("eventtype", ['{job=~".+"} | json | event_eventType=~`(?i)test_value`']),
-        ("legacyeventtype", ['{job=~".+"} | json | event_legacyEventType=~`(?i)test_value`']),
-        ("actor.alternateid", ['{job=~".+"} | json | event_actor_alternateId=~`(?i)test_value`']),
-        ("actor.displayname", ['{job=~".+"} | json | event_actor_displayName=~`(?i)test_value`']),
+        (
+            "legacyeventtype",
+            ['{job=~".+"} | json | event_legacyEventType=~`(?i)test_value`'],
+        ),
+        (
+            "actor.alternateid",
+            ['{job=~".+"} | json | event_actor_alternateId=~`(?i)test_value`'],
+        ),
+        (
+            "actor.displayname",
+            ['{job=~".+"} | json | event_actor_displayName=~`(?i)test_value`'],
+        ),
         (
             "client.useragent.rawuseragent",
-            ['{job=~".+"} | json | event_client_userAgent_rawUserAgent=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_userAgent_rawUserAgent=~`(?i)test_value`'
+            ],
         ),
         (
             "client.useragent.os",
-            ['{job=~".+"} | json | event_client_userAgent_os=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_client_userAgent_os=~`(?i)test_value`'],
         ),
         (
             "client.useragent.browser",
-            ['{job=~".+"} | json | event_client_userAgent_browser=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_client_userAgent_browser=~`(?i)test_value`'],
         ),
         (
             "client.geographicalcontext.geolocation.lat",
-            ['{job=~".+"} | json | event_client_geographicalContext_geolocation_lat=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lat=~`(?i)test_value`'
+            ],
         ),
         (
             "client.geographicalcontext.geolocation.lon",
-            ['{job=~".+"} | json | event_client_geographicalContext_geolocation_lon=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lon=~`(?i)test_value`'
+            ],
         ),
         (
             "client.geographicalcontext.city",
-            ['{job=~".+"} | json | event_client_geographicalContext_city=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_geographicalContext_city=~`(?i)test_value`'
+            ],
         ),
         (
             "client.geographicalcontext.state",
-            ['{job=~".+"} | json | event_client_geographicalContext_state=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_geographicalContext_state=~`(?i)test_value`'
+            ],
         ),
         (
             "client.geographicalcontext.country",
-            ['{job=~".+"} | json | event_client_geographicalContext_country=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_geographicalContext_country=~`(?i)test_value`'
+            ],
         ),
         (
             "client.geographicalcontext.postalcode",
-            ['{job=~".+"} | json | event_client_geographicalContext_postalCode=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_client_geographicalContext_postalCode=~`(?i)test_value`'
+            ],
         ),
-        ("client.ipaddress", ['{job=~".+"} | json | event_client_ipAddress=~`(?i)test_value`']),
+        (
+            "client.ipaddress",
+            ['{job=~".+"} | json | event_client_ipAddress=~`(?i)test_value`'],
+        ),
         (
             "debugcontext.debugdata.requesturi",
-            ['{job=~".+"} | json | event_debugContext_debugData_requestUri=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_requestUri=~`(?i)test_value`'
+            ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.id",
-            ['{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_id=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_id=~`(?i)test_value`'
+            ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.type",
-            ['{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_type=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_type=~`(?i)test_value`'
+            ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.alternateid",
-            ['{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_alternateId=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_alternateId=~`(?i)test_value`'
+            ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.displayname",
-            ['{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_displayName=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_displayName=~`(?i)test_value`'
+            ],
         ),
         (
             "debugcontext.debugdata.behaviors",
-            ['{job=~".+"} | json | event_debugContext_debugData_behaviors=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_behaviors=~`(?i)test_value`'
+            ],
         ),
         (
             "debugcontext.debugdata.logonlysecuritydata",
-            ['{job=~".+"} | json | event_debugContext_debugData_logOnlySecurityData=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_debugContext_debugData_logOnlySecurityData=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.authenticationprovider",
-            ['{job=~".+"} | json | event_authenticationContext_authenticationProvider=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_authenticationProvider=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.authenticationstep",
-            ['{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.credentialprovider",
-            ['{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.credentialtype",
-            ['{job=~".+"} | json | event_authenticationContext_credentialType=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_credentialType=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.issuer.id",
-            ['{job=~".+"} | json | event_authenticationContext_issuer_id=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_issuer_id=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.issuer.type",
-            ['{job=~".+"} | json | event_authenticationContext_issuer_type=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_issuer_type=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.externalsessionid",
-            ['{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)test_value`'
+            ],
         ),
         (
             "authenticationcontext.interface",
-            ['{job=~".+"} | json | event_authenticationContext_interface=~`(?i)test_value`']
+            [
+                '{job=~".+"} | json | event_authenticationContext_interface=~`(?i)test_value`'
+            ],
         ),
         (
             "securitycontext.asnumber",
-            ['{job=~".+"} | json | event_securityContext_asNumber=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_securityContext_asNumber=~`(?i)test_value`'],
         ),
         (
             "securitycontext.asorg",
-            ['{job=~".+"} | json | event_securityContext_asOrg=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_securityContext_asOrg=~`(?i)test_value`'],
         ),
         (
             "securitycontext.isp",
-            ['{job=~".+"} | json | event_securityContext_isp=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_securityContext_isp=~`(?i)test_value`'],
         ),
         (
             "securitycontext.domain",
-            ['{job=~".+"} | json | event_securityContext_domain=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_securityContext_domain=~`(?i)test_value`'],
         ),
         (
             "securitycontext.isproxy",
-            ['{job=~".+"} | json | event_securityContext_isProxy=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_securityContext_isProxy=~`(?i)test_value`'],
         ),
         (
             "target.alternateid",
-            ['{job=~".+"} | json | event_target_alternateId=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_target_alternateId=~`(?i)test_value`'],
         ),
         (
             "target.displayname",
-            ['{job=~".+"} | json | event_target_displayName=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_target_displayName=~`(?i)test_value`'],
         ),
         (
             "target.detailentry",
-            ['{job=~".+"} | json | event_target_detailEntry=~`(?i)test_value`']
+            ['{job=~".+"} | json | event_target_detailEntry=~`(?i)test_value`'],
         ),
     ]
 
