@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
 from sigma.rule import SigmaRule
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
@@ -141,7 +142,7 @@ def loki_okta_system_log() -> ProcessingPipeline:
                 # See https://developer.okta.com/docs/reference/api/system-log/#logevent-object-annotated-example  # noqa: E501
                 transformation=FieldMappingTransformation(
                     {
-                        v.lower(): v
+                        v.lower().replace("_", "."): v
                         for v in [
                             "eventType",
                             "legacyEventType",
@@ -163,6 +164,8 @@ def loki_okta_system_log() -> ProcessingPipeline:
                             "debugContext_debugData_originalPrincipal_type",
                             "debugContext_debugData_originalPrincipal_alternateId",
                             "debugContext_debugData_originalPrincipal_displayName",
+                            "debugContext_debugData_behaviors",
+                            "debugContext_debugData_logOnlySecurityData",
                             "authenticationContext_authenticationProvider",
                             "authenticationContext_authenticationStep",
                             "authenticationContext_credentialProvider",
@@ -176,6 +179,9 @@ def loki_okta_system_log() -> ProcessingPipeline:
                             "securityContext_isp",
                             "securityContext_domain",
                             "securityContext_isProxy",
+                            "target_alternateId",
+                            "target_displayName",
+                            "target_detailEntry",
                         ]
                     }
                 ),
