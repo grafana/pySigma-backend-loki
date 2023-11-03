@@ -13,15 +13,15 @@ packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.10.5"
+pysigma = "^0.10.6"
 pysigma-pipeline-sysmon = "^1.0.3"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.7.0"
-coverage = "^7.3.0"
+black = "^23.10.1"
+coverage = "^7.3.2"
 flake8 = "^5.0.4"
-mypy = "^1.5.1"
-pytest = "^7.4.0"
+mypy = "^1.6.1"
+pytest = "^7.4.3"
 pytest-cov = "^4.1.0"
 pytest-mypy = "^0.10.3"
 types-pyyaml = "6.0.12.12"
