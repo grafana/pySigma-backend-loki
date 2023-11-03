@@ -41,3 +41,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: ./coverage.lcov
+          parallel: true
+          flag-name: python-${{ matrix.python-version }}
+  finish:
+    needs: test
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Finish coveralls
+        uses: coverallsapp/github-action@1.1.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+          carryforward: "python-3.8,python-3.9,python-3.10"
