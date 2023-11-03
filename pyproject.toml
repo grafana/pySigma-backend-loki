@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pySigma-backend-loki"
-version = "0.10.2"
+version = "0.10.3"
 description = "pySigma Loki backend"
 readme = "README.md"
 authors = [
