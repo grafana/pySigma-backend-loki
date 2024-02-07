@@ -14,7 +14,6 @@ packages = [{ include = "sigma" }]
 [tool.poetry.dependencies]
 python = "^3.8"
 pysigma = "^0.10.10"
-pysigma-pipeline-sysmon = "^1.0.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.12.1"
