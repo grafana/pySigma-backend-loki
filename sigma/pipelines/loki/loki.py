@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 
 from sigma.rule import SigmaRule
 from sigma.correlations import SigmaCorrelationRule
@@ -30,7 +30,7 @@ class SetCustomAttributeTransformation(Transformation):
     value: Any
 
     def apply(
-        self, pipeline: ProcessingPipeline, rule: SigmaRule | SigmaCorrelationRule
+        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
     ) -> None:
         super().apply(pipeline, rule)
         rule.custom_attributes[self.attribute] = self.value
