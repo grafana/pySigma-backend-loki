@@ -435,6 +435,9 @@ def test_processing_pipeline_custom_attribute_from_dict():
 
 
 def test_set_custom_attribute_correlation_rule():
+    """
+    Test that the custom attribute transformation can be applied to a correlation rule.
+    """
     rule = SigmaCorrelationRule.from_yaml(
         """
 title: Valid correlation
