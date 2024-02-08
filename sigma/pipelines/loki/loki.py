@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 
 from sigma.rule import SigmaRule
+from sigma.correlations import SigmaCorrelationRule
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
@@ -28,7 +29,9 @@ class SetCustomAttributeTransformation(Transformation):
     attribute: str
     value: Any
 
-    def apply(self, pipeline: ProcessingPipeline, rule: SigmaRule) -> None:
+    def apply(
+        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+    ) -> None:
         super().apply(pipeline, rule)
         rule.custom_attributes[self.attribute] = self.value
 

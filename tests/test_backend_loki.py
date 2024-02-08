@@ -1367,6 +1367,42 @@ def test_loki_collect_errors(loki_backend: LogQLBackend):
     assert r == rules[0] and isinstance(e, SigmaFeatureNotSupportedByBackendError)
 
 
+def test_loki_correlation_not_implemented_error(loki_backend: LogQLBackend):
+    """
+    A test to validate the correct error is thrown when a Correlation rule is converted by the
+    backend, given it does not currently support that format of Sigma rule.
+    """
+    rules = SigmaCollection.from_yaml(
+        """
+title: Test
+name: failed_login
+status: test
+logsource:
+    product: okta
+    service: okta
+detection:
+    selector:
+        legacyeventtype: 'core.user_auth.login_failed'
+    condition: selector
+---
+title: Valid correlation
+status: test
+correlation:
+    type: event_count
+    rules: failed_login
+    group-by: actor.alternateid
+    timespan: 10m
+    condition:
+        gte: 10
+        """
+    )
+    try:
+        loki_backend.convert(rules)
+    except Exception as e:
+        assert isinstance(e, NotImplementedError)
+        assert str(e) == "Backend does not support correlation rules."
+
+
 def test_loki_default_output(loki_backend: LogQLBackend):
     """Test for output format default."""
     # TODO: implement a test for the output format

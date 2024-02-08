@@ -7,8 +7,7 @@ from typing import Any, Dict
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
-from sigma.pipelines.sysmon import sysmon_pipeline
-from sigma.pipelines.loki import loki_grafana_logfmt, loki_promtail_sysmon
+from sigma.pipelines.loki import loki_grafana_logfmt
 from sigma.rule import SigmaDetection, SigmaError
 
 parser = argparse.ArgumentParser(
@@ -70,23 +69,13 @@ parser.add_argument(
     help="Validate the generated rule(s) through the backend engine, where one or more lines of "
     "stdout denotes a successful validation",
 )
-parser.add_argument(
-    "-w",
-    "--windows",
-    action="store_true",
-    help="Use Windows sysmon pipelines",
-)
 
 
 args = parser.parse_args()
 
 rule_path = args.signature_path
 
-pipeline = (
-    sysmon_pipeline() + loki_promtail_sysmon()
-    if args.windows
-    else loki_grafana_logfmt()
-)
+pipeline = loki_grafana_logfmt()
 
 backend = LogQLBackend(
     processing_pipeline=pipeline,

@@ -13,12 +13,11 @@ packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.10.10"
-pysigma-pipeline-sysmon = "^1.0.3"
+pysigma = "^0.11.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.12.1"
-coverage = "^7.4.0"
+coverage = "^7.4.1"
 flake8 = "^5.0.4"
 mypy = "^1.8.0"
 pytest = "^7.4.4"
