@@ -1,5 +1,6 @@
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
+from sigma.correlations import SigmaCorrelationRule
 from sigma.processing.transformations import transformations
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
@@ -430,4 +431,42 @@ def test_processing_pipeline_custom_attribute_from_dict():
     assert (
         processing_item.transformation.value
         == pipeline_dict["transformations"][0]["value"]
+    )
+
+
+def test_set_custom_attribute_correlation_rule():
+    rule = SigmaCorrelationRule.from_yaml(
+        """
+title: Valid correlation
+status: test
+correlation:
+    type: event_count
+    rules: failed_login
+    group-by: actor.alternateid
+    timespan: 10m
+    condition:
+        gte: 10
+        """
+    )
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="set_loki_logsource_selection",
+                transformation=SetCustomAttributeTransformation(
+                    attribute=LokiCustomAttributes.LOGSOURCE_SELECTION.value,
+                    value="{job=`mylogs`,filename=~`.*[\\d]+.log$`}",
+                ),
+            )
+        ],
+    )
+    # FIXME: once the LogQL backend supports correlation rules, it'd be better to test this properly
+    #       with a conversion
+    assert "logsource_loki_selection" not in rule.custom_attributes
+    updated_rule = pipeline.apply(rule)
+    assert "logsource_loki_selection" in updated_rule.custom_attributes
+    assert (
+        updated_rule.custom_attributes["logsource_loki_selection"]
+        == "{job=`mylogs`,filename=~`.*[\\d]+.log$`}"
     )
