@@ -304,7 +304,7 @@ class LogQLBackend(TextQueryBackend):
         processing_pipeline: Optional[ProcessingPipeline] = None,
         collect_errors: bool = False,
         add_line_filters: Union[bool, str] = False,
-        case_insensitive: Union[bool, str] = True,
+        case_sensitive: Union[bool, str] = False,
     ):
         super().__init__(processing_pipeline, collect_errors)
         # mypy type: ignore required due to incorrect typing on Backend
@@ -316,10 +316,10 @@ class LogQLBackend(TextQueryBackend):
             self.add_line_filters = add_line_filters
         else:
             self.add_line_filters = add_line_filters.lower() == "true"
-        if isinstance(case_insensitive, bool):
-            self.case_insensitive = case_insensitive
+        if isinstance(case_sensitive, bool):
+            self.case_insensitive = not case_sensitive
         else:
-            self.case_insensitive = case_insensitive.lower() == "true"
+            self.case_insensitive = case_sensitive.lower() == "false"
 
     # Loki-specific functions
     # When converting values to regexes, we need to escape the string to prevent use of

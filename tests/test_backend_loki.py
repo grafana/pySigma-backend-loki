@@ -1496,12 +1496,12 @@ def test_backend_options(loki_backend: LogQLBackend):
     alf_backend_str_false = LogQLBackend(add_line_filters="false")
     assert alf_backend_str_true.add_line_filters
     assert not alf_backend_str_false.add_line_filters
-    ci_backend_bool_true = LogQLBackend(case_insensitive=True)
-    ci_backend_bool_false = LogQLBackend(case_insensitive=False)
+    ci_backend_bool_true = LogQLBackend(case_sensitive=False)
+    ci_backend_bool_false = LogQLBackend(case_sensitive=True)
     assert ci_backend_bool_true.case_insensitive
     assert not ci_backend_bool_false.case_insensitive
-    ci_backend_str_true = LogQLBackend(case_insensitive="true")
-    ci_backend_str_false = LogQLBackend(case_insensitive="false")
+    ci_backend_str_true = LogQLBackend(case_sensitive="false")
+    ci_backend_str_false = LogQLBackend(case_sensitive="true")
     assert ci_backend_str_true.case_insensitive
     assert not ci_backend_str_false.case_insensitive
     # Check unrecognised argument
