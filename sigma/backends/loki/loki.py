@@ -607,7 +607,7 @@ class LogQLBackend(TextQueryBackend):
         - LogQL does case sensitive searches by default, but Sigma strings are case
           insensitive, so to be fully spec compliant, we have to convert them into
           regular expressions with a leading (?i) flag
-          - to enforce case_sensitive matching,rather than the Sigma default, set
+          - to enforce case_sensitive matching, rather than the Sigma default, set
             case_sensitive to True
         - LogQL does not support NOT operators, so we use De Morgan's law to push the
           negation down the tree (flipping ANDs and ORs and swapping operators, i.e.,
