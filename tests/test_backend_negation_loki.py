@@ -432,7 +432,7 @@ def test_loki_not_cidr_query(loki_backend: LogQLBackend):
 
 
 def test_loki_not_unbound_case_sensitive(loki_backend: LogQLBackend):
-    loki_backend.case_insensitive = False
+    loki_backend.case_sensitive = True
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(

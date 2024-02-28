@@ -10,7 +10,7 @@ from sigma.collection import SigmaCollection
 
 @pytest.fixture
 def loki_backend():
-    return LogQLBackend(add_line_filters=True, case_insensitive=False)
+    return LogQLBackend(add_line_filters=True, case_sensitive=True)
 
 
 # Testing line filters introduction

@@ -297,14 +297,14 @@ class LogQLBackend(TextQueryBackend):
 
     # Loki-specific functionality
     add_line_filters: bool = False
-    case_insensitive: bool = True
+    case_sensitive: bool = False
 
     def __init__(
         self,
         processing_pipeline: Optional[ProcessingPipeline] = None,
         collect_errors: bool = False,
         add_line_filters: Union[bool, str] = False,
-        case_insensitive: Union[bool, str] = True,
+        case_sensitive: Union[bool, str] = False,
     ):
         super().__init__(processing_pipeline, collect_errors)
         # mypy type: ignore required due to incorrect typing on Backend
@@ -316,10 +316,10 @@ class LogQLBackend(TextQueryBackend):
             self.add_line_filters = add_line_filters
         else:
             self.add_line_filters = add_line_filters.lower() == "true"
-        if isinstance(case_insensitive, bool):
-            self.case_insensitive = case_insensitive
+        if isinstance(case_sensitive, bool):
+            self.case_sensitive = case_sensitive
         else:
-            self.case_insensitive = case_insensitive.lower() == "true"
+            self.case_sensitive = case_sensitive.lower() == "true"
 
     # Loki-specific functions
     # When converting values to regexes, we need to escape the string to prevent use of
@@ -607,7 +607,8 @@ class LogQLBackend(TextQueryBackend):
         - LogQL does case sensitive searches by default, but Sigma strings are case
           insensitive, so to be fully spec compliant, we have to convert them into
           regular expressions with a leading (?i) flag
-          - Can be disabled by setting the instance variable case_insensitive to False
+          - to enforce case_sensitive matching, rather than the Sigma default, set
+            case_sensitive to True
         - LogQL does not support NOT operators, so we use De Morgan's law to push the
           negation down the tree (flipping ANDs and ORs and swapping operators, i.e.,
           = becomes !=, etc.)
@@ -618,7 +619,7 @@ class LogQLBackend(TextQueryBackend):
         ):
             if (
                 isinstance(condition.value, SigmaString)
-                and (self.case_insensitive or condition.value.contains_special())
+                and (not self.case_sensitive or condition.value.contains_special())
                 and not isinstance(condition.value, SigmaCasedString)
             ):
                 condition.value = self.convert_str_to_re(condition.value)
@@ -805,7 +806,7 @@ class LogQLBackend(TextQueryBackend):
             ):
                 if unbound_deferred_or is None:
                     unbound_deferred_or = LogQLDeferredOrUnboundExpression(
-                        state, [], "|~", self.case_insensitive
+                        state, [], "|~", not self.case_sensitive
                     )
                     if getattr(cond, "negated", False):
                         unbound_deferred_or.negate()
@@ -893,7 +894,7 @@ class LogQLBackend(TextQueryBackend):
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         if (
-            self.case_insensitive
+            not self.case_sensitive
             and isinstance(cond.value, SigmaString)
             and len(cond.value) > 0
         ):

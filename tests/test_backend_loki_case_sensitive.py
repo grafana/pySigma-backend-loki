@@ -9,7 +9,7 @@ from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 
 @pytest.fixture
 def loki_backend():
-    return LogQLBackend(case_insensitive=False)
+    return LogQLBackend(case_sensitive=True)
 
 
 # Testing field filters
