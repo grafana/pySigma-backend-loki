@@ -31,6 +31,7 @@ PY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep "\.py$")
 if [ -n "$PY_CHANGED_FILES" ]; then
 	PY_CHANGED_FILES_ARGS=$(echo "$PY_CHANGED_FILES" | tr '\n' ' ')
 	check "poetry run mypy --explicit-package-bases $PY_CHANGED_FILES_ARGS"
+	check "poetry run ruff check $PY_CHANGED_FILES_ARGS"
 fi
 
 exit $RESULT

@@ -21,7 +21,12 @@ mypy = "^1.8.0"
 pytest = "^7.4.4"
 pytest-cov = "^4.1.0"
 pytest-mypy = "^0.10.3"
+ruff = "^0.2.2"
 types-pyyaml = "6.0.12.12"
+
+[tool.ruff]
+exclude = ["dist", "build", "env", "venv", ".env", ".venv"]
+line-length = 100
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
