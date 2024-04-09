@@ -79,7 +79,7 @@ def test_loki_field_ref_json(loki_backend: LogQLBackend):
     )
 
 
-def test_loki_field_ref_json(loki_backend: LogQLBackend):
+def test_loki_field_ref_json_multi_selection(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
             SigmaCollection.from_yaml(
