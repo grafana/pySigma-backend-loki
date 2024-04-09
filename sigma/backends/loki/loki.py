@@ -44,6 +44,7 @@ from sigma.types import (
     SigmaString,
     SigmaNull,
     SigmaNumber,
+    SigmaFieldReference
 )
 from warnings import warn
 from yaml import dump
@@ -83,6 +84,7 @@ class LogQLDeferredType:
     CIDR = auto()
     REGEXP = auto()
     OR_STR = auto()
+    FIELD_REF = auto()
 
 
 @dataclass
@@ -179,6 +181,16 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
             or_value = "`" + or_value + "`"
         return f"{self.op} {or_value}"
 
+@dataclass
+class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
+    """'Defer' field reference matching to pipelined command **BEFORE** main search expression."""
+
+    field: str
+    value: str
+    field_tracker: int
+
+    def finalize_expression(self) -> str:
+        return "| label_format match_" + str(self.field_tracker) + "=`{{ if eq ." + self.field + " ." + self.value + " }}true{{ else }}false{{ end }}` | match_" + str(self.field_tracker) +  "=`true`"
 
 LogQLLineFilterInfo = NamedTuple(
     "LogQLLineFilterInfo",
@@ -298,6 +310,9 @@ class LogQLBackend(TextQueryBackend):
     # Loki-specific functionality
     add_line_filters: bool = False
     case_sensitive: bool = False
+
+    # Field Ref Match Tracker
+    field_ref_tracker: int = 0
 
     def __init__(
         self,
@@ -881,6 +896,19 @@ class LogQLBackend(TextQueryBackend):
             )
         )
 
+    def convert_condition_field_eq_field(self, cond: SigmaFieldReference, state: ConversionState):
+        """
+        Constructs a condition that compares two fields in a log line to enable us to
+        search for logs where the values of two labels are the same.
+        """
+
+        if isinstance(cond, ConditionFieldEqualsValueExpression):
+            if isinstance(cond.value, SigmaFieldReference):
+                expr = LogQLDeferredFieldRefExpression(state,cond.field, cond.value.field, self.field_ref_tracker)
+                self.field_ref_tracker += 1
+
+                return expr
+
     def convert_condition_field_eq_val(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
@@ -1031,7 +1059,7 @@ class LogQLBackend(TextQueryBackend):
     ) -> Union[str, DeferredQueryExpression]:
         """Complete the conversion of the query, selecting an appropriate log parser if necessary,
         and pre-pending deferred line filters."""
-        if isinstance(query, DeferredQueryExpression):
+        if isinstance(query, DeferredQueryExpression): 
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
@@ -1039,12 +1067,13 @@ class LogQLBackend(TextQueryBackend):
         elif query is None:
             query = ""
         if state.has_deferred():
-            query = self.deferred_separator.join(
-                (
-                    deferred_expression.finalize_expression()
-                    for deferred_expression in state.deferred
-                )
-            ) + (" " + query if len(query) > 0 else "")
+            standard_deferred = [expression.finalize_expression() for expression in state.deferred if not isinstance(expression, LogQLDeferredFieldRefExpression)]
+            field_refs = [str(self.select_log_parser(rule))] + [expression.finalize_expression() for expression in state.deferred if isinstance(expression, LogQLDeferredFieldRefExpression)]
+            field_ref_expression = ""
+            if len(field_refs) > 1:
+                field_ref_expression = "| " + self.deferred_separator.join(field_refs)
+
+            query = self.deferred_separator.join(standard_deferred) + field_ref_expression + (" " + query if len(query) > 0 else "")
             # Since we've already processed the deferred parts, we can clear them
             state.deferred.clear()
         if rule.fields and len(rule.fields) > 0:
