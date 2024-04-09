@@ -44,7 +44,7 @@ from sigma.types import (
     SigmaString,
     SigmaNull,
     SigmaNumber,
-    SigmaFieldReference
+    SigmaFieldReference,
 )
 from warnings import warn
 from yaml import dump
@@ -181,6 +181,7 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
             or_value = "`" + or_value + "`"
         return f"{self.op} {or_value}"
 
+
 @dataclass
 class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
     """'Defer' field reference matching to pipelined command **BEFORE** main search expression."""
@@ -190,7 +191,18 @@ class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
     field_tracker: int
 
     def finalize_expression(self) -> str:
-        return "| label_format match_" + str(self.field_tracker) + "=`{{ if eq ." + self.field + " ." + self.value + " }}true{{ else }}false{{ end }}` | match_" + str(self.field_tracker) +  "=`true`"
+        return (
+            "| label_format match_"
+            + str(self.field_tracker)
+            + "=`{{ if eq ."
+            + self.field
+            + " ."
+            + self.value
+            + " }}true{{ else }}false{{ end }}` | match_"
+            + str(self.field_tracker)
+            + "=`true`"
+        )
+
 
 LogQLLineFilterInfo = NamedTuple(
     "LogQLLineFilterInfo",
@@ -896,7 +908,9 @@ class LogQLBackend(TextQueryBackend):
             )
         )
 
-    def convert_condition_field_eq_field(self, cond: SigmaFieldReference, state: ConversionState):
+    def convert_condition_field_eq_field(
+        self, cond: SigmaFieldReference, state: ConversionState
+    ):
         """
         Constructs a condition that compares two fields in a log line to enable us to
         search for logs where the values of two labels are the same.
@@ -904,7 +918,9 @@ class LogQLBackend(TextQueryBackend):
 
         if isinstance(cond, ConditionFieldEqualsValueExpression):
             if isinstance(cond.value, SigmaFieldReference):
-                expr = LogQLDeferredFieldRefExpression(state,cond.field, cond.value.field, self.field_ref_tracker)
+                expr = LogQLDeferredFieldRefExpression(
+                    state, cond.field, cond.value.field, self.field_ref_tracker
+                )
                 self.field_ref_tracker += 1
 
                 return expr
@@ -1059,7 +1075,7 @@ class LogQLBackend(TextQueryBackend):
     ) -> Union[str, DeferredQueryExpression]:
         """Complete the conversion of the query, selecting an appropriate log parser if necessary,
         and pre-pending deferred line filters."""
-        if isinstance(query, DeferredQueryExpression): 
+        if isinstance(query, DeferredQueryExpression):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
@@ -1067,13 +1083,25 @@ class LogQLBackend(TextQueryBackend):
         elif query is None:
             query = ""
         if state.has_deferred():
-            standard_deferred = [expression.finalize_expression() for expression in state.deferred if not isinstance(expression, LogQLDeferredFieldRefExpression)]
-            field_refs = [str(self.select_log_parser(rule))] + [expression.finalize_expression() for expression in state.deferred if isinstance(expression, LogQLDeferredFieldRefExpression)]
+            standard_deferred = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if not isinstance(expression, LogQLDeferredFieldRefExpression)
+            ]
+            field_refs = [str(self.select_log_parser(rule))] + [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if isinstance(expression, LogQLDeferredFieldRefExpression)
+            ]
             field_ref_expression = ""
             if len(field_refs) > 1:
                 field_ref_expression = "| " + self.deferred_separator.join(field_refs)
 
-            query = self.deferred_separator.join(standard_deferred) + field_ref_expression + (" " + query if len(query) > 0 else "")
+            query = (
+                self.deferred_separator.join(standard_deferred)
+                + field_ref_expression
+                + (" " + query if len(query) > 0 else "")
+            )
             # Since we've already processed the deferred parts, we can clear them
             state.deferred.clear()
         if rule.fields and len(rule.fields) > 0:

@@ -2,6 +2,7 @@ import pytest
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 
+
 @pytest.fixture
 def loki_backend():
     return LogQLBackend(add_line_filters=True)
@@ -25,8 +26,11 @@ def test_loki_field_ref_single(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`']
+        == [
+            '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+        ]
     )
+
 
 def test_loki_field_ref_multi(loki_backend: LogQLBackend):
     assert (
@@ -46,8 +50,11 @@ def test_loki_field_ref_multi(loki_backend: LogQLBackend):
             """
             )
         )
-        == ['{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` | match_0=`true` | label_format match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_1=`true`']
+        == [
+            '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` | match_0=`true` | label_format match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_1=`true`'
+        ]
     )
+
 
 def test_loki_field_ref_json(loki_backend: LogQLBackend):
     assert (
@@ -66,8 +73,11 @@ def test_loki_field_ref_json(loki_backend: LogQLBackend):
             """
             )
         )
-        == ['{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`']
+        == [
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+        ]
     )
+
 
 def test_loki_field_ref_json(loki_backend: LogQLBackend):
     assert (
@@ -87,5 +97,7 @@ def test_loki_field_ref_json(loki_backend: LogQLBackend):
             """
             )
         )
-        == ['{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` | match_0=`true` | json | field2=~`(?i)Something`']
+        == [
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` | match_0=`true` | json | field2=~`(?i)Something`'
+        ]
     )
