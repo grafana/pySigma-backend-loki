@@ -931,12 +931,14 @@ class LogQLBackend(TextQueryBackend):
         search for logs where the values of two labels are the same.
         """
 
+        field1, field2 = self.convert_condition_field_eq_field_escape_and_quote(cond.field, cond.value.field)
+
         if isinstance(cond, ConditionFieldEqualsValueExpression):
             if isinstance(cond.value, SigmaFieldReference):
                 # This gets added by the base class to the state, so we don't need
                 # to return this here, see __post_init__()
                 LogQLDeferredFieldRefExpression(
-                    state, cond.field, cond.value.field, self.field_ref_tracker
+                    state, field1, field2, self.field_ref_tracker
                 )
                 expr = LogQLDeferredFieldRefFilterExpression(
                     state, self.field_ref_tracker
