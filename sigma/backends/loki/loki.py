@@ -925,16 +925,17 @@ class LogQLBackend(TextQueryBackend):
 
     def convert_condition_field_eq_field(
         self, cond: SigmaFieldReference, state: ConversionState
-    ) -> DeferredQueryExpression:
+    ) -> Union[str, DeferredQueryExpression]:
         """
         Constructs a condition that compares two fields in a log line to enable us to
         search for logs where the values of two labels are the same.
         """
 
-        field1, field2 = self.convert_condition_field_eq_field_escape_and_quote(cond.field, cond.value.field)
-
         if isinstance(cond, ConditionFieldEqualsValueExpression):
             if isinstance(cond.value, SigmaFieldReference):
+                field1, field2 = self.convert_condition_field_eq_field_escape_and_quote(
+                    cond.field, cond.value.field
+                )
                 # This gets added by the base class to the state, so we don't need
                 # to return this here, see __post_init__()
                 LogQLDeferredFieldRefExpression(
@@ -948,6 +949,7 @@ class LogQLBackend(TextQueryBackend):
                 self.field_ref_tracker += 1
 
                 return expr
+        return ""
 
     def convert_condition_field_eq_val(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
