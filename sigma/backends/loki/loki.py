@@ -184,7 +184,7 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
 
 @dataclass
 class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
-    """'Defer' field reference matching to pipelined command **BEFORE** main search expression."""
+    """'Defer' field reference matching to pipelined command **AFTER** main search expression."""
 
     field: str
     value: str
@@ -192,13 +192,7 @@ class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
 
     def finalize_expression(self) -> str:
         return (
-            "match_"
-            + str(self.field_tracker)
-            + "=`{{ if eq ."
-            + self.field
-            + " ."
-            + self.value
-            + " }}true{{ else }}false{{ end }}`"
+            f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
         )
 
 
@@ -1134,7 +1128,7 @@ class LogQLBackend(TextQueryBackend):
             field_ref_filters_expression = ""
             if len(field_refs) > 0:
                 label_fmt = ",".join(field_refs)
-                field_ref_expression = f"{'' if len(query) > 0 else '| ' + str(self.select_log_parser(rule)) + ' '}| label_format {label_fmt}"
+                field_ref_expression = ("| " if len(query) > 0 else f"| {self.select_log_parser(rule)} | ") + f"label_format {label_fmt}"
                 filter_fmt = " " + self.and_token + " "
                 field_ref_filters_expression = (
                     f" | {filter_fmt.join(field_ref_filters)}"
