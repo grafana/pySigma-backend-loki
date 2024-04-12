@@ -191,9 +191,7 @@ class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
     field_tracker: int
 
     def finalize_expression(self) -> str:
-        return (
-            f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
-        )
+        return f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
 
 
 @dataclass
@@ -1128,7 +1126,9 @@ class LogQLBackend(TextQueryBackend):
             field_ref_filters_expression = ""
             if len(field_refs) > 0:
                 label_fmt = ",".join(field_refs)
-                field_ref_expression = ("| " if len(query) > 0 else f"| {self.select_log_parser(rule)} | ") + f"label_format {label_fmt}"
+                field_ref_expression = (
+                    "| " if len(query) > 0 else f"| {self.select_log_parser(rule)} | "
+                ) + f"label_format {label_fmt}"
                 filter_fmt = " " + self.and_token + " "
                 field_ref_filters_expression = (
                     f" | {filter_fmt.join(field_ref_filters)}"
