@@ -44,6 +44,7 @@ from sigma.types import (
     SigmaString,
     SigmaNull,
     SigmaNumber,
+    SigmaFieldReference,
 )
 from warnings import warn
 from yaml import dump
@@ -83,6 +84,7 @@ class LogQLDeferredType:
     CIDR = auto()
     REGEXP = auto()
     OR_STR = auto()
+    FIELD_REF = auto()
 
 
 @dataclass
@@ -178,6 +180,35 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         else:
             or_value = "`" + or_value + "`"
         return f"{self.op} {or_value}"
+
+
+@dataclass
+class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
+    """'Defer' field reference matching to pipelined command **AFTER** main search expression."""
+
+    field: str
+    value: str
+    field_tracker: int
+
+    def finalize_expression(self) -> str:
+        return f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
+
+
+@dataclass
+class LogQLDeferredFieldRefFilterExpression(DeferredQueryExpression):
+    """
+    'Defer' field reference matching to after the label_format expressions
+    """
+
+    field_tracker: int
+    op = "true"
+
+    def negate(self) -> DeferredQueryExpression:
+        self.op = "false"
+        return self
+
+    def finalize_expression(self) -> str:
+        return f"match_{self.field_tracker}=`{self.op}`"
 
 
 LogQLLineFilterInfo = NamedTuple(
@@ -298,6 +329,9 @@ class LogQLBackend(TextQueryBackend):
     # Loki-specific functionality
     add_line_filters: bool = False
     case_sensitive: bool = False
+
+    # Field Ref Match Tracker
+    field_ref_tracker: int = 0
 
     def __init__(
         self,
@@ -881,6 +915,34 @@ class LogQLBackend(TextQueryBackend):
             )
         )
 
+    def convert_condition_field_eq_field(
+        self, cond: SigmaFieldReference, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """
+        Constructs a condition that compares two fields in a log line to enable us to
+        search for logs where the values of two labels are the same.
+        """
+
+        if isinstance(cond, ConditionFieldEqualsValueExpression):
+            if isinstance(cond.value, SigmaFieldReference):
+                field1, field2 = self.convert_condition_field_eq_field_escape_and_quote(
+                    cond.field, cond.value.field
+                )
+                # This gets added by the base class to the state, so we don't need
+                # to return this here, see __post_init__()
+                LogQLDeferredFieldRefExpression(
+                    state, field1, field2, self.field_ref_tracker
+                )
+                expr = LogQLDeferredFieldRefFilterExpression(
+                    state, self.field_ref_tracker
+                )
+                if getattr(cond, "negated", False):
+                    expr.negate()
+                self.field_ref_tracker += 1
+
+                return expr
+        return ""
+
     def convert_condition_field_eq_val(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
@@ -1039,12 +1101,45 @@ class LogQLBackend(TextQueryBackend):
         elif query is None:
             query = ""
         if state.has_deferred():
-            query = self.deferred_separator.join(
-                (
-                    deferred_expression.finalize_expression()
-                    for deferred_expression in state.deferred
+            standard_deferred = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if not isinstance(
+                    expression,
+                    (
+                        LogQLDeferredFieldRefExpression,
+                        LogQLDeferredFieldRefFilterExpression,
+                    ),
                 )
-            ) + (" " + query if len(query) > 0 else "")
+            ]
+            field_refs = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if isinstance(expression, LogQLDeferredFieldRefExpression)
+            ]
+            field_ref_filters = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if isinstance(expression, LogQLDeferredFieldRefFilterExpression)
+            ]
+            field_ref_expression = ""
+            field_ref_filters_expression = ""
+            if len(field_refs) > 0:
+                label_fmt = ",".join(field_refs)
+                field_ref_expression = (
+                    "| " if len(query) > 0 else f"| {self.select_log_parser(rule)} | "
+                ) + f"label_format {label_fmt}"
+                filter_fmt = " " + self.and_token + " "
+                field_ref_filters_expression = (
+                    f" | {filter_fmt.join(field_ref_filters)}"
+                )
+
+            query = (
+                self.deferred_separator.join(standard_deferred)
+                + (" " + query if len(query) > 0 else "")
+                + field_ref_expression
+                + field_ref_filters_expression
+            )
             # Since we've already processed the deferred parts, we can clear them
             state.deferred.clear()
         if rule.fields and len(rule.fields) > 0:
