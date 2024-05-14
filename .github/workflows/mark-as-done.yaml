@@ -1,0 +1,16 @@
+name: Mark as Done
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  mark-as-done:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move closed issues and merged PRs to the "✅ Done" column
+        uses: grafana/auto-mate@v1
+        with:
+          token: ${{ secrets.AUTO_MATE_TOKEN }}
+          projectNo: 346
