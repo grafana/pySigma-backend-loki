@@ -279,6 +279,10 @@ class LogQLBackend(TextQueryBackend):
         expression was negated or not."""
         if negated == LogQLBackend.current_templates:
             return  # nothing to do!
+
+        # Set the expression templates regardless of the negation state
+        LogQLBackend.compare_op_expression = "{field}{operator}{value}"
+
         if not negated:
             LogQLBackend.eq_token = "="
             LogQLBackend.field_null_expression = "{field}=``"
