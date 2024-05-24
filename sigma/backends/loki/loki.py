@@ -273,6 +273,7 @@ class LogQLBackend(TextQueryBackend):
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
     case_sensitive_match_expression: ClassVar[str]
     field_exists_expression: ClassVar[str]
+    field_not_exists_expression: ClassVar[str]
 
     @staticmethod
     def set_expression_templates(negated: bool) -> None:
@@ -285,6 +286,8 @@ class LogQLBackend(TextQueryBackend):
 
         # Set the expression templates regardless of the negation state
         LogQLBackend.compare_op_expression = "{field}{operator}{value}"
+        LogQLBackend.field_exists_expression = '{field}!=""'
+        LogQLBackend.field_not_exists_expression = '{field}=""'
 
         if not negated:
             LogQLBackend.eq_token = "="
@@ -298,7 +301,6 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GTE: ">=",
             }
             LogQLBackend.case_sensitive_match_expression = "{field}={value}"
-            LogQLBackend.field_exists_expression = '{field}!=""'
         else:
             LogQLBackend.eq_token = "!="
             LogQLBackend.field_null_expression = "{field}!=``"
@@ -311,7 +313,6 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GTE: "<",
             }
             LogQLBackend.case_sensitive_match_expression = "{field}!={value}"
-            LogQLBackend.field_exists_expression = '{field}=""'
         # Cache the state of these variables, so we don't keep setting them needlessly
         LogQLBackend.current_templates = negated
 
