@@ -273,6 +273,9 @@ class LogQLBackend(TextQueryBackend):
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
     case_sensitive_match_expression: ClassVar[str]
 
+    # exists modifier is not supported in LogQL (yet?)
+    field_exists_expression: ClassVar[str] = ""
+
     @staticmethod
     def set_expression_templates(negated: bool) -> None:
         """When converting field expressions, the TextBackend class uses the below
