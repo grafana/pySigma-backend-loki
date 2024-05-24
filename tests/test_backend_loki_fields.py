@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 import pytest
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
@@ -12,35 +12,45 @@ def loki_backend() -> LogQLBackend:
 
 
 # Mapping from modifier identifier strings to modifier classes
-modifier_sample_data: Dict[str, Any] = {
-    "contains": "valueA",
-    "startswith": "valueA",
-    "endswith": "valueA",
-    "exists": "yes",
-    "base64": "valueA",
-    "base64offset": "valueA",
-    "wide": "valueA",
-    "windash": "-foo",
-    "re": ".*valueA$",
-    "i": "valueA",
-    "ignorecase": "valueA",
-    "m": ["valueA", "valueB"],
-    "multiline": ["valueA", "valueB"],
-    "s": "valueA",
-    "dotall": "valueA",
-    "cased": "valueA",
-    "cidr": "192.0.0.0/8",
-    "all": ["valueA", "valueB"],
-    "lt": 1,
-    "lte": 1,
-    "gt": 1,
-    "gte": 1,
-    "fieldref": "fieldA",
-    "expand": '"%test%"',
+modifier_sample_data: Dict[str, Tuple[Any, str]] = {
+    # "modifer": (value, expected_output)
+    "contains": ("valueA", "fieldA=~`(?i).*valueA.*`"),
+    "startswith": ("valueA", "fieldA=~`(?i)valueA.*`"),
+    "endswith": ("valueA", "fieldA=~`(?i).*valueA`"),
+    "exists": ("yes", 'fieldA!=""'),
+    "base64": ("valueA", "fieldA=~`(?i)dmFsdWVB`"),
+    "base64offset": (
+        "valueA",
+        "fieldA=~`(?i)dmFsdWVB` or fieldA=~`(?i)ZhbHVlQ` or fieldA=~`(?i)2YWx1ZU`",
+    ),
+    "wide": ("valueA", "fieldA=~`(?i)v\x00a\x00l\x00u\x00e\x00A\x00`"),
+    "windash": ("-foo", "fieldA=~`(?i)\\-foo` or fieldA=~`(?i)/foo`"),
+    "re": (".*valueA$", "fieldA=~`.*valueA$`"),
+    "i": ("valueA", "---"),
+    "ignorecase": ("valueA", "---"),
+    "m": (["valueA", "valueB"], "---"),
+    "multiline": (["valueA", "valueB"], "---"),
+    "s": ("valueA", "---"),
+    "dotall": ("valueA", "---"),
+    "cased": ("valueA", "fieldA=`valueA`"),
+    "cidr": ("192.0.0.0/8", 'fieldA=ip("192.0.0.0/8")'),
+    "all": (["valueA", "valueB"], "fieldA=~`(?i)valueA` and fieldA=~`(?i)valueB`"),
+    "lt": (1, "fieldA<1"),
+    "lte": (1, "fieldA<=1"),
+    "gt": (1, "fieldA>1"),
+    "gte": (1, "fieldA>=1"),
+    "fieldref": (
+        "fieldA",
+        "label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`"
+        " | match_0=`true`",
+    ),
+    "expand": ('"%test%"', "fieldA=~`(?i)%test%`"),
 }
 
 
-def generate_rule_with_field_modifier(modifier: str, value: str) -> str:
+def generate_rule_with_field_modifier(
+    modifier: str, value: Tuple[Any, str]
+) -> Tuple[str, str]:
     """Generate a Sigma rule with a field modifier."""
     rule = """
     title: Test
@@ -50,10 +60,10 @@ def generate_rule_with_field_modifier(modifier: str, value: str) -> str:
         product: test_product
     detection:
         selection:
-            fieldA|{modifier}: {value}
+            fieldA|{modifier}: {value[0]}
         condition: selection
     """
-    return rule.format(modifier=modifier, value=value)
+    return (rule.format(modifier=modifier, value=value), value[1])
 
 
 def test_modifiers(loki_backend: LogQLBackend):
@@ -71,9 +81,12 @@ def test_modifiers(loki_backend: LogQLBackend):
 
 @pytest.mark.parametrize("label", modifier_mapping.keys())
 def test_loki_field_modifiers(loki_backend: LogQLBackend, label: str):
-    rule = generate_rule_with_field_modifier(label, modifier_sample_data[label])
+    input_rule, output_expr = generate_rule_with_field_modifier(
+        label, modifier_sample_data[label]
+    )
     try:
-        loki_backend.convert(SigmaCollection.from_yaml(rule))
+        query = loki_backend.convert(SigmaCollection.from_yaml(input_rule))
+        assert output_expr in query[0]
     except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError):
         pytest.skip(
             f"Backend does not support {modifier_mapping[label].__name__} modifier"
