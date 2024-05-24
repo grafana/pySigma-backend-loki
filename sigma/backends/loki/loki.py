@@ -167,9 +167,11 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         )
         or_value = "|".join(
             (
-                re.escape(str(val))
-                if isinstance(val, SigmaString)
-                else re.sub("^\\(\\?i\\)", "", val.regexp)
+                (
+                    re.escape(str(val))
+                    if isinstance(val, SigmaString)
+                    else re.sub("^\\(\\?i\\)", "", val.regexp)
+                )
                 for val in self.exprs
             )
         )
@@ -429,12 +431,14 @@ class LogQLBackend(TextQueryBackend):
             key = "_" + key
         return "".join(
             (
-                r
-                if (r >= "a" and r <= "z")
-                or (r >= "A" and r <= "Z")
-                or r == "_"
-                or (r >= "0" and r <= "9")
-                else "_"
+                (
+                    r
+                    if (r >= "a" and r <= "z")
+                    or (r >= "A" and r <= "Z")
+                    or r == "_"
+                    or (r >= "0" and r <= "9")
+                    else "_"
+                )
                 for r in key
             )
         )
@@ -864,16 +868,18 @@ class LogQLBackend(TextQueryBackend):
                 (
                     converted
                     for converted in (
-                        self.convert_condition(arg, state)  # type: ignore
-                        if isinstance(
-                            arg,
-                            (
-                                ConditionFieldEqualsValueExpression,
-                                ConditionValueExpression,
-                            ),
+                        (
+                            self.convert_condition(arg, state)  # type: ignore
+                            if isinstance(
+                                arg,
+                                (
+                                    ConditionFieldEqualsValueExpression,
+                                    ConditionValueExpression,
+                                ),
+                            )
+                            or self.compare_precedence(cond, arg)
+                            else self.convert_condition_group(arg, state)
                         )
-                        or self.compare_precedence(cond, arg)
-                        else self.convert_condition_group(arg, state)
                         for arg in cond.args
                     )
                     if converted is not None
@@ -901,16 +907,18 @@ class LogQLBackend(TextQueryBackend):
             (
                 converted
                 for converted in (
-                    self.convert_condition(arg, state)  # type: ignore
-                    if isinstance(
-                        arg,
-                        (
-                            ConditionFieldEqualsValueExpression,
-                            ConditionValueExpression,
-                        ),
+                    (
+                        self.convert_condition(arg, state)  # type: ignore
+                        if isinstance(
+                            arg,
+                            (
+                                ConditionFieldEqualsValueExpression,
+                                ConditionValueExpression,
+                            ),
+                        )
+                        or self.compare_precedence(cond, arg)
+                        else self.convert_condition_group(arg, state)
                     )
-                    or self.compare_precedence(cond, arg)
-                    else self.convert_condition_group(arg, state)
                     for arg in cond.args
                 )
                 if converted is not None
