@@ -26,8 +26,8 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "wide": ("valueA", "fieldA=~`(?i)v\x00a\x00l\x00u\x00e\x00A\x00`"),
     "windash": ("-foo", "fieldA=~`(?i)\\-foo` or fieldA=~`(?i)/foo`"),
     "re": (".*valueA$", "fieldA=~`.*valueA$`"),
-    "i": ("valueA", "---"),
-    "ignorecase": ("valueA", "---"),
+    "i": ("valueA", "valueA"),
+    "ignorecase": ("valueA", "valueA"),
     # Multiline modifier is not supported by LogQL, and the recommended way to handle
     # multiline logs can be found below:
     # https://grafana.com/docs/loki/latest/send-data/promtail/stages/multiline/
@@ -66,6 +66,9 @@ def generate_rule_with_field_modifier(
             fieldA|{modifier}: {value[0]}
         condition: selection
     """
+    # Ignorecase modifier is a special case of the regex (re) modifier.
+    if modifier in ["i", "ignorecase"]:
+        modifier = "re|" + modifier
     return (rule.format(modifier=modifier, value=value), value[1])
 
 
@@ -90,7 +93,8 @@ def test_loki_field_modifiers(loki_backend: LogQLBackend, label: str):
     try:
         query = loki_backend.convert(SigmaCollection.from_yaml(input_rule))
         assert output_expr in query[0]
-    except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError):
+    except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError) as e:
+        print(type(e), e)
         pytest.skip(
             f"Backend does not support {modifier_mapping[label].__name__} modifier"
         )
