@@ -286,22 +286,8 @@ class LogQLBackend(TextQueryBackend):
 
         # Set the expression templates regardless of the negation state
         LogQLBackend.compare_op_expression = "{field}{operator}{value}"
-        LogQLBackend.field_exists_expression = '{field}!=""'
-        LogQLBackend.field_not_exists_expression = '{field}=""'
 
-        if not negated:
-            LogQLBackend.eq_token = "="
-            LogQLBackend.field_null_expression = "{field}=``"
-            LogQLBackend.re_expression = "{field}=~{regex}"
-            LogQLBackend.cidr_expression = '{field}=ip("{value}")'
-            LogQLBackend.compare_operators = {
-                SigmaCompareExpression.CompareOperators.LT: "<",
-                SigmaCompareExpression.CompareOperators.LTE: "<=",
-                SigmaCompareExpression.CompareOperators.GT: ">",
-                SigmaCompareExpression.CompareOperators.GTE: ">=",
-            }
-            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
-        else:
+        if negated:
             LogQLBackend.eq_token = "!="
             LogQLBackend.field_null_expression = "{field}!=``"
             LogQLBackend.re_expression = "{field}!~{regex}"
@@ -313,6 +299,23 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GTE: "<",
             }
             LogQLBackend.case_sensitive_match_expression = "{field}!={value}"
+            LogQLBackend.field_exists_expression = '{field}=""'
+            LogQLBackend.field_not_exists_expression = '{field}!=""'
+        else:
+            LogQLBackend.eq_token = "="
+            LogQLBackend.field_null_expression = "{field}=``"
+            LogQLBackend.re_expression = "{field}=~{regex}"
+            LogQLBackend.cidr_expression = '{field}=ip("{value}")'
+            LogQLBackend.compare_operators = {
+                SigmaCompareExpression.CompareOperators.LT: "<",
+                SigmaCompareExpression.CompareOperators.LTE: "<=",
+                SigmaCompareExpression.CompareOperators.GT: ">",
+                SigmaCompareExpression.CompareOperators.GTE: ">=",
+            }
+            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
+            LogQLBackend.field_exists_expression = '{field}!=""'
+            LogQLBackend.field_not_exists_expression = '{field}=""'
+
         # Cache the state of these variables, so we don't keep setting them needlessly
         LogQLBackend.current_templates = negated
 
