@@ -536,6 +536,48 @@ def test_loki_field_contains(loki_backend: LogQLBackend):
     )
 
 
+def test_loki_field_exists(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|exists: yes
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA!=""']
+    )
+
+
+def test_loki_field_not_exists(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|exists: no
+                condition: sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=""']
+    )
+
+
 def test_loki_field_cased_startswith(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(

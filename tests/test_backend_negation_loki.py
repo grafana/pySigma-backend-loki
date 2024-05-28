@@ -673,3 +673,45 @@ def test_loki_field_and_not_multi_unbound_expression(loki_backend: LogQLBackend)
             '{job=~".+"} !~ `(?i)valueB` !~ `(?i)valueC` | logfmt | fieldA=~`(?i)valueA`'
         ]
     )
+
+
+def test_loki_field_exists_negated(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|exists: yes
+                condition: not sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=""']
+    )
+
+
+def test_loki_field_not_exists_negated(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    fieldA|exists: no
+                condition: not sel
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA!=""']
+    )

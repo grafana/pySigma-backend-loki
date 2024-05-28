@@ -167,9 +167,11 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         )
         or_value = "|".join(
             (
-                re.escape(str(val))
-                if isinstance(val, SigmaString)
-                else re.sub("^\\(\\?i\\)", "", val.regexp)
+                (
+                    re.escape(str(val))
+                    if isinstance(val, SigmaString)
+                    else re.sub("^\\(\\?i\\)", "", val.regexp)
+                )
                 for val in self.exprs
             )
         )
@@ -270,6 +272,8 @@ class LogQLBackend(TextQueryBackend):
     compare_op_expression: ClassVar[str]
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
     case_sensitive_match_expression: ClassVar[str]
+    field_exists_expression: ClassVar[str]
+    field_not_exists_expression: ClassVar[str]
 
     @staticmethod
     def set_expression_templates(negated: bool) -> None:
@@ -279,19 +283,11 @@ class LogQLBackend(TextQueryBackend):
         expression was negated or not."""
         if negated == LogQLBackend.current_templates:
             return  # nothing to do!
-        if not negated:
-            LogQLBackend.eq_token = "="
-            LogQLBackend.field_null_expression = "{field}=``"
-            LogQLBackend.re_expression = "{field}=~{regex}"
-            LogQLBackend.cidr_expression = '{field}=ip("{value}")'
-            LogQLBackend.compare_operators = {
-                SigmaCompareExpression.CompareOperators.LT: "<",
-                SigmaCompareExpression.CompareOperators.LTE: "<=",
-                SigmaCompareExpression.CompareOperators.GT: ">",
-                SigmaCompareExpression.CompareOperators.GTE: ">=",
-            }
-            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
-        else:
+
+        # Set the expression templates regardless of the negation state
+        LogQLBackend.compare_op_expression = "{field}{operator}{value}"
+
+        if negated:
             LogQLBackend.eq_token = "!="
             LogQLBackend.field_null_expression = "{field}!=``"
             LogQLBackend.re_expression = "{field}!~{regex}"
@@ -303,6 +299,23 @@ class LogQLBackend(TextQueryBackend):
                 SigmaCompareExpression.CompareOperators.GTE: "<",
             }
             LogQLBackend.case_sensitive_match_expression = "{field}!={value}"
+            LogQLBackend.field_exists_expression = '{field}=""'
+            LogQLBackend.field_not_exists_expression = '{field}!=""'
+        else:
+            LogQLBackend.eq_token = "="
+            LogQLBackend.field_null_expression = "{field}=``"
+            LogQLBackend.re_expression = "{field}=~{regex}"
+            LogQLBackend.cidr_expression = '{field}=ip("{value}")'
+            LogQLBackend.compare_operators = {
+                SigmaCompareExpression.CompareOperators.LT: "<",
+                SigmaCompareExpression.CompareOperators.LTE: "<=",
+                SigmaCompareExpression.CompareOperators.GT: ">",
+                SigmaCompareExpression.CompareOperators.GTE: ">=",
+            }
+            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
+            LogQLBackend.field_exists_expression = '{field}!=""'
+            LogQLBackend.field_not_exists_expression = '{field}=""'
+
         # Cache the state of these variables, so we don't keep setting them needlessly
         LogQLBackend.current_templates = negated
 
@@ -425,12 +438,14 @@ class LogQLBackend(TextQueryBackend):
             key = "_" + key
         return "".join(
             (
-                r
-                if (r >= "a" and r <= "z")
-                or (r >= "A" and r <= "Z")
-                or r == "_"
-                or (r >= "0" and r <= "9")
-                else "_"
+                (
+                    r
+                    if (r >= "a" and r <= "z")
+                    or (r >= "A" and r <= "Z")
+                    or r == "_"
+                    or (r >= "0" and r <= "9")
+                    else "_"
+                )
                 for r in key
             )
         )
@@ -860,16 +875,18 @@ class LogQLBackend(TextQueryBackend):
                 (
                     converted
                     for converted in (
-                        self.convert_condition(arg, state)  # type: ignore
-                        if isinstance(
-                            arg,
-                            (
-                                ConditionFieldEqualsValueExpression,
-                                ConditionValueExpression,
-                            ),
+                        (
+                            self.convert_condition(arg, state)  # type: ignore
+                            if isinstance(
+                                arg,
+                                (
+                                    ConditionFieldEqualsValueExpression,
+                                    ConditionValueExpression,
+                                ),
+                            )
+                            or self.compare_precedence(cond, arg)
+                            else self.convert_condition_group(arg, state)
                         )
-                        or self.compare_precedence(cond, arg)
-                        else self.convert_condition_group(arg, state)
                         for arg in cond.args
                     )
                     if converted is not None
@@ -897,16 +914,18 @@ class LogQLBackend(TextQueryBackend):
             (
                 converted
                 for converted in (
-                    self.convert_condition(arg, state)  # type: ignore
-                    if isinstance(
-                        arg,
-                        (
-                            ConditionFieldEqualsValueExpression,
-                            ConditionValueExpression,
-                        ),
+                    (
+                        self.convert_condition(arg, state)  # type: ignore
+                        if isinstance(
+                            arg,
+                            (
+                                ConditionFieldEqualsValueExpression,
+                                ConditionValueExpression,
+                            ),
+                        )
+                        or self.compare_precedence(cond, arg)
+                        else self.convert_condition_group(arg, state)
                     )
-                    or self.compare_precedence(cond, arg)
-                    else self.convert_condition_group(arg, state)
                     for arg in cond.args
                 )
                 if converted is not None
