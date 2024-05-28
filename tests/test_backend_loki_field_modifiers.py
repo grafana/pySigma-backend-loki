@@ -28,6 +28,9 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "re": (".*valueA$", "fieldA=~`.*valueA$`"),
     "i": ("valueA", "---"),
     "ignorecase": ("valueA", "---"),
+    # Multiline modifier is not supported by LogQL, and the recommended way to handle
+    # multiline logs can be found below:
+    # https://grafana.com/docs/loki/latest/send-data/promtail/stages/multiline/
     "m": (["valueA", "valueB"], "---"),
     "multiline": (["valueA", "valueB"], "---"),
     "s": ("valueA", "---"),
