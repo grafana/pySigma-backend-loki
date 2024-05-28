@@ -4,11 +4,23 @@ from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaTypeError
 from sigma.modifiers import modifier_mapping
+from sigma.processing.pipeline import ProcessingPipeline
 
 
 @pytest.fixture
 def loki_backend() -> LogQLBackend:
-    return LogQLBackend()
+    # Add a processing pipeline to the backend to test the expand modifier.
+    pipeline = ProcessingPipeline.from_yaml(
+        """
+        name: Test Pipeline
+        priority: 20
+        vars:
+            test: valueA
+        transformations:
+            - type: value_placeholders
+        """
+    )
+    return LogQLBackend(processing_pipeline=pipeline)
 
 
 # Mapping from modifier identifier strings to modifier classes
@@ -47,7 +59,7 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
         "label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`"
         " | match_0=`true`",
     ),
-    "expand": ('"%test%"', "fieldA=~`(?i)%test%`"),
+    "expand": ('"%test%"', "fieldA=~`(?i)valueA`"),
 }
 
 
@@ -93,8 +105,7 @@ def test_loki_field_modifiers(loki_backend: LogQLBackend, label: str):
     try:
         query = loki_backend.convert(SigmaCollection.from_yaml(input_rule))
         assert output_expr in query[0]
-    except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError) as e:
-        print(type(e), e)
+    except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError):
         pytest.skip(
             f"Backend does not support {modifier_mapping[label].__name__} modifier"
         )
