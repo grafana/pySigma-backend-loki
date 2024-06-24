@@ -25,10 +25,10 @@ def loki_backend() -> LogQLBackend:
 
 # Mapping from modifier identifier strings to modifier classes
 modifier_sample_data: Dict[str, Tuple[Any, str]] = {
-    # "modifer": (value, expected_output)
+    # "modifier": (value, expected_output)
     "contains": ("valueA", "fieldA=~`(?i).*valueA.*`"),
-    "startswith": ("valueA", "fieldA=~`(?i)valueA.*`"),
-    "endswith": ("valueA", "fieldA=~`(?i).*valueA`"),
+    "startswith": ("valueA", "fieldA=~`(?i)^valueA.*`"),
+    "endswith": ("valueA", "fieldA=~`(?i).*valueA$`"),
     "exists": ("yes", 'fieldA!=""'),
     "base64": ("valueA", "fieldA=~`(?i)dmFsdWVB`"),
     "base64offset": (
