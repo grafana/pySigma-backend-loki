@@ -45,6 +45,7 @@ from sigma.types import (
     SigmaNull,
     SigmaNumber,
     SigmaFieldReference,
+    SpecialChars,
 )
 from warnings import warn
 from yaml import dump
@@ -381,7 +382,9 @@ class LogQLBackend(TextQueryBackend):
         case-insensitive matching"""
         return SigmaRegularExpression(
             ("(?i)" if case_insensitive else "")
+            + ("^" if not value.startswith(SpecialChars.WILDCARD_MULTI) else "")
             + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
+            + ("$" if not value.endswith(SpecialChars.WILDCARD_MULTI) else "")
         )
 
     def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
