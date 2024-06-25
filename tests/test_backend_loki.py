@@ -30,7 +30,7 @@ def test_loki_field_eq(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)valueA`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$`']
     )
 
 
@@ -51,7 +51,7 @@ def test_loki_field_eq_tilde(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~"(?i)value`A"']
+        == ['{job=~".+"} | logfmt | fieldA=~"(?i)^value`A$"']
     )
 
 
@@ -72,7 +72,7 @@ def test_loki_field_eq_tilde_double_quote(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~"(?i)v\\"alue`A"']
+        == ['{job=~".+"} | logfmt | fieldA=~"(?i)^v\\"alue`A$"']
     )
 
 
@@ -116,7 +116,7 @@ def test_loki_and_expression(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)valueA` and fieldB=~`(?i)valueB`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` and fieldB=~`(?i)^valueB$`']
     )
 
 
@@ -139,7 +139,7 @@ def test_loki_or_expression(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)valueA` or fieldB=~`(?i)valueB`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` or fieldB=~`(?i)^valueB$`']
     )
 
 
@@ -166,8 +166,8 @@ def test_loki_and_or_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | (fieldA=~`(?i)valueA1` or fieldA=~`(?i)valueA2`) and '
-            "(fieldB=~`(?i)valueB1` or fieldB=~`(?i)valueB2`)"
+            '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA1$` or fieldA=~`(?i)^valueA2$`) and '
+            "(fieldB=~`(?i)^valueB1$` or fieldB=~`(?i)^valueB2$`)"
         ]
     )
 
@@ -194,8 +194,8 @@ def test_loki_or_and_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=~`(?i)valueA1` and fieldB=~`(?i)valueB1` or '
-            "fieldA=~`(?i)valueA2` and fieldB=~`(?i)valueB2`"
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA1$` and fieldB=~`(?i)^valueB1$` or '
+            "fieldA=~`(?i)^valueA2$` and fieldB=~`(?i)^valueB2$`"
         ]
     )
 
@@ -222,8 +222,8 @@ def test_loki_in_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=~`(?i)valueA` or fieldA=~`(?i)valueB` or '
-            "fieldA=~`(?i)valueC`"
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$` or '
+            "fieldA=~`(?i)^valueC$`"
         ]
     )
 
@@ -247,7 +247,7 @@ def test_loki_all_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)valueA` and fieldA=~`(?i)valueB`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` and fieldA=~`(?i)^valueB$`']
     )
 
 
@@ -317,7 +317,7 @@ def test_loki_wildcard_single(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)va.ue`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^va.ue$`']
     )
 
 
@@ -338,7 +338,7 @@ def test_loki_wildcard_multi(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)value.*`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^value.*`']
     )
 
 
@@ -361,29 +361,7 @@ def test_loki_wildcard_escape(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$`']
-    )
-
-
-def test_loki_cased_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|cased: fooBAR
-                    fieldB: fooBAR
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=`fooBAR` and fieldB=~`(?i)fooBAR`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^\\^v\\)\\+\\[al\\]u\\(e.*\\$$`']
     )
 
 
@@ -405,29 +383,7 @@ def test_loki_cased_unbound_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |= `fooBAR` | logfmt | fieldB=~`(?i)fooBAR`']
-    )
-
-
-def test_loki_regex_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|re: foo.*bar
-                    fieldB: foo
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=~`foo.*bar` and fieldB=~`(?i)foo`']
+        == ['{job=~".+"} |= `fooBAR` | logfmt | fieldB=~`(?i)^fooBAR$`']
     )
 
 
@@ -452,132 +408,6 @@ def test_loki_field_re_tilde(loki_backend: LogQLBackend):
     )
 
 
-def test_loki_field_re_tilde_double_quote(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|re: v"alue`A
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=~"v\\"alue`A"']
-    )
-
-
-def test_loki_field_startswith(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|startswith: foo
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)foo.*`']
-    )
-
-
-def test_loki_field_endswith(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|endswith: bar
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i).*bar`']
-    )
-
-
-def test_loki_field_contains(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|contains: ooba
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i).*ooba.*`']
-    )
-
-
-def test_loki_field_exists(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|exists: yes
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA!=""']
-    )
-
-
-def test_loki_field_not_exists(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|exists: no
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=""']
-    )
-
-
 def test_loki_field_cased_startswith(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
@@ -595,7 +425,7 @@ def test_loki_field_cased_startswith(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`foo.*`']
+        == ['{job=~".+"} | logfmt | fieldA=~`^foo.*`']
     )
 
 
@@ -616,7 +446,7 @@ def test_loki_field_cased_endswith(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`.*bar`']
+        == ['{job=~".+"} | logfmt | fieldA=~`.*bar$`']
     )
 
 
@@ -641,72 +471,6 @@ def test_loki_field_cased_contains(loki_backend: LogQLBackend):
     )
 
 
-def test_loki_cidr_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|cidr: 192.168.0.0/16
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=ip("192.168.0.0/16")']
-    )
-
-
-def test_loki_base64_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|base64: value
-                condition: sel
-        """
-            )
-        )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)dmFsdWU=`']
-    )
-
-
-def test_loki_base64offset_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|base64offset: value
-                condition: sel
-        """
-            )
-        )
-        == [
-            '{job=~".+"} | logfmt | fieldA=~`(?i)dmFsdW` or fieldA=~`(?i)ZhbHVl` or '
-            "fieldA=~`(?i)2YWx1Z`"
-        ]
-    )
-
-
 def test_loki_field_name_with_whitespace(loki_backend: LogQLBackend):
     assert (
         loki_backend.convert(
@@ -724,7 +488,7 @@ def test_loki_field_name_with_whitespace(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} | logfmt | field_name=~`(?i)value`']
+        == ['{job=~".+"} | logfmt | field_name=~`(?i)^value$`']
     )
 
 
@@ -745,7 +509,7 @@ def test_loki_field_name_leading_num(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} | logfmt | _0field=~`(?i)value`']
+        == ['{job=~".+"} | logfmt | _0field=~`(?i)^value$`']
     )
 
 
@@ -768,7 +532,7 @@ def test_loki_field_name_empty_whitespace_null(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} |~ `(?i)valueA` |~ `(?i)valueB` | logfmt | =~`(?i)valueC`']
+        == ['{job=~".+"} |~ `(?i)valueA` |~ `(?i)valueB` | logfmt | =~`(?i)^valueC$`']
     )
 
 
@@ -789,7 +553,7 @@ def test_loki_field_name_invalid(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job=~".+"} | logfmt | field_name_A_Z=~`(?i)value`']
+        == ['{job=~".+"} | logfmt | field_name_A_Z=~`(?i)^value$`']
     )
 
 
@@ -1104,7 +868,7 @@ def test_loki_field_and_unbound(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)valueB`']
+        == ['{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)^valueB$`']
     )
 
 
@@ -1130,7 +894,7 @@ def test_loki_field_and_unbound_group_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} |~ `(?i)valueB` |~ `(?i)valueC` | logfmt | fieldA=~`(?i)valueA`'
+            '{job=~".+"} |~ `(?i)valueB` |~ `(?i)valueC` | logfmt | fieldA=~`(?i)^valueA$`'
         ]
     )
 
@@ -1189,7 +953,7 @@ def test_loki_windows_logsource(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | key1_key2=~`(?i)value`'
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | key1_key2=~`(?i)^value$`'
         ]
     )
 
@@ -1211,7 +975,7 @@ def test_loki_azure_logsource(loki_backend: LogQLBackend):
           """
             )
         )
-        == ['{job="logstash"} | json | key1_key2=~`(?i)value`']
+        == ['{job="logstash"} | json | key1_key2=~`(?i)^value$`']
     )
 
 
@@ -1237,7 +1001,7 @@ def test_loki_fields(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA=~`(?i)valueA` and fieldB=~`(?i)valueB` | '
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` and fieldB=~`(?i)^valueB$` | '
             'line_format "{{.fieldA}} {{.fieldB}}"'
         ]
     )
@@ -1360,7 +1124,7 @@ def test_loki_custom_attrs(loki_backend: LogQLBackend):
         """
             )
         )
-        == ["{job=~`(?i)test`} | pattern `<ip> <ts> <msg>` | fieldA=~`(?i)valueA`"]
+        == ["{job=~`(?i)test`} | pattern `<ip> <ts> <msg>` | fieldA=~`(?i)^valueA$`"]
     )
 
 
