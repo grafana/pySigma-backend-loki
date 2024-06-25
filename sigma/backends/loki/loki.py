@@ -50,7 +50,6 @@ from sigma.types import (
 from warnings import warn
 from yaml import dump
 
-
 Conditions = Union[
     ConditionItem,
     ConditionNOT,
@@ -256,6 +255,9 @@ class LogQLBackend(TextQueryBackend):
     filter_chars: ClassVar[str] = ""
 
     field_replace_pattern: ClassVar[Pattern] = re.compile("[^a-zA-Z0-9_:]+")
+    anchor_replace_pattern: ClassVar[Pattern] = re.compile(
+        "^(?P<ext>\\(\\?[^)]\\))?(?P<start>\\^)?(?P<body>.*?)(?P<end>\\$)?$"
+    )
 
     negated_line_filter_operator: ClassVar[Dict[str, str]] = {
         "|=": "!=",
@@ -385,9 +387,17 @@ class LogQLBackend(TextQueryBackend):
         case-insensitive matching"""
         return SigmaRegularExpression(
             ("(?i)" if case_insensitive else "")
-            + ("^" if field_filter and not value.startswith(SpecialChars.WILDCARD_MULTI) else "")
+            + (
+                "^"
+                if field_filter and not value.startswith(SpecialChars.WILDCARD_MULTI)
+                else ""
+            )
             + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
-            + ("$" if field_filter and not value.endswith(SpecialChars.WILDCARD_MULTI) else "")
+            + (
+                "$"
+                if field_filter and not value.endswith(SpecialChars.WILDCARD_MULTI)
+                else ""
+            )
         )
 
     def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
@@ -540,8 +550,16 @@ class LogQLBackend(TextQueryBackend):
             )
         elif isinstance(expr.value, SigmaRegularExpression):
             # Could include field name if entries are logfmt and doesn't start with wildcard
+            regexp = expr.value.regexp
+            anchors = LogQLBackend.anchor_replace_pattern.match(expr.value.regexp)
+            if anchors and anchors.group("body") and (
+                anchors.group("start") or anchors.group("end")
+            ):
+                regexp = (
+                    anchors.group("ext") if anchors.group("ext") else ""
+                ) + anchors.group("body")
             return LogQLLineFilterInfo(
-                value=expr.value.regexp,
+                value=regexp,
                 negated=getattr(expr, "negated", False),
                 deftype=LogQLDeferredType.REGEXP,
             )
