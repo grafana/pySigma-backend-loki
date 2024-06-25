@@ -27,7 +27,7 @@ def test_loki_field_not_eq(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)valueA`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$`']
     )
 
 
@@ -69,7 +69,7 @@ def test_loki_field_not_not_eq(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)valueA`']
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$`']
     )
 
 
@@ -92,7 +92,7 @@ def test_loki_not_and_expression(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)valueA` or fieldB!~`(?i)valueB`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` or fieldB!~`(?i)^valueB$`']
     )
 
 
@@ -115,7 +115,7 @@ def test_loki_not_or_expression(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)valueA` and fieldB!~`(?i)valueB`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`']
     )
 
 
@@ -142,8 +142,8 @@ def test_loki_not_and_or_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA!~`(?i)valueA1` and fieldA!~`(?i)valueA2` '
-            "or fieldB!~`(?i)valueB1` and fieldB!~`(?i)valueB2`"
+            '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA1$` and fieldA!~`(?i)^valueA2$` '
+            "or fieldB!~`(?i)^valueB1$` and fieldB!~`(?i)^valueB2$`"
         ]
     )
 
@@ -170,8 +170,8 @@ def test_loki_not_or_and_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | (fieldA!~`(?i)valueA1` or fieldB!~`(?i)valueB1`) and '
-            "(fieldA!~`(?i)valueA2` or fieldB!~`(?i)valueB2`)"
+            '{job=~".+"} | logfmt | (fieldA!~`(?i)^valueA1$` or fieldB!~`(?i)^valueB1$`) and '
+            "(fieldA!~`(?i)^valueA2$` or fieldB!~`(?i)^valueB2$`)"
         ]
     )
 
@@ -198,8 +198,8 @@ def test_loki_not_in_expression(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA!~`(?i)valueA` and fieldA!~`(?i)valueB` and '
-            "fieldA!~`(?i)valueC`"
+            '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldA!~`(?i)^valueB$` and '
+            "fieldA!~`(?i)^valueC$`"
         ]
     )
 
@@ -223,7 +223,7 @@ def test_loki_not_all_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)valueA` or fieldA!~`(?i)valueB`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` or fieldA!~`(?i)^valueB$`']
     )
 
 
@@ -251,8 +251,8 @@ def test_loki_not_all_bracket_query(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | (fieldA=~`(?i)valueA` or fieldA=~`(?i)valueB`) and '
-            "(fieldB!~`(?i)valueC` or fieldB!~`(?i)valueD`)"
+            '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$`) and '
+            "(fieldB!~`(?i)^valueC$` or fieldB!~`(?i)^valueD$`)"
         ]
     )
 
@@ -274,7 +274,7 @@ def test_loki_not_base64_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)dmFsdWU=`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdWU=$`']
     )
 
 
@@ -296,8 +296,8 @@ def test_loki_not_base64offset_query(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~".+"} | logfmt | fieldA!~`(?i)dmFsdW` and fieldA!~`(?i)ZhbHVl` and '
-            "fieldA!~`(?i)2YWx1Z`"
+            '{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdW$` and fieldA!~`(?i)^ZhbHVl$` and '
+            "fieldA!~`(?i)^2YWx1Z$`"
         ]
     )
 
@@ -342,7 +342,7 @@ def test_loki_not_wildcard_single(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)va.ue`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^va.ue$`']
     )
 
 
@@ -363,7 +363,7 @@ def test_loki_not_wildcard_multi(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)value.*`']
+        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^value.*`']
     )
 
 
@@ -406,7 +406,7 @@ def test_loki_not_regex_query(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`foo.*bar` or fieldB!~`(?i)foo`']
+        == ['{job=~".+"} | logfmt | fieldA!~`foo.*bar` or fieldB!~`(?i)^foo$`']
     )
 
 
@@ -558,7 +558,7 @@ def test_loki_not_unbound_or_field(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)valueB`']
+        == ['{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueB$`']
     )
 
 
@@ -670,7 +670,7 @@ def test_loki_field_and_not_multi_unbound_expression(loki_backend: LogQLBackend)
             )
         )
         == [
-            '{job=~".+"} !~ `(?i)valueB` !~ `(?i)valueC` | logfmt | fieldA=~`(?i)valueA`'
+            '{job=~".+"} !~ `(?i)valueB` !~ `(?i)valueC` | logfmt | fieldA=~`(?i)^valueA$`'
         ]
     )
 

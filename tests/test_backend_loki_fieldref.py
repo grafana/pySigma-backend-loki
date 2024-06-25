@@ -99,7 +99,9 @@ def test_loki_field_ref_json_multi_selection(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)Something`| label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+            '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)^Something$`'
+            '| label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` '
+            '| match_0=`true`'
         ]
     )
 

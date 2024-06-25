@@ -30,13 +30,13 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "startswith": ("valueA", "fieldA=~`(?i)^valueA.*`"),
     "endswith": ("valueA", "fieldA=~`(?i).*valueA$`"),
     "exists": ("yes", 'fieldA!=""'),
-    "base64": ("valueA", "fieldA=~`(?i)dmFsdWVB`"),
+    "base64": ("valueA", "fieldA=~`(?i)^dmFsdWVB$`"),
     "base64offset": (
         "valueA",
-        "fieldA=~`(?i)dmFsdWVB` or fieldA=~`(?i)ZhbHVlQ` or fieldA=~`(?i)2YWx1ZU`",
+        "fieldA=~`(?i)^dmFsdWVB$` or fieldA=~`(?i)^ZhbHVlQ$` or fieldA=~`(?i)^2YWx1ZU$`",
     ),
-    "wide": ("valueA", "fieldA=~`(?i)v\x00a\x00l\x00u\x00e\x00A\x00`"),
-    "windash": ("-foo", "fieldA=~`(?i)\\-foo` or fieldA=~`(?i)/foo`"),
+    "wide": ("valueA", "fieldA=~`(?i)^v\x00a\x00l\x00u\x00e\x00A\x00$`"),
+    "windash": ("-foo", "fieldA=~`(?i)^\\-foo$` or fieldA=~`(?i)^/foo$`"),
     "re": (".*valueA$", "fieldA=~`.*valueA$`"),
     "i": ("valueA", "valueA"),
     "ignorecase": ("valueA", "valueA"),
@@ -49,7 +49,7 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "dotall": ("valueA", "---"),
     "cased": ("valueA", "fieldA=`valueA`"),
     "cidr": ("192.0.0.0/8", 'fieldA=ip("192.0.0.0/8")'),
-    "all": (["valueA", "valueB"], "fieldA=~`(?i)valueA` and fieldA=~`(?i)valueB`"),
+    "all": (["valueA", "valueB"], "fieldA=~`(?i)^valueA$` and fieldA=~`(?i)^valueB$`"),
     "lt": (1, "fieldA<1"),
     "lte": (1, "fieldA<=1"),
     "gt": (1, "fieldA>1"),
@@ -59,7 +59,7 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
         "label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`"
         " | match_0=`true`",
     ),
-    "expand": ('"%test%"', "fieldA=~`(?i)valueA`"),
+    "expand": ('"%test%"', "fieldA=~`(?i)^valueA$`"),
 }
 
 

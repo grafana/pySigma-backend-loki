@@ -75,7 +75,7 @@ def test_loki_lf_field_eq_wildcard(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i)value.A` | logfmt | fieldA=~`(?i)value.A`']
+        == ['{job=~".+"} |~ `(?i)value.A` | logfmt | fieldA=~`(?i)^value.A$`']
     )
 
 
@@ -96,7 +96,7 @@ def test_loki_lf_field_not_eq_wildcard(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} !~ `(?i)value.A` | logfmt | fieldA!~`(?i)value.A`']
+        == ['{job=~".+"} !~ `(?i)value.A` | logfmt | fieldA!~`(?i)^value.A$`']
     )
 
 
@@ -426,7 +426,7 @@ def test_loki_lf_wildcard_single(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i)va.ue` | logfmt | fieldA=~`(?i)va.ue`']
+        == ['{job=~".+"} |~ `(?i)va.ue` | logfmt | fieldA=~`(?i)^va.ue$`']
     )
 
 
@@ -447,7 +447,7 @@ def test_loki_lf_wildcard_multi(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i)value.*` | logfmt | fieldA=~`(?i)value.*`']
+        == ['{job=~".+"} |~ `(?i)value.*` | logfmt | fieldA=~`(?i)^value.*`']
     )
 
 
@@ -472,7 +472,7 @@ def test_loki_lf_wildcard_escape(loki_backend: LogQLBackend):
         )
         == [
             '{job=~".+"} |~ `(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$` | logfmt | '
-            "fieldA=~`(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$`"
+            "fieldA=~`(?i)^\\^v\\)\\+\\[al\\]u\\(e.*\\$$`"
         ]
     )
 
@@ -560,7 +560,7 @@ def test_loki_lf_field_startswith(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i)foo.*` | logfmt | fieldA=~`(?i)foo.*`']
+        == ['{job=~".+"} |~ `(?i)foo.*` | logfmt | fieldA=~`(?i)^foo.*`']
     )
 
 
@@ -581,7 +581,7 @@ def test_loki_lf_field_endswith(loki_backend: LogQLBackend):
         """
             )
         )
-        == ['{job=~".+"} |~ `(?i).*bar` | logfmt | fieldA=~`(?i).*bar`']
+        == ['{job=~".+"} |~ `(?i).*bar` | logfmt | fieldA=~`(?i).*bar$`']
     )
 
 
