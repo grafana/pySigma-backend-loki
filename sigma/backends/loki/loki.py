@@ -1145,7 +1145,9 @@ class LogQLBackend(TextQueryBackend):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
             # selecting an appropriate log parser to use
-            query = f"| {str(self.select_log_parser(rule))} | {query}"
+            log_parser = str(self.select_log_parser(rule))
+            query = (f"{'| ' if not log_parser.lstrip().startswith('|') else ''}{log_parser} "
+                     f"{'| ' if not log_parser.rstrip().endswith('|') else ''}{query}")
         elif query is None:
             query = ""
         if state.has_deferred():
