@@ -1209,6 +1209,42 @@ correlation:
         assert str(e) == "Backend does not support correlation rules."
 
 
+def test_sigma_filters(loki_backend: LogQLBackend):
+    assert (
+        loki_backend.convert(
+            SigmaCollection.from_yaml(
+                """
+title: Test
+id: a6a829ba-c27a-4e3b-9244-28a2cd7d994a
+name: test_rule
+status: test
+logsource:
+    category: test_category
+    product: test_product
+detection:
+    sel:
+        fieldA: valueA
+    condition: sel
+---
+title: Filter Test
+id: 8a876a7d-e281-46d7-9ccc-fcbbd822737b
+status: test
+logsource:
+    category: test_category
+    product: test_product
+filter:
+    rules:
+        - test_rule
+    selection:
+        fieldB: valueB
+    condition: not selection
+        """
+            )
+        )
+        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`']
+    )
+
+
 def test_loki_default_output(loki_backend: LogQLBackend):
     """Test for output format default."""
     # TODO: implement a test for the output format
