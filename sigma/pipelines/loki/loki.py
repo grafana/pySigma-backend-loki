@@ -1,3 +1,4 @@
+import string
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Union
@@ -65,6 +66,7 @@ class CustomLogSourceTransformation(Transformation):
     referencing log source and/or detection fields from the rule"""
 
     selection: Dict[str, Union[str, List[str]]]
+    template: bool = False
 
     def apply(
         self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
@@ -89,7 +91,7 @@ class CustomLogSourceTransformation(Transformation):
                     detection.to_plain()
                     for detection in rule.detection.detections.values()
                 ]
-                field_values: list[dict[str, Union[str, int, None]]] = [
+                field_values: List[Dict[str, Union[str, int, None]]] = [
                     d for d in plain if isinstance(d, dict)
                 ]
                 if len(field_values) > 0:
@@ -111,9 +113,16 @@ class CustomLogSourceTransformation(Transformation):
                                     label, [str(v) for v in values]
                                 )
                             )
-            rule.custom_attributes[LokiCustomAttributes.LOGSOURCE_SELECTION.value] = (
-                "{" + ",".join(selectors) + "}"
-            )
+            formatted_selectors = "{" + ",".join(selectors) + "}"
+            if self.template:
+                formatted_selectors = string.Template(formatted_selectors).safe_substitute(
+                    category=rule.logsource.category,
+                    product=rule.logsource.product,
+                    service=rule.logsource.service,
+                )
+            rule.custom_attributes[
+                LokiCustomAttributes.LOGSOURCE_SELECTION.value
+            ] = formatted_selectors
         else:
             raise SigmaFeatureNotSupportedByBackendError(
                 "custom log source transforms are not supported for Correlation rules"

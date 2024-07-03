@@ -395,7 +395,12 @@ def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
             ProcessingItem(
                 identifier="complex_custom_log_source",
                 transformation=CustomLogSourceTransformation(
-                    selection={"job": ["a", "b", "c"], "message|fieldref": "msg"}
+                    selection={
+                        "job": ["a", "b", "c"],
+                        "message|fieldref": "msg",
+                        "env": "$product",
+                    },
+                    template=True,
                 ),
             )
         ],
@@ -403,7 +408,7 @@ def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
     assert loki_rule == [
-        "{job=~`a|b|c`,message=`testing`} | logfmt | msg=~`(?i)^testing$`"
+        "{job=~`a|b|c`,env=`test`,message=`testing`} | logfmt | msg=~`(?i)^testing$`"
     ]
 
 
