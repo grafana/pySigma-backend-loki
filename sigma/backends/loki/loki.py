@@ -50,6 +50,8 @@ from sigma.types import (
 from warnings import warn
 from yaml import dump
 
+from sigma.shared import sanitize_label_key, quote_string_value, join_or_values_re
+
 Conditions = Union[
     ConditionItem,
     ConditionNOT,
@@ -150,38 +152,7 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
         return self
 
     def finalize_expression(self) -> str:
-        # This makes the regex case insensitive if any values are SigmaStrings
-        # or if any of the regexes are case insensitive
-        # TODO: can we make this more precise?
-        case_insensitive = any(
-            (
-                isinstance(val, SigmaString)
-                and self.case_insensitive
-                and not isinstance(val, SigmaCasedString)
-            )
-            or (
-                isinstance(val, SigmaRegularExpression)
-                and val.regexp.startswith("(?i)")
-            )
-            for val in self.exprs
-        )
-        or_value = "|".join(
-            (
-                (
-                    re.escape(str(val))
-                    if isinstance(val, SigmaString)
-                    else re.sub("^\\(\\?i\\)", "", val.regexp)
-                )
-                for val in self.exprs
-            )
-        )
-        if case_insensitive:
-            or_value = "(?i)" + or_value
-        if "`" in or_value:
-            or_value = '"' + SigmaRegularExpression(or_value).escape(('"',)) + '"'
-        else:
-            or_value = "`" + or_value + "`"
-        return f"{self.op} {or_value}"
+        return f"{self.op} {join_or_values_re(self.exprs, self.case_insensitive)}"
 
 
 @dataclass
@@ -440,32 +411,6 @@ class LogQLBackend(TextQueryBackend):
         # By default, bring back all log streams
         return '{job=~".+"}'
 
-    def sanitize_label_key(self, key: str, isprefix: bool = True) -> str:
-        """Implements the logic used by Loki to sanitize labels.
-
-        See: https://github.com/grafana/loki/blob/main/pkg/logql/log/util.go#L21"""
-        # pySigma treats null or empty fields as unbound expressions, rather than keys
-        if key is None or len(key) == 0:  # pragma: no cover
-            return ""
-        key = key.strip()
-        if len(key) == 0:
-            return key
-        if isprefix and key[0] >= "0" and key[0] <= "9":
-            key = "_" + key
-        return "".join(
-            (
-                (
-                    r
-                    if (r >= "a" and r <= "z")
-                    or (r >= "A" and r <= "Z")
-                    or r == "_"
-                    or (r >= "0" and r <= "9")
-                    else "_"
-                )
-                for r in key
-            )
-        )
-
     def partition_rule(
         self, condition: Conditions, partitions: int
     ) -> List[Conditions]:
@@ -552,8 +497,10 @@ class LogQLBackend(TextQueryBackend):
             # Could include field name if entries are logfmt and doesn't start with wildcard
             regexp = expr.value.regexp
             anchors = LogQLBackend.anchor_replace_pattern.match(expr.value.regexp)
-            if anchors and anchors.group("body") and (
-                anchors.group("start") or anchors.group("end")
+            if (
+                anchors
+                and anchors.group("body")
+                and (anchors.group("start") or anchors.group("end"))
             ):
                 regexp = (
                     anchors.group("ext") if anchors.group("ext") else ""
@@ -1109,24 +1056,13 @@ class LogQLBackend(TextQueryBackend):
     # Loki has strict rules about field (label) names, so use their rules
     def escape_and_quote_field(self, field_name: str) -> str:
         """Use Loki's sanitize function to ensure the field name is appropriately escaped."""
-        return self.sanitize_label_key(field_name)
+        return sanitize_label_key(field_name)
 
     # If a string doesn't contain a tilde character, easier to use it to quote strings,
     # otherwise we will default to using a double quote character, and escape the string
     # appropriately
     def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
-        """By default, use the tilde character to quote fields, which needs limited escaping.
-        If the value contains a tilde character, use double quotes and apply more rigourous
-        escaping."""
-        quote = "`"
-        if any([c == quote for c in str(s)]):
-            quote = '"'
-        # If our string doesn't contain any tilde characters
-        if quote == "`":
-            converted = s.convert()
-        else:
-            converted = s.convert(escape_char="\\", add_escaped='"\\')
-        return quote + converted + quote
+        return quote_string_value(s)
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
     # rather than the end (since this is the recommended approach for LogQL), and add in log
@@ -1192,7 +1128,7 @@ class LogQLBackend(TextQueryBackend):
             state.deferred.clear()
         if rule.fields and len(rule.fields) > 0:
             line_fmt_fields = " ".join(
-                "{{." + self.sanitize_label_key(field) + "}}" for field in rule.fields
+                "{{." + sanitize_label_key(field) + "}}" for field in rule.fields
             )
             query = query + f' | line_format "{line_fmt_fields}"'
         # Select an appropriate source based on the logsource

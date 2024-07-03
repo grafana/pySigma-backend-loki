@@ -1,3 +1,5 @@
+import pytest
+
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.correlations import SigmaCorrelationRule
@@ -6,10 +8,28 @@ from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
     LokiCustomAttributes,
     SetCustomAttributeTransformation,
+    CustomLogSourceTransformation,
     loki_grafana_logfmt,
     loki_promtail_sysmon,
     loki_okta_system_log,
 )
+
+
+@pytest.fixture
+def sigma_rules() -> SigmaCollection:
+    return SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    msg: testing
+                condition: sel
+        """
+    )
 
 
 def test_transformations_contains_custom_attribute():
@@ -178,7 +198,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
             "client.geographicalcontext.postalcode",
             [
                 '{job=~".+"} | json | event_client_geographicalContext_postalCode=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
@@ -243,21 +263,21 @@ def test_okta_json_pipeline_exclusive_exhaustive():
             "authenticationcontext.authenticationstep",
             [
                 '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
             "authenticationcontext.credentialprovider",
             [
                 '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
             "authenticationcontext.credentialtype",
             [
                 '{job=~".+"} | json | event_authenticationContext_credentialType=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
@@ -276,7 +296,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
             "authenticationcontext.externalsessionid",
             [
                 '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
@@ -325,7 +345,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         assert loki_rule == rule[1]
 
 
-def test_loki_parser_pipeline():
+def test_loki_parser_pipeline(sigma_rules: SigmaCollection):
     pipeline = ProcessingPipeline(
         name="Test custom Loki parser pipeline",
         priority=20,
@@ -340,24 +360,13 @@ def test_loki_parser_pipeline():
         ],
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                sel:
-                    msg: testing
-                condition: sel
-        """
-    )
-    loki_rule = backend.convert(sigma_rule)
-    assert loki_rule == ['{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`']
+    loki_rule = backend.convert(sigma_rules)
+    assert loki_rule == [
+        '{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`'
+    ]
 
 
-def test_loki_logsource_selection_pipeline():
+def test_loki_logsource_selection_pipeline(sigma_rules: SigmaCollection):
     pipeline = ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
         priority=20,
@@ -372,22 +381,29 @@ def test_loki_logsource_selection_pipeline():
         ],
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                sel:
-                    msg: testing
-                condition: sel
-        """
-    )
-    loki_rule = backend.convert(sigma_rule)
+    loki_rule = backend.convert(sigma_rules)
     assert loki_rule == [
         "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=~`(?i)^testing$`"
+    ]
+
+
+def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={"job": ["a", "b", "c"], "message|fieldref": "msg"}
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    loki_rule = backend.convert(sigma_rules)
+    assert loki_rule == [
+        "{job=~`a|b|c`,message=`testing`} | logfmt | msg=~`(?i)^testing$`"
     ]
 
 

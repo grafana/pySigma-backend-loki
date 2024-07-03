@@ -1,9 +1,14 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Dict, List, Union
 
+from sigma.types import SigmaString
 from sigma.rule import SigmaRule
 from sigma.correlations import SigmaCorrelationRule
+from sigma.exceptions import (
+    SigmaConfigurationError,
+    SigmaFeatureNotSupportedByBackendError,
+)
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
@@ -12,6 +17,7 @@ from sigma.processing.transformations import (
     AddFieldnamePrefixTransformation,
     FieldMappingTransformation,
 )
+from sigma.shared import sanitize_label_key, quote_string_value, join_or_values_re
 
 
 class LokiCustomAttributes(Enum):
@@ -36,9 +42,88 @@ class SetCustomAttributeTransformation(Transformation):
         rule.custom_attributes[self.attribute] = self.value
 
 
+def format_log_source_selector(field: str, value: Union[str, List[str]]) -> str:
+    """Formats a string label name and either a single string or multiple strings into a valid LogQL
+    stream selector query. This currently assumes that the label values are case-sensitive.
+    """
+    # TODO: replace log source placeholders
+    if isinstance(value, str):
+        # TODO: support regular expressions?
+        string = SigmaString(value)
+        return f"{sanitize_label_key(field)}={quote_string_value(string)}"
+    elif isinstance(value, list):
+        regex = join_or_values_re([SigmaString(s) for s in value], False)
+        return f"{sanitize_label_key(field)}=~{regex}"
+    raise SigmaConfigurationError(
+        f"unable to format selector {value} for field {field}"
+    )
+
+
+@dataclass
+class CustomLogSourceTransformation(Transformation):
+    """Allow the definition of a log source selector using YAML structured data, including
+    referencing log source and/or detection fields from the rule"""
+
+    selection: Dict[str, Union[str, List[str]]]
+
+    def apply(
+        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+    ):
+        super().apply(pipeline, rule)
+        if isinstance(rule, SigmaRule):
+            selectors: List[str] = []
+            refs: Dict[str, str] = {}
+            for field, value in self.selection.items():
+                if field.endswith("|fieldref"):
+                    if isinstance(value, list):
+                        raise SigmaConfigurationError(
+                            f"fieldref custom log source transformation {field} "
+                            "can only refer to a single field"
+                        )
+                    else:
+                        refs[field.removesuffix("|fieldref")] = value
+                else:
+                    selectors.append(format_log_source_selector(field, value))
+            if len(refs) > 0:
+                plain = [
+                    detection.to_plain()
+                    for detection in rule.detection.detections.values()
+                ]
+                field_values: list[dict[str, str | int | None]] = [
+                    d for d in plain if isinstance(d, dict)
+                ]
+                if len(field_values) > 0:
+                    for label, field_name in refs.items():
+                        values: list[Union[str, int, None]] = []
+                        for mapping in field_values:
+                            if (
+                                field_name in mapping
+                                and mapping[field_name] is not None
+                            ):
+                                values.append(mapping[field_name])
+                        if len(values) == 1:
+                            selectors.append(
+                                format_log_source_selector(label, str(values[0]))
+                            )
+                        elif len(values) > 1:
+                            selectors.append(
+                                format_log_source_selector(
+                                    label, [str(v) for v in values]
+                                )
+                            )
+            rule.custom_attributes[LokiCustomAttributes.LOGSOURCE_SELECTION.value] = (
+                "{" + ",".join(selectors) + "}"
+            )
+        else:
+            raise SigmaFeatureNotSupportedByBackendError(
+                "custom log source transforms are not supported for Correlation rules"
+            )
+
+
 # Update pySigma transformations to include the above
 # mypy type: ignore required due to incorrect type annotation on the transformations dict
 transformations["set_custom_attribute"] = SetCustomAttributeTransformation  # type: ignore
+transformations["set_custom_log_source"] = CustomLogSourceTransformation  # type: ignore
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
