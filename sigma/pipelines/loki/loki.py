@@ -89,7 +89,7 @@ class CustomLogSourceTransformation(Transformation):
                     detection.to_plain()
                     for detection in rule.detection.detections.values()
                 ]
-                field_values: list[dict[str, str | int | None]] = [
+                field_values: list[dict[str, Union[str, int, None]]] = [
                     d for d in plain if isinstance(d, dict)
                 ]
                 if len(field_values) > 0:
