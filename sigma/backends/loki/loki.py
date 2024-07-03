@@ -1182,7 +1182,7 @@ class LogQLBackend(TextQueryBackend):
             if len(field_refs) > 0:
                 label_fmt = ",".join(field_refs)
                 field_ref_expression = (
-                    "| " if len(query) > 0 else f"{query_log_parser}  "
+                    "| " if len(query) > 0 else f"{query_log_parser} "
                 ) + f"label_format {label_fmt}"
                 filter_fmt = " " + self.and_token + " "
                 field_ref_filters_expression = (
