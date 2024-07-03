@@ -83,7 +83,7 @@ class CustomLogSourceTransformation(Transformation):
                             "can only refer to a single field"
                         )
                     else:
-                        refs[field.removesuffix("|fieldref")] = value
+                        refs[field[:-len("|fieldref")]] = value
                 else:
                     selectors.append(format_log_source_selector(field, value))
             if len(refs) > 0:
@@ -96,7 +96,7 @@ class CustomLogSourceTransformation(Transformation):
                 ]
                 if len(field_values) > 0:
                     for label, field_name in refs.items():
-                        values: list[Union[str, int, None]] = []
+                        values: List[Union[str, int, None]] = []
                         for mapping in field_values:
                             if (
                                 field_name in mapping
