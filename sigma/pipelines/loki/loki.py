@@ -47,7 +47,6 @@ def format_log_source_selector(field: str, value: Union[str, List[str]]) -> str:
     """Formats a string label name and either a single string or multiple strings into a valid LogQL
     stream selector query. This currently assumes that the label values are case-sensitive.
     """
-    # TODO: replace log source placeholders
     if isinstance(value, str):
         # TODO: support regular expressions?
         string = SigmaString(value)
@@ -83,7 +82,7 @@ class CustomLogSourceTransformation(Transformation):
                             "can only refer to a single field"
                         )
                     else:
-                        refs[field[:-len("|fieldref")]] = value
+                        refs[field[: -len("|fieldref")]] = value
                 else:
                     selectors.append(format_log_source_selector(field, value))
             if len(refs) > 0:
@@ -91,18 +90,21 @@ class CustomLogSourceTransformation(Transformation):
                     detection.to_plain()
                     for detection in rule.detection.detections.values()
                 ]
-                field_values: List[Dict[str, Union[str, int, None]]] = [
-                    d for d in plain if isinstance(d, dict)
-                ]
+                field_values = [d for d in plain if isinstance(d, dict)]
                 if len(field_values) > 0:
                     for label, field_name in refs.items():
-                        values: List[Union[str, int, None]] = []
+                        values: List[str] = []
                         for mapping in field_values:
                             if (
                                 field_name in mapping
                                 and mapping[field_name] is not None
                             ):
-                                values.append(mapping[field_name])
+                                if isinstance(mapping[field_name], list):
+                                    # mypy type: ignore required due to incorrect type annotation on
+                                    # to_plain
+                                    values.extend([str(v) for v in mapping[field_name]])  # type: ignore
+                                else:
+                                    values.append(str(mapping[field_name]))
                         if len(values) == 1:
                             selectors.append(
                                 format_log_source_selector(label, str(values[0]))
@@ -115,7 +117,9 @@ class CustomLogSourceTransformation(Transformation):
                             )
             formatted_selectors = "{" + ",".join(selectors) + "}"
             if self.template:
-                formatted_selectors = string.Template(formatted_selectors).safe_substitute(
+                formatted_selectors = string.Template(
+                    formatted_selectors
+                ).safe_substitute(
                     category=rule.logsource.category,
                     product=rule.logsource.product,
                     service=rule.logsource.service,

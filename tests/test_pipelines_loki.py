@@ -412,6 +412,51 @@ def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     ]
 
 
+def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "name": "okta-logs",
+                        "eventType|fieldref": "eventType",
+                    },
+                    template=True,
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: okta
+                service: okta
+            detection:
+                sel:
+                    eventType:
+                        - policy.lifecycle.update
+                        - policy.lifecycle.delete
+                    legacyeventtype: 'core.user_auth.login_failed'
+                    displaymessage: 'Failed login to Okta'
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        "{name=`okta-logs`,eventType=~`policy\\.lifecycle\\.update|policy\\.lifecycle\\.delete`} | "
+        "logfmt | (eventType=~`(?i)^policy\\.lifecycle\\.update$` or "
+        "eventType=~`(?i)^policy\\.lifecycle\\.delete$`) and "
+        "legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` and "
+        "displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$`"
+    ]
+
+
 def test_processing_pipeline_custom_attribute_from_dict():
     pipeline_dict = {
         "name": "Testing Custom Pipeline",
