@@ -552,8 +552,10 @@ class LogQLBackend(TextQueryBackend):
             # Could include field name if entries are logfmt and doesn't start with wildcard
             regexp = expr.value.regexp
             anchors = LogQLBackend.anchor_replace_pattern.match(expr.value.regexp)
-            if anchors and anchors.group("body") and (
-                anchors.group("start") or anchors.group("end")
+            if (
+                anchors
+                and anchors.group("body")
+                and (anchors.group("start") or anchors.group("end"))
             ):
                 regexp = (
                     anchors.group("ext") if anchors.group("ext") else ""
