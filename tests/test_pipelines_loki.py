@@ -178,7 +178,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
             "client.geographicalcontext.postalcode",
             [
                 '{job=~".+"} | json | event_client_geographicalContext_postalCode=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
@@ -243,21 +243,21 @@ def test_okta_json_pipeline_exclusive_exhaustive():
             "authenticationcontext.authenticationstep",
             [
                 '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
             "authenticationcontext.credentialprovider",
             [
                 '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
             "authenticationcontext.credentialtype",
             [
                 '{job=~".+"} | json | event_authenticationContext_credentialType=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
@@ -276,7 +276,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
             "authenticationcontext.externalsessionid",
             [
                 '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)^test_'
-                'value$`'
+                "value$`"
             ],
         ),
         (
@@ -354,7 +354,9 @@ def test_loki_parser_pipeline():
         """
     )
     loki_rule = backend.convert(sigma_rule)
-    assert loki_rule == ['{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`']
+    assert loki_rule == [
+        '{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`'
+    ]
 
 
 def test_loki_pipe_parser_pipeline():
