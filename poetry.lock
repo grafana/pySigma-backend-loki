@@ -21,13 +21,13 @@ tests-no-zope = ["attrs[tests-mypy]", "cloudpickle", "hypothesis", "pympler", "p
 
 [[package]]
 name = "certifi"
-version = "2024.6.2"
+version = "2024.7.4"
 description = "Python package for providing Mozilla's CA Bundle."
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "certifi-2024.6.2-py3-none-any.whl", hash = "sha256:ddc6c8ce995e6987e7faf5e3f1b02b302836a0e5d98ece18392cb1a36c72ad56"},
-    {file = "certifi-2024.6.2.tar.gz", hash = "sha256:3cd43f1c6fa7dedc5899d69d3ad0398fd018ad1a17fba83ddaf78aa46c747516"},
+    {file = "certifi-2024.7.4-py3-none-any.whl", hash = "sha256:c198e21b1289c2ab85ee4e67bb4b4ef3ead0892059901a8d5b622f24a1101e90"},
+    {file = "certifi-2024.7.4.tar.gz", hash = "sha256:5a1e7645bc0ec61a09e26c36f6106dd4cf40c6db3a1fb6352b0244e7fb057c7b"},
 ]
 
 [[package]]
@@ -445,13 +445,13 @@ diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
 name = "pysigma"
-version = "0.11.7"
+version = "0.11.8"
 description = "Sigma rule processing and conversion tools"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "pysigma-0.11.7-py3-none-any.whl", hash = "sha256:0bbcbd63bf696ffb6f0d127681c6db95141f9d9047d9f5e735e907de1748d8fd"},
-    {file = "pysigma-0.11.7.tar.gz", hash = "sha256:0414db911bdb8aea11967e64a53da4288b869374135ee81a0e5e3658c7a79eb6"},
+    {file = "pysigma-0.11.8-py3-none-any.whl", hash = "sha256:b8a811c36ea97a66ceaff158de92b054b5531d1a2fe3c4317133101c624ad97e"},
+    {file = "pysigma-0.11.8.tar.gz", hash = "sha256:08ae6d134567960c39a1907c9111504a1a4cdbabe71555c1f62f7d67a6228298"},
 ]
 
 [package.dependencies]
