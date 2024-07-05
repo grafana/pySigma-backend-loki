@@ -1143,11 +1143,16 @@ class LogQLBackend(TextQueryBackend):
     ) -> Union[str, DeferredQueryExpression]:
         """Complete the conversion of the query, selecting an appropriate log parser if necessary,
         and pre-pending deferred line filters."""
+        # selecting an appropriate log parser to use
+        log_parser = str(self.select_log_parser(rule))
+        query_log_parser = (
+            f"{'| ' if not log_parser.lstrip().startswith('|') else ''}{log_parser}"
+            f"{' |' if not log_parser.rstrip().endswith('|') else ''}"
+        )
         if isinstance(query, DeferredQueryExpression):
             query = self.deferred_only_query
         elif query is not None and len(query) > 0:
-            # selecting an appropriate log parser to use
-            query = f"| {str(self.select_log_parser(rule))} | {query}"
+            query = f"{query_log_parser} {query}"
         elif query is None:
             query = ""
         if state.has_deferred():
@@ -1177,7 +1182,7 @@ class LogQLBackend(TextQueryBackend):
             if len(field_refs) > 0:
                 label_fmt = ",".join(field_refs)
                 field_ref_expression = (
-                    "| " if len(query) > 0 else f"| {self.select_log_parser(rule)} | "
+                    "| " if len(query) > 0 else f"{query_log_parser} "
                 ) + f"label_format {label_fmt}"
                 filter_fmt = " " + self.and_token + " "
                 field_ref_filters_expression = (

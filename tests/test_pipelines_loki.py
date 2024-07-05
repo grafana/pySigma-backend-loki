@@ -359,6 +359,37 @@ def test_loki_parser_pipeline():
     ]
 
 
+def test_loki_pipe_parser_pipeline():
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki pipe parser pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="set_loki_parser_pattern",
+                transformation=SetCustomAttributeTransformation(
+                    attribute=LokiCustomAttributes.PARSER.value,
+                    value="|= `value` | pattern `<ip> <ts> <msg>`",
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    msg: testing
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == ['{job=~".+"} |= `value` | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`']
+
 def test_loki_logsource_selection_pipeline():
     pipeline = ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
