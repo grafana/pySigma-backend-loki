@@ -1,6 +1,11 @@
 import re
 from typing import List, Union
-from sigma.types import SigmaCasedString, SigmaString, SigmaRegularExpression
+from sigma.types import (
+    SigmaCasedString,
+    SigmaString,
+    SigmaRegularExpression,
+    SpecialChars,
+)
 
 
 def sanitize_label_key(key: str, isprefix: bool = True) -> str:
@@ -45,6 +50,38 @@ def quote_string_value(s: SigmaString) -> str:
     return quote + converted + quote
 
 
+def convert_str_to_re(
+    value: SigmaString,
+    case_insensitive: bool = True,
+    field_filter: bool = False,
+) -> SigmaRegularExpression:
+    """Convert a SigmaString into a regular expression, replacing any
+    wildcards with equivalent regular expression operators, and enforcing
+    case-insensitive matching"""
+    return SigmaRegularExpression(
+        ("(?i)" if case_insensitive else "")
+        + (
+            "^"
+            if field_filter and not value.startswith(SpecialChars.WILDCARD_MULTI)
+            else ""
+        )
+        + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
+        + (
+            "$"
+            if field_filter and not value.endswith(SpecialChars.WILDCARD_MULTI)
+            else ""
+        )
+    )
+
+
+def escape_and_quote_re(r: SigmaRegularExpression) -> str:
+    """LogQL does not require any additional escaping for regular expressions if we
+    can use the tilde character"""
+    if "`" in r.regexp:
+        return '"' + r.escape(('"',)) + '"'
+    return "`" + r.regexp + "`"
+
+
 def join_or_values_re(
     exprs: List[Union[SigmaString, SigmaRegularExpression]], case_insensitive: bool
 ) -> str:
@@ -60,6 +97,12 @@ def join_or_values_re(
         or (isinstance(val, SigmaRegularExpression) and val.regexp.startswith("(?i)"))
         for val in exprs
     )
+    vals = [
+        convert_str_to_re(val)
+        if isinstance(val, SigmaString) and val.contains_special()
+        else val
+        for val in exprs
+    ]
     or_value = "|".join(
         (
             (
@@ -67,7 +110,7 @@ def join_or_values_re(
                 if isinstance(val, SigmaString)
                 else re.sub("^\\(\\?i\\)", "", val.regexp)
             )
-            for val in exprs
+            for val in vals
         )
     )
     if case_insensitive:

@@ -45,12 +45,17 @@ from sigma.types import (
     SigmaNull,
     SigmaNumber,
     SigmaFieldReference,
-    SpecialChars,
 )
 from warnings import warn
 from yaml import dump
 
-from sigma.shared import sanitize_label_key, quote_string_value, join_or_values_re
+from sigma.shared import (
+    sanitize_label_key,
+    quote_string_value,
+    join_or_values_re,
+    escape_and_quote_re,
+    convert_str_to_re,
+)
 
 Conditions = Union[
     ConditionItem,
@@ -343,33 +348,6 @@ class LogQLBackend(TextQueryBackend):
             self.case_sensitive = case_sensitive.lower() == "true"
 
     # Loki-specific functions
-    # When converting values to regexes, we need to escape the string to prevent use of
-    # non-wildcard metacharacters
-    # As str equality is case-insensitive in Sigma, but LogQL regexes are case-sensitive,
-    # we need to do the same for *ALL* string values and prepend with (?i)
-    def convert_str_to_re(
-        self,
-        value: SigmaString,
-        case_insensitive: bool = True,
-        field_filter: bool = False,
-    ) -> SigmaRegularExpression:
-        """Convert a SigmaString into a regular expression, replacing any
-        wildcards with equivalent regular expression operators, and enforcing
-        case-insensitive matching"""
-        return SigmaRegularExpression(
-            ("(?i)" if case_insensitive else "")
-            + (
-                "^"
-                if field_filter and not value.startswith(SpecialChars.WILDCARD_MULTI)
-                else ""
-            )
-            + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
-            + (
-                "$"
-                if field_filter and not value.endswith(SpecialChars.WILDCARD_MULTI)
-                else ""
-            )
-        )
 
     def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
         """Select a relevant log parser based on common approaches to ingesting data into Loki.
@@ -642,7 +620,7 @@ class LogQLBackend(TextQueryBackend):
                 and (not self.case_sensitive or condition.value.contains_special())
                 and not isinstance(condition.value, SigmaCasedString)
             ):
-                condition.value = self.convert_str_to_re(
+                condition.value = convert_str_to_re(
                     condition.value,
                     field_filter=isinstance(
                         condition, ConditionFieldEqualsValueExpression
@@ -813,11 +791,7 @@ class LogQLBackend(TextQueryBackend):
     def convert_value_re(
         self, r: SigmaRegularExpression, state: ConversionState
     ) -> str:
-        """LogQL does not require any additional escaping for regular expressions if we
-        can use the tilde character"""
-        if "`" in r.regexp:
-            return '"' + r.escape(('"',)) + '"'
-        return "`" + r.regexp + "`"
+        return escape_and_quote_re(r)
 
     def convert_condition_or(
         self, cond: ConditionOR, state: ConversionState
@@ -955,7 +929,7 @@ class LogQLBackend(TextQueryBackend):
             and isinstance(cond.value, SigmaString)
             and len(cond.value) > 0
         ):
-            cond.value = self.convert_str_to_re(cond.value, True, True)
+            cond.value = convert_str_to_re(cond.value, True, True)
             return super().convert_condition_field_eq_val_re(cond, state)
         return super().convert_condition_field_eq_val_str(cond, state)
 
@@ -966,7 +940,7 @@ class LogQLBackend(TextQueryBackend):
         modifiers, Sigma introduces wildcards that are then not handled correctly
         by Loki. So, in those cases, we convert the string to a regular expression."""
         if isinstance(cond.value, SigmaString) and cond.value.contains_special():
-            cond.value = self.convert_str_to_re(cond.value, False, True)
+            cond.value = convert_str_to_re(cond.value, False, True)
             return super().convert_condition_field_eq_val_re(cond, state)
         return super().convert_condition_field_eq_val_str_case_sensitive(cond, state)
 

@@ -408,7 +408,7 @@ def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
     assert loki_rule == [
-        "{job=~`a|b|c`,env=`test`,message=`testing`} | logfmt | msg=~`(?i)^testing$`"
+        "{job=~`a|b|c`,message=`testing`,env=`test`} | logfmt | msg=~`(?i)^testing$`"
     ]
 
 
@@ -421,7 +421,8 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
                 identifier="complex_custom_log_source",
                 transformation=CustomLogSourceTransformation(
                     selection={
-                        "name": "okta-logs",
+                        "name|re": "okta.logs",
+                        "job": "*secops*",
                         "eventType|fieldref": "eventType",
                     },
                     template=True,
@@ -438,22 +439,26 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
                 product: okta
                 service: okta
             detection:
-                sel:
+                sel1:
                     eventType:
                         - policy.lifecycle.update
-                        - policy.lifecycle.delete
+                        - policy.lifecycle.del*
                     legacyeventtype: 'core.user_auth.login_failed'
                     displaymessage: 'Failed login to Okta'
-                condition: sel
+                sel2:
+                    eventType|re: 'policy\\.life.*\\.'
+                condition: all of sel*
         """
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{name=`okta-logs`,eventType=~`policy\\.lifecycle\\.update|policy\\.lifecycle\\.delete`} | "
-        "logfmt | (eventType=~`(?i)^policy\\.lifecycle\\.update$` or "
-        "eventType=~`(?i)^policy\\.lifecycle\\.delete$`) and "
-        "legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` and "
-        "displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$`"
+        "{name=~`okta.logs`,job=~`.*secops.*`,"
+        "eventType=~`policy\\.lifecycle\\.update|policy\\.lifecycle\\.del.*|policy\\.life.*\\.`} "
+        "| logfmt | (eventType=~`(?i)^policy\\.lifecycle\\.update$` "
+        "or eventType=~`(?i)^policy\\.lifecycle\\.del.*`) "
+        "and legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
+        "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
+        "and eventType=~`policy\\.life.*\\.`"
     ]
 
 
