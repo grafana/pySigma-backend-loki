@@ -1,4 +1,5 @@
 import pytest
+from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
@@ -387,6 +388,29 @@ def test_loki_logsource_selection_pipeline(sigma_rules: SigmaCollection):
     ]
 
 
+def test_single_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "message|fieldref": "msg",
+                    },
+                    template=True,
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    loki_rule = backend.convert(sigma_rules)
+    assert loki_rule == [
+        "{message=`testing`} | logfmt | msg=~`(?i)^testing$`"
+    ]
+
+
 def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     pipeline = ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
@@ -544,6 +568,84 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
         "and (eventType!~`(?i)^policy\\.lifecycle\\.update$` "
         "or ruleField!~`.*out`)"
     ]
+
+
+def test_unsupported_line_filter_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="invalid_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "": "value",
+                    }
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    raised_error = False
+    try:
+        backend.convert(sigma_rules)
+    except Exception as e:
+        raised_error = True
+        assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
+        assert "only supports field equals value conditions" in str(e)
+    assert raised_error
+
+
+def test_unsupported_nested_or_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="invalid_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "test|all": ["a", "b", "c"],
+                    }
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    raised_error = False
+    try:
+        backend.convert(sigma_rules)
+    except Exception as e:
+        raised_error = True
+        assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
+        assert "allows one required value for a field" in str(e)
+    assert raised_error
+
+
+def test_unsupported_filter_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="invalid_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "test|cidr": "1.2.0.0/16",
+                    }
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    raised_error = False
+    try:
+        backend.convert(sigma_rules)
+    except Exception as e:
+        raised_error = True
+        assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
+        assert "only supports: string values, field references and regular expressions" in str(e)
+    assert raised_error
 
 
 def test_processing_pipeline_custom_attribute_from_dict():

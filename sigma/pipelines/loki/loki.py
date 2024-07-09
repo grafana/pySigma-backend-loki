@@ -9,7 +9,7 @@ from sigma.conditions import (
     ConditionFieldEqualsValueExpression,
     ConditionOR,
     ConditionItem,
-    ConditionType,
+    ConditionType, ConditionAND,
 )
 from sigma.types import (
     SigmaString,
@@ -94,21 +94,23 @@ class CustomLogSourceTransformation(Transformation):
         if isinstance(rule, SigmaRule):
             selectors: List[str] = []
             logsource_detections = SigmaDetection.from_definition(self.selection)
-            conditions = logsource_detections.postprocess(rule.detection)
+            conds = logsource_detections.postprocess(rule.detection)
+            fields_set = set()
             args: List[
                 Union[
                     ConditionItem,
                     ConditionFieldEqualsValueExpression,
                     ConditionValueExpression,
                 ]
-            ] = (
-                [conditions]
-                if isinstance(
-                    conditions,
-                    (ConditionFieldEqualsValueExpression, ConditionValueExpression),
+            ] = []
+            if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
+                args.append(conds)
+            elif isinstance(conds, ConditionAND):
+                args.extend(conds.args)
+            else:
+                raise SigmaFeatureNotSupportedByBackendError(
+                    "the custom log source selector only supports field equals value conditions"
                 )
-                else conditions.args
-            )
             for cond in args:
                 field: Union[str, None] = None
                 op: Union[str, None] = None
@@ -147,11 +149,15 @@ class CustomLogSourceTransformation(Transformation):
                             "the custom log selector pipeline only supports: string values, field "
                             "references and regular expressions"
                         )
+                if field in fields_set:
+                    raise SigmaFeatureNotSupportedByBackendError(
+                        "the custom log source selector only allows one required value for a field"
+                    )
 
                 skip = False
                 rule_conditions = []
-                for conditions in rule.detection.parsed_condition:
-                    rule_conditions.extend(traverse_conditions(conditions.parsed))  # type: ignore
+                for conds in rule.detection.parsed_condition:
+                    rule_conditions.extend(traverse_conditions(conds.parsed))  # type: ignore
 
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
@@ -190,6 +196,7 @@ class CustomLogSourceTransformation(Transformation):
                     op = "=~"
                     value = escape_and_quote_re(value)
                 if field and op and value:
+                    fields_set.add(field)
                     selectors.append(f"{sanitize_label_key(field)}{op}{value}")
             formatted_selectors = "{" + ",".join(selectors) + "}"
             if self.template:
