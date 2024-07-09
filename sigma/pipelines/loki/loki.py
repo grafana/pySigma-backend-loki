@@ -8,6 +8,8 @@ from sigma.conditions import (
     ConditionNOT,
     ConditionFieldEqualsValueExpression,
     ConditionOR,
+    ConditionItem,
+    ConditionType,
 )
 from sigma.types import (
     SigmaString,
@@ -15,7 +17,7 @@ from sigma.types import (
     SigmaFieldReference,
     SigmaType,
 )
-from sigma.rule import SigmaRule, SigmaDetection, SigmaDetectionItem
+from sigma.rule import SigmaRule, SigmaDetection
 from sigma.correlations import SigmaCorrelationRule
 from sigma.exceptions import (
     SigmaFeatureNotSupportedByBackendError,
@@ -59,16 +61,22 @@ class SetCustomAttributeTransformation(Transformation):
         rule.custom_attributes[self.attribute] = self.value
 
 
-def traverse_detections(items: List[Union[SigmaDetectionItem, SigmaDetection]]):
-    for item in items:
-        if isinstance(item, SigmaDetectionItem):
-            yield item
+def traverse_conditions(item: ConditionType):
+    queue: List[
+        Union[
+            ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression
+        ]
+    ] = [item]
+    while len(queue) > 0:
+        cond = queue.pop(0)
+        if isinstance(cond, ConditionItem):
+            queue.extend(cond.args)
         else:
-            traverse_detections(item.detection_items)
+            yield cond
 
 
 def count_negated(classes: List[Type[Any]]) -> int:
-    return len([neg for neg in classes if isinstance(neg, ConditionNOT)])
+    return len([neg for neg in classes if neg == ConditionNOT])
 
 
 @dataclass
@@ -87,7 +95,21 @@ class CustomLogSourceTransformation(Transformation):
             selectors: List[str] = []
             logsource_detections = SigmaDetection.from_definition(self.selection)
             conditions = logsource_detections.postprocess(rule.detection)
-            for cond in conditions.args:
+            args: List[
+                Union[
+                    ConditionItem,
+                    ConditionFieldEqualsValueExpression,
+                    ConditionValueExpression,
+                ]
+            ] = (
+                [conditions]
+                if isinstance(
+                    conditions,
+                    (ConditionFieldEqualsValueExpression, ConditionValueExpression),
+                )
+                else conditions.args
+            )
+            for cond in args:
                 field: Union[str, None] = None
                 op: Union[str, None] = None
                 value: Union[SigmaType, str, None] = None
@@ -125,34 +147,28 @@ class CustomLogSourceTransformation(Transformation):
                             "the custom log selector pipeline only supports: string values, field "
                             "references and regular expressions"
                         )
+
                 skip = False
+                rule_conditions = []
+                for conditions in rule.detection.parsed_condition:
+                    rule_conditions.extend(traverse_conditions(conditions.parsed))  # type: ignore
 
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
                     values = []
                     negated = None
-                    for detection in rule.detection.detections.values():
-                        for item in traverse_detections(detection.detection_items):
-                            if item.field == value.field:
-                                new_negated = (
-                                    count_negated(item.parent_chain_condition_classes())
-                                    % 2
-                                    == 1
-                                )
-                                if negated is not None and negated != new_negated:
-                                    # Skipping fields refs with both negated and un-negated values
-                                    skip = True
-                                else:
-                                    negated = new_negated
-                                values.extend(
-                                    [
-                                        val
-                                        for val in item.value
-                                        if isinstance(
-                                            val, (SigmaString, SigmaRegularExpression)
-                                        )
-                                    ]
-                                )
+                    for item in rule_conditions:
+                        if item.field == value.field and isinstance(
+                            item.value, (SigmaString, SigmaRegularExpression)
+                        ):
+                            classes = item.parent_chain_condition_classes()
+                            new_negated = count_negated(classes) % 2 == 1
+                            if negated is not None and negated != new_negated:
+                                # Skipping fields refs with both negated and un-negated values
+                                skip = True
+                            else:
+                                negated = new_negated
+                            values.append(item.value)
                     if len(values) == 0 or skip:
                         continue
                     if len(values) == 1:
