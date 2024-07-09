@@ -171,11 +171,11 @@ class CustomLogSourceTransformation(Transformation):
                             values.append(item.value)
                     if len(values) == 0 or skip:
                         continue
-                    if len(values) == 1:
+                    if len(values) == 1 and isinstance(values[0], SigmaString):
                         if negated:
                             op = "!="
                         value = values[0]
-                    if len(values) > 1:
+                    else:
                         op = "=~"
                         if negated:
                             op = "!~"

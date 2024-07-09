@@ -422,7 +422,7 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
                 transformation=CustomLogSourceTransformation(
                     selection={
                         "name|re": "okta.logs",
-                        "job": "*secops*",
+                        "job|contains": "secops",
                         "eventType|fieldref": "eventType",
                     },
                     template=True,
@@ -462,6 +462,45 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     ]
 
 
+def test_skip_both_negated_and_positive_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "name": "okta-logs",
+                        "eventType|fieldref": "eventType",
+                    }
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: okta
+                service: okta
+            detection:
+                sel1:
+                    eventType|startswith: policy.lifecycle.
+                sel2:
+                    eventType|endswith: create
+                condition: sel1 and not sel2
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule == [
+        "{name=`okta-logs`} | logfmt | eventType=~`(?i)^policy\\.lifecycle\\..*` "
+        "and eventType!~`(?i).*create$`"
+    ]
+
+
 def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     pipeline = ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
@@ -472,6 +511,7 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
                 transformation=CustomLogSourceTransformation(
                     selection={
                         "eventType|fieldref": "eventType",
+                        "stream|fieldref": "ruleField",
                     },
                     template=True,
                 ),
@@ -492,17 +532,17 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
                     displaymessage: 'Failed login to Okta'
                 sel2:
                     eventType: 'policy.lifecycle.update'
-                    test: 'value'
+                    ruleField|re: '.*out'
                 condition: sel1 and not sel2
         """
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{eventType!=`policy.lifecycle.update`} "
+        "{eventType!=`policy.lifecycle.update`,stream!~`.*out`} "
         "| logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
         "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
         "and (eventType!~`(?i)^policy\\.lifecycle\\.update$` "
-        "or test!~`(?i)^value$`)"
+        "or ruleField!~`.*out`)"
     ]
 
 
