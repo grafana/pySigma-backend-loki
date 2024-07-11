@@ -4,7 +4,7 @@ from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.correlations import SigmaCorrelationRule
-from sigma.processing.transformations import transformations
+from sigma.processing.transformations import transformations, FieldMappingTransformation
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
     LokiCustomAttributes,
@@ -433,6 +433,36 @@ def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     loki_rule = backend.convert(sigma_rules)
     assert loki_rule == [
         "{job=~`a|b|c`,message=`testing`,env=`test`} | logfmt | msg=~`(?i)^testing$`"
+    ]
+
+
+def test_field_renamed_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="update_msg_field_name",
+                transformation=FieldMappingTransformation(
+                    mapping={
+                        "msg": "message",
+                    }
+                ),
+            ),
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "msg_lbl|fieldref": "message"
+                    }
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    loki_rule = backend.convert(sigma_rules)
+    assert loki_rule == [
+        "{msg_lbl=`testing`} | logfmt | message=~`(?i)^testing$`"
     ]
 
 
