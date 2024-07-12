@@ -56,8 +56,8 @@ To release new versions of pySigma-backend-loki, we use GitHub actions to update
 
 1. Determine the correct version number using the [Semantic Versioning](https://semver.org/) methodology. All version numbers should be in the format `\d+\.\d+\.\d+(-[0-9A-Za-z-]+)?`
 2. Update [pyproject.toml](https://github.com/grafana/pySigma-backend-loki/blob/main/pyproject.toml) with the new version number
-3. Commit and push the change to GitHub, and validate that the GitHub actions tests pass
-4. Create a signed tag for the release, named the version number prefixed with a v, e.g., `git tag --sign --message="Release vX.X.X" vX.X.X`
+3. Commit and push the change to GitHub, validate that the GitHub actions tests pass, and merge the PR into main
+4. Checkout main and create a signed tag for the release, named the version number prefixed with a v, e.g., `git tag --sign --message="Release vX.X.X" vX.X.X`
 5. Push the tag to GitHub, e.g., `git push --tags`, and validate that the release to the test instance of PyPI is successful
 6. Run `poetry build` to produce distributable versions in `dist/`
 7. Create a release in GitHub against the appropriate tag. If the version number starts with `v0`, or ends with `-alpha/beta` etc., mark it as a pre-release, and attach the distributable files to the release
