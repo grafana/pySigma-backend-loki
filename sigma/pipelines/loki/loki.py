@@ -1,9 +1,27 @@
+import string
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union
+from typing import Any, Dict, List, Union, Type
 
-from sigma.rule import SigmaRule
+from sigma.conditions import (
+    ConditionValueExpression,
+    ConditionNOT,
+    ConditionFieldEqualsValueExpression,
+    ConditionOR,
+    ConditionItem,
+    ConditionType, ConditionAND,
+)
+from sigma.types import (
+    SigmaString,
+    SigmaRegularExpression,
+    SigmaFieldReference,
+    SigmaType,
+)
+from sigma.rule import SigmaRule, SigmaDetection
 from sigma.correlations import SigmaCorrelationRule
+from sigma.exceptions import (
+    SigmaFeatureNotSupportedByBackendError,
+)
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
@@ -11,6 +29,13 @@ from sigma.processing.transformations import (
     Transformation,
     AddFieldnamePrefixTransformation,
     FieldMappingTransformation,
+)
+from sigma.shared import (
+    sanitize_label_key,
+    quote_string_value,
+    join_or_values_re,
+    escape_and_quote_re,
+    convert_str_to_re,
 )
 
 
@@ -36,9 +61,166 @@ class SetCustomAttributeTransformation(Transformation):
         rule.custom_attributes[self.attribute] = self.value
 
 
+def traverse_conditions(item: ConditionType):
+    queue: List[
+        Union[
+            ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression
+        ]
+    ] = [item]
+    while len(queue) > 0:
+        cond = queue.pop(0)
+        if isinstance(cond, ConditionItem):
+            queue.extend(cond.args)
+        else:
+            yield cond
+
+
+def count_negated(classes: List[Type[Any]]) -> int:
+    return len([neg for neg in classes if neg == ConditionNOT])
+
+
+@dataclass
+class CustomLogSourceTransformation(Transformation):
+    """Allow the definition of a log source selector using YAML structured data, including
+    referencing log source and/or detection fields from the rule"""
+
+    selection: Dict[str, Union[str, List[str]]]
+    case_insensitive: bool = False
+    template: bool = False
+
+    def apply(
+        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+    ):
+        if isinstance(rule, SigmaRule):
+            selectors: List[str] = []
+            logsource_detections = SigmaDetection.from_definition(self.selection)
+            conds = logsource_detections.postprocess(rule.detection)
+            fields_set = set()
+            args: List[
+                Union[
+                    ConditionItem,
+                    ConditionFieldEqualsValueExpression,
+                    ConditionValueExpression,
+                ]
+            ] = []
+            if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
+                args.append(conds)
+            elif isinstance(conds, ConditionAND):
+                args.extend(conds.args)
+            else:
+                raise SigmaFeatureNotSupportedByBackendError(
+                    "the custom log source selector only supports field equals value conditions"
+                )
+            for cond in args:
+                field: Union[str, None] = None
+                op: Union[str, None] = None
+                value: Union[SigmaType, str, None] = None
+                if isinstance(cond, ConditionValueExpression):
+                    raise SigmaFeatureNotSupportedByBackendError(
+                        "the custom log source selector only supports field equals value conditions"
+                    )
+                elif isinstance(cond, ConditionOR):
+                    op = "=~"
+                    values = []
+                    for arg in cond.args:
+                        if not isinstance(arg, ConditionFieldEqualsValueExpression):
+                            raise SigmaFeatureNotSupportedByBackendError(
+                                "the custom log source selector only supports a single nesting of "
+                                "OR'd values"
+                            )
+                        if field is None:
+                            field = arg.field
+                        elif field != arg.field:
+                            raise SigmaFeatureNotSupportedByBackendError(
+                                "the custom log source selector only supports ORs on a single field"
+                            )
+                        if isinstance(arg.value, (SigmaString, SigmaRegularExpression)):
+                            values.append(arg.value)
+                    value = join_or_values_re(values, self.case_insensitive)
+                elif isinstance(cond, ConditionFieldEqualsValueExpression):
+                    field = cond.field
+                    op = "="
+                    value = cond.value
+                    if not isinstance(
+                        value,
+                        (SigmaFieldReference, SigmaString, SigmaRegularExpression),
+                    ):
+                        raise SigmaFeatureNotSupportedByBackendError(
+                            "the custom log selector pipeline only supports: string values, field "
+                            "references and regular expressions"
+                        )
+                if field in fields_set:
+                    raise SigmaFeatureNotSupportedByBackendError(
+                        "the custom log source selector only allows one required value for a field"
+                    )
+
+                skip = False
+                rule_conditions = []
+                for conds in rule.detection.parsed_condition:
+                    rule_conditions.extend(traverse_conditions(conds.parsed))  # type: ignore
+
+                # Note: the order of these if statements is important and should be preserved
+                if isinstance(value, SigmaFieldReference):
+                    values = []
+                    negated = None
+                    for item in rule_conditions:
+                        if item.field == value.field and isinstance(
+                            item.value, (SigmaString, SigmaRegularExpression)
+                        ):
+                            classes = item.parent_chain_condition_classes()
+                            new_negated = count_negated(classes) % 2 == 1
+                            if negated is not None and negated != new_negated:
+                                # Skipping fields refs with both negated and un-negated values
+                                skip = True
+                            else:
+                                negated = new_negated
+                            values.append(item.value)
+                    if len(values) == 0 or skip:
+                        continue
+                    if len(values) == 1 and isinstance(values[0], SigmaString):
+                        if negated:
+                            op = "!="
+                        value = values[0]
+                    else:
+                        op = "=~"
+                        if negated:
+                            op = "!~"
+                        value = join_or_values_re(values, self.case_insensitive)
+                if isinstance(value, SigmaString):
+                    if value.contains_special():
+                        value = convert_str_to_re(value, self.case_insensitive, False)
+                    else:
+                        value = quote_string_value(value)
+                # Not elif, as if the value was a string containing wildcards, it is now a RegEx
+                if isinstance(value, SigmaRegularExpression):
+                    op = "=~"
+                    value = escape_and_quote_re(value)
+                if field and op and value:
+                    fields_set.add(field)
+                    selectors.append(f"{sanitize_label_key(field)}{op}{value}")
+            formatted_selectors = "{" + ",".join(selectors) + "}"
+            if self.template:
+                formatted_selectors = string.Template(
+                    formatted_selectors
+                ).safe_substitute(
+                    category=rule.logsource.category,
+                    product=rule.logsource.product,
+                    service=rule.logsource.service,
+                )
+            rule.custom_attributes[
+                LokiCustomAttributes.LOGSOURCE_SELECTION.value
+            ] = formatted_selectors
+            super().apply(pipeline, rule)
+        else:
+            raise SigmaFeatureNotSupportedByBackendError(
+                "custom log source transforms are not supported for Correlation rules"
+            )
+
+
 # Update pySigma transformations to include the above
 # mypy type: ignore required due to incorrect type annotation on the transformations dict
 transformations["set_custom_attribute"] = SetCustomAttributeTransformation  # type: ignore
+transformations["set_custom_log_source"] = CustomLogSourceTransformation  # type: ignore
 
 
 def loki_grafana_logfmt() -> ProcessingPipeline:
