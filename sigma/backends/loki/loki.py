@@ -30,6 +30,7 @@ from sigma.conditions import (
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
+from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.processing.pipeline import ProcessingPipeline
@@ -321,13 +322,13 @@ class LogQLBackend(TextQueryBackend):
     # Correlation rule support
     correlation_methods = {"default": "Use LogQL metric queries to correlate events"}
     event_count_correlation_query = {
-        "default": "{aggregate} {search} {condition}",
+        "default": "{aggregate} {condition}",
     }
     correlation_search_single_rule_expression = "{query}"
     correlation_search_field_normalization_expression = "{field}"
     correlation_search_field_normalization_expression_joiner = ","
     event_count_aggregation_expression = {
-        "default": "sum by {groupby} (count_over_time([{timespan}]))",
+        "default": "sum by {groupby} (count_over_time({query} [{timespan}]))",
     }
     # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
     timespan_mapping = {}
@@ -1068,6 +1069,28 @@ class LogQLBackend(TextQueryBackend):
     # appropriately
     def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
         return quote_string_value(s)
+
+    # Overriding the implementation to provide the query to the aggregation
+    def convert_correlation_aggregation_from_template(
+        self, rule: SigmaCorrelationRule, correlation_type: SigmaCorrelationTypeLiteral, method: str
+    ) -> str:
+        templates = getattr(self, f"{correlation_type}_aggregation_expression")
+        if templates is None:
+            raise NotImplementedError(
+                f"Correlation type '{correlation_type}' is not supported by backend."
+            )
+        template = templates[method]
+        return template.format(
+            rule=rule,
+            referenced_rules=self.convert_referenced_rules(rule.rules, method),
+            field=rule.condition.fieldref if rule.condition else None,
+            timespan=self.convert_timespan(rule.timespan, method),
+            groupby=self.convert_correlation_aggregation_groupby_from_template(
+                rule.group_by, method
+            ),
+            # FIXME: this only supports a single rule that produces a single query
+            query=rule.rules[0].rule.get_conversion_result()[0]
+        )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
     # rather than the end (since this is the recommended approach for LogQL), and add in log
