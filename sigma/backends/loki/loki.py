@@ -325,15 +325,13 @@ class LogQLBackend(TextQueryBackend):
         "default": "{aggregate} {condition}",
     }
     correlation_search_single_rule_expression = "{query}"
-    correlation_search_field_normalization_expression = "{field}"
-    correlation_search_field_normalization_expression_joiner = ","
     event_count_aggregation_expression = {
-        "default": "sum by {groupby} (count_over_time({query} [{timespan}]))",
+        "default": "sum{groupby}(count_over_time({query} [{timespan}]))",
     }
     # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
     timespan_mapping = {}
     groupby_expression = {
-        "default": "({fields})",
+        "default": " by ({fields}) ",
     }
     groupby_field_expression = {
         "default": "{field}",
