@@ -30,6 +30,7 @@ from sigma.conditions import (
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
+from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.processing.pipeline import ProcessingPipeline
@@ -317,6 +318,30 @@ class LogQLBackend(TextQueryBackend):
     deferred_start: ClassVar[str] = ""
     deferred_separator: ClassVar[str] = " "
     deferred_only_query: ClassVar[str] = ""
+
+    # Correlation rule support
+    correlation_methods = {"default": "Use LogQL metric queries to correlate events"}
+    event_count_correlation_query = {
+        "default": "{aggregate} {condition}",
+    }
+    correlation_search_single_rule_expression = "{query}"
+    event_count_aggregation_expression = {
+        "default": "sum{groupby}(count_over_time({query} [{timespan}]))",
+    }
+    # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
+    timespan_mapping = {}
+    groupby_expression = {
+        "default": " by ({fields}) ",
+    }
+    groupby_field_expression = {
+        "default": "{field}",
+    }
+    groupby_field_expression_joiner = {
+        "default": ", ",
+    }
+    event_count_condition_expression = {
+        "default": "{op} {count}",
+    }
 
     # Loki-specific functionality
     add_line_filters: bool = False
@@ -699,7 +724,7 @@ class LogQLBackend(TextQueryBackend):
                 for index, cond in enumerate(rule.detection.parsed_condition)
             ]
             shortened_conditions: List[Tuple[int, Conditions]] = []
-            final_queries: List[Union[str, DeferredQueryExpression]] = []
+            finalized_queries: List[Union[str, DeferredQueryExpression]] = []
 
             threshold_length = 4096  # 80% of Loki limit (5120) due to query expansion
             while not attempted_conversion or attempt_shortening:
@@ -754,7 +779,7 @@ class LogQLBackend(TextQueryBackend):
                     if isinstance(final_query, str):
                         if len(final_query) < threshold_length:
                             # If the query is within the threshold length, all is well
-                            final_queries.append(final_query)
+                            finalized_queries.append(final_query)
                         elif not attempted_conversion:
                             # If this is the first pass, try to shorten the condition
                             shortened_conditions.extend(
@@ -767,11 +792,16 @@ class LogQLBackend(TextQueryBackend):
                             attempt_shortening = True
                         else:
                             # Otherwise, produce the query anyway
-                            final_queries.append(final_query)
+                            finalized_queries.append(final_query)
                     else:
-                        final_queries.append(final_query)
+                        finalized_queries.append(final_query)
                 attempted_conversion = True
-            return final_queries
+            rule.set_conversion_result(finalized_queries)
+            rule.set_conversion_states(states)
+            if rule._output:
+                return finalized_queries
+            else:
+                return []
 
         except SigmaError as e:
             if self.collect_errors:
@@ -1037,6 +1067,27 @@ class LogQLBackend(TextQueryBackend):
     # appropriately
     def convert_value_str(self, s: SigmaString, state: ConversionState) -> str:
         return quote_string_value(s)
+
+    # Overriding the implementation to provide the query to the aggregation
+    def convert_correlation_aggregation_from_template(
+        self, rule: SigmaCorrelationRule, correlation_type: SigmaCorrelationTypeLiteral, method: str
+    ) -> str:
+        templates = getattr(self, f"{correlation_type}_aggregation_expression")
+        if templates is None:
+            raise NotImplementedError(
+                f"Correlation type '{correlation_type}' is not supported by backend."
+            )
+        template = templates[method]
+        return template.format(
+            rule=rule,
+            referenced_rules=self.convert_referenced_rules(rule.rules, method),
+            field=rule.condition.fieldref if rule.condition else None,
+            timespan=self.convert_timespan(rule.timespan, method),
+            groupby=self.convert_correlation_aggregation_groupby_from_template(
+                rule.group_by, method
+            ),
+            query=self.convert_correlation_search(rule)
+        )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
     # rather than the end (since this is the recommended approach for LogQL), and add in log
