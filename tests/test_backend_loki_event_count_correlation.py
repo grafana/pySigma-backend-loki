@@ -38,7 +38,6 @@ correlation:
                        'fieldA=~`(?i)^valueA$` [30s])) == 42']
 
 
-# Testing event count correlation rules
 def test_loki_default_event_count_single_field(loki_backend: LogQLBackend):
     rules = SigmaCollection.from_yaml(
         """
@@ -71,7 +70,6 @@ correlation:
                        'fieldA=~`(?i)^valueA$` [5m])) >= 1']
 
 
-# Testing event count correlation rules
 def test_loki_default_event_count_multiple_fields(loki_backend: LogQLBackend):
     rules = SigmaCollection.from_yaml(
         """
