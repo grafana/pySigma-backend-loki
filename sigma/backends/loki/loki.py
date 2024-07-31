@@ -1088,8 +1088,7 @@ class LogQLBackend(TextQueryBackend):
             groupby=self.convert_correlation_aggregation_groupby_from_template(
                 rule.group_by, method
             ),
-            # FIXME: this only supports a single rule that produces a single query
-            query=rule.rules[0].rule.get_conversion_result()[0]
+            query=self.convert_correlation_search(rule)
         )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
