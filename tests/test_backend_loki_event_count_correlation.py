@@ -1,4 +1,7 @@
 import pytest
+from sigma.processing.pipeline import ProcessingPipeline, ProcessingItem
+from sigma.processing.transformations import FieldMappingTransformation
+
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 
@@ -101,3 +104,51 @@ correlation:
     queries = loki_backend.convert(rules)
     assert queries == ['sum by (fieldB, fieldC) (count_over_time({job=~".+"} | logfmt | '
                        'fieldA=~`(?i)^valueA$` [1d])) < 100']
+
+
+def test_loki_default_event_count_field_mapping(loki_backend: LogQLBackend):
+    pipeline = ProcessingPipeline(
+        name="Test mapping fields in correlations",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="update_field_B_to_C",
+                transformation=FieldMappingTransformation(
+                    mapping={
+                        "fieldB": "fieldC",
+                    }
+                ),
+            ),
+        ],
+    )
+    rules = SigmaCollection.from_yaml(
+        """
+title: Test Rule
+name: test_rule
+status: test
+logsource:
+    category: test_category
+    product: test_product
+detection:
+    sel:
+        fieldA: valueA
+        fieldB|contains: valueB
+    condition: sel
+---
+title: Test Correlation
+status: test
+correlation:
+    type: event_count
+    rules:
+        - test_rule
+    group-by:
+        - fieldB
+    timespan: 36h
+    condition:
+        lte: 5000
+"""
+    )
+    loki_backend = LogQLBackend(processing_pipeline=pipeline)
+    queries = loki_backend.convert(rules)
+    assert queries == ['sum by (fieldC) (count_over_time({job=~".+"} | logfmt | '
+                       'fieldA=~`(?i)^valueA$` and fieldC=~`(?i).*valueB.*` [36h])) <= 5000']
