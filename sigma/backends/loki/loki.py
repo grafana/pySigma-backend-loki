@@ -318,6 +318,32 @@ class LogQLBackend(TextQueryBackend):
     deferred_separator: ClassVar[str] = " "
     deferred_only_query: ClassVar[str] = ""
 
+    # Correlation rule support
+    correlation_methods = {"default": "Use LogQL metric queries to correlate events"}
+    event_count_correlation_query = {
+        "default": "{aggregate} {search} {condition}",
+    }
+    correlation_search_single_rule_expression = "{query}"
+    correlation_search_field_normalization_expression = "{field}"
+    correlation_search_field_normalization_expression_joiner = ","
+    event_count_aggregation_expression = {
+        "default": "sum by {groupby} (count_over_time([{timespan}]))",
+    }
+    # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
+    timespan_mapping = {}
+    groupby_expression = {
+        "default": "({fields})",
+    }
+    groupby_field_expression = {
+        "default": "{field}",
+    }
+    groupby_field_expression_joiner = {
+        "default": ", ",
+    }
+    event_count_condition_expression = {
+        "default": "{op} {count}",
+    }
+
     # Loki-specific functionality
     add_line_filters: bool = False
     case_sensitive: bool = False
@@ -699,7 +725,7 @@ class LogQLBackend(TextQueryBackend):
                 for index, cond in enumerate(rule.detection.parsed_condition)
             ]
             shortened_conditions: List[Tuple[int, Conditions]] = []
-            final_queries: List[Union[str, DeferredQueryExpression]] = []
+            finalized_queries: List[Union[str, DeferredQueryExpression]] = []
 
             threshold_length = 4096  # 80% of Loki limit (5120) due to query expansion
             while not attempted_conversion or attempt_shortening:
@@ -754,7 +780,7 @@ class LogQLBackend(TextQueryBackend):
                     if isinstance(final_query, str):
                         if len(final_query) < threshold_length:
                             # If the query is within the threshold length, all is well
-                            final_queries.append(final_query)
+                            finalized_queries.append(final_query)
                         elif not attempted_conversion:
                             # If this is the first pass, try to shorten the condition
                             shortened_conditions.extend(
@@ -767,11 +793,16 @@ class LogQLBackend(TextQueryBackend):
                             attempt_shortening = True
                         else:
                             # Otherwise, produce the query anyway
-                            final_queries.append(final_query)
+                            finalized_queries.append(final_query)
                     else:
-                        final_queries.append(final_query)
+                        finalized_queries.append(final_query)
                 attempted_conversion = True
-            return final_queries
+            rule.set_conversion_result(finalized_queries)
+            rule.set_conversion_states(states)
+            if rule._output:
+                return finalized_queries
+            else:
+                return []
 
         except SigmaError as e:
             if self.collect_errors:
