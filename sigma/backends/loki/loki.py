@@ -331,6 +331,8 @@ class LogQLBackend(TextQueryBackend):
     event_count_aggregation_expression = {
         "default": "sum{groupby}(count_over_time({query} [{timespan}]))",
     }
+    # Note: here groupby includes field appended to the end, due to the overriden implementation of
+    #       convert_correlation_aggregation_from_template
     value_count_aggregation_expression = {
         "default": "count without ({field}) (sum{groupby}(count_over_time({query} [{timespan}])))",
     }
