@@ -111,6 +111,7 @@ correlation:
 
 def test_loki_okta_country_count():
     pipeline = loki_okta_system_log()
+    # Note: using
     rules = SigmaCollection.from_yaml(
         """
 title: Okta User Activity With Country Defined
@@ -133,6 +134,8 @@ falsepositives:
     - If a user requires an anonymising proxy due to valid justifications.
 level: high
 ---
+# Note: using transformed field names as LogsourceConditions do not currently support correlation 
+# rules
 title: Okta User Activity Across Multiple Countries
 id: a8c75573-8513-40c6-85a6-818b7c58a601
 author: kelnage
@@ -143,10 +146,10 @@ correlation:
     rules:
         - 79bbc335-7ab0-4316-a17b-30c85f7f0595
     group-by:
-        - actor.alternateid
+        - event_actor_alternateId
     timespan: 1h
     condition:
-        field: client.geographicalcontext.country
+        field: event_client_geographicalContext_country
         gt: 1
 level: high
 """

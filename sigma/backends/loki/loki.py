@@ -329,12 +329,12 @@ class LogQLBackend(TextQueryBackend):
     }
     correlation_search_single_rule_expression = "{query}"
     event_count_aggregation_expression = {
-        "default": "sum{groupby}(count_over_time({query} [{timespan}]))",
+        "default": "sum{groupby}(count_over_time({search} [{timespan}]))",
     }
     # Note: here groupby includes field appended to the end, due to the overriden implementation of
     #       convert_correlation_aggregation_from_template
     value_count_aggregation_expression = {
-        "default": "count without ({field}) (sum{groupby}(count_over_time({query} [{timespan}])))",
+        "default": "count without ({field}) (sum{groupby}(count_over_time({search} [{timespan}])))",
     }
     # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
     timespan_mapping = {}
@@ -1085,6 +1085,7 @@ class LogQLBackend(TextQueryBackend):
         rule: SigmaCorrelationRule,
         correlation_type: SigmaCorrelationTypeLiteral,
         method: str,
+        search: str,
     ) -> str:
         templates = getattr(self, f"{correlation_type}_aggregation_expression")
         if templates is None:
@@ -1111,7 +1112,7 @@ class LogQLBackend(TextQueryBackend):
             groupby=self.convert_correlation_aggregation_groupby_from_template(
                 groups, method
             ),
-            query=self.convert_correlation_search(rule),
+            search=search,
         )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
