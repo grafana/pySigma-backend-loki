@@ -908,7 +908,7 @@ def test_loki_list_condition(loki_backend: LogQLBackend):
             id: 8bcaaeff-3fe4-4793-9fcc-9a61acec6290
             description: Short Description
             author: Your Name
-            date: 2023/06/27
+            date: 2023-06-27
             logsource:
                 category: application
             detection:
