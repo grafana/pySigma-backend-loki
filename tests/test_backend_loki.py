@@ -908,7 +908,7 @@ def test_loki_list_condition(loki_backend: LogQLBackend):
             id: 8bcaaeff-3fe4-4793-9fcc-9a61acec6290
             description: Short Description
             author: Your Name
-            date: 2023/06/27
+            date: 2023-06-27
             logsource:
                 category: application
             detection:
@@ -1171,42 +1171,6 @@ def test_loki_collect_errors(loki_backend: LogQLBackend):
     assert len(loki_backend.errors) == 1
     (r, e) = loki_backend.errors[0]
     assert r == rules[0] and isinstance(e, SigmaFeatureNotSupportedByBackendError)
-
-
-def test_loki_correlation_not_implemented_error(loki_backend: LogQLBackend):
-    """
-    A test to validate the correct error is thrown when a Correlation rule is converted by the
-    backend, given it does not currently support that format of Sigma rule.
-    """
-    rules = SigmaCollection.from_yaml(
-        """
-title: Test
-name: failed_login
-status: test
-logsource:
-    product: okta
-    service: okta
-detection:
-    selector:
-        legacyeventtype: 'core.user_auth.login_failed'
-    condition: selector
----
-title: Valid correlation
-status: test
-correlation:
-    type: event_count
-    rules: failed_login
-    group-by: actor.alternateid
-    timespan: 10m
-    condition:
-        gte: 10
-        """
-    )
-    try:
-        loki_backend.convert(rules)
-    except Exception as e:
-        assert isinstance(e, NotImplementedError)
-        assert str(e) == "Backend does not support correlation rules."
 
 
 def test_sigma_filters(loki_backend: LogQLBackend):

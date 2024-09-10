@@ -9,7 +9,8 @@ from sigma.conditions import (
     ConditionFieldEqualsValueExpression,
     ConditionOR,
     ConditionItem,
-    ConditionType, ConditionAND,
+    ConditionType,
+    ConditionAND,
 )
 from sigma.types import (
     SigmaString,

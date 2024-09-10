@@ -324,9 +324,17 @@ class LogQLBackend(TextQueryBackend):
     event_count_correlation_query = {
         "default": "{aggregate} {condition}",
     }
+    value_count_correlation_query = {
+        "default": "{aggregate} {condition}",
+    }
     correlation_search_single_rule_expression = "{query}"
     event_count_aggregation_expression = {
-        "default": "sum{groupby}(count_over_time({query} [{timespan}]))",
+        "default": "sum{groupby}(count_over_time({search} [{timespan}]))",
+    }
+    # Note: here groupby includes field appended to the end, due to the overriden implementation of
+    #       convert_correlation_aggregation_from_template
+    value_count_aggregation_expression = {
+        "default": "count without ({field}) (sum{groupby}(count_over_time({search} [{timespan}])))",
     }
     # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
     timespan_mapping = {}
@@ -340,6 +348,9 @@ class LogQLBackend(TextQueryBackend):
         "default": ", ",
     }
     event_count_condition_expression = {
+        "default": "{op} {count}",
+    }
+    value_count_condition_expression = {
         "default": "{op} {count}",
     }
 
@@ -1070,7 +1081,11 @@ class LogQLBackend(TextQueryBackend):
 
     # Overriding the implementation to provide the query to the aggregation
     def convert_correlation_aggregation_from_template(
-        self, rule: SigmaCorrelationRule, correlation_type: SigmaCorrelationTypeLiteral, method: str
+        self,
+        rule: SigmaCorrelationRule,
+        correlation_type: SigmaCorrelationTypeLiteral,
+        method: str,
+        search: str,
     ) -> str:
         templates = getattr(self, f"{correlation_type}_aggregation_expression")
         if templates is None:
@@ -1078,15 +1093,26 @@ class LogQLBackend(TextQueryBackend):
                 f"Correlation type '{correlation_type}' is not supported by backend."
             )
         template = templates[method]
+        # When doing a value_count correlation, Loki must append the value field to the group-by
+        groups = rule.group_by
+        if (
+            correlation_type == "value_count"
+            and rule.condition
+            and rule.condition.fieldref
+        ):
+            if not groups:
+                groups = [rule.condition.fieldref]
+            else:
+                groups.append(rule.condition.fieldref)
         return template.format(
             rule=rule,
             referenced_rules=self.convert_referenced_rules(rule.rules, method),
             field=rule.condition.fieldref if rule.condition else None,
             timespan=self.convert_timespan(rule.timespan, method),
             groupby=self.convert_correlation_aggregation_groupby_from_template(
-                rule.group_by, method
+                groups, method
             ),
-            query=self.convert_correlation_search(rule)
+            search=search,
         )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
