@@ -1097,10 +1097,10 @@ class LogQLBackend(TextQueryBackend):
         groups = rule.group_by
         if (
             correlation_type == "value_count"
-            and rule.condition is not None
-            and rule.condition.fieldref is not None
+            and rule.condition
+            and rule.condition.fieldref
         ):
-            if groups is None:
+            if not groups:
                 groups = [rule.condition.fieldref]
             else:
                 groups.append(rule.condition.fieldref)
