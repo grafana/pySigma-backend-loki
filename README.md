@@ -14,6 +14,7 @@ It supports the following output formats for Sigma rules:
 It also supports the following query formats for and categories of [Sigma Correlation rules](https://github.com/SigmaHQ/sigma-specification/blob/version_2/Sigma_meta_rules.md):
 * `default` format using [LogQL metric queries](https://grafana.com/docs/loki/latest/query/metric_queries/):
   * `event_count`
+  * `value_count`
 
 It includes the following pipeline transformations in `sigma.pipelines.loki`:
 

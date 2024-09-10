@@ -560,6 +560,7 @@ class LogQLBackend(TextQueryBackend):
             return None
         matcher = None
         match = None
+        value = None
         # Finding the longest common substring of a list of strings, by repeatedly
         # calling SequenceMatcher's find_longest_match. The 1st candidate is cached
         # in the 2nd sequence (b), then following candidates are set as the 1st
@@ -571,14 +572,15 @@ class LogQLBackend(TextQueryBackend):
                 # First iteration: initialise sequence matcher with the first
                 # candidate as sequence 2
                 # mypy doesn't spot that the previous check will prevent cand = None
-                matcher = SequenceMatcher(None, b=cand.value)  # type: ignore
+                value = cand.value  # type: ignore
+                matcher = SequenceMatcher(None, b=value)
             else:
                 # Subsequent iterations: use the current candidate as sequence 1
                 matcher.set_seq1(cand.value)
                 # If we've previously found a match, only use the current matched
                 # region in b for this search, otherwise use the whole string
                 blo = match.b if match else 0
-                bhi = match.b + match.size if match else len(matcher.b)
+                bhi = match.b + match.size if match else len(value)
                 match = matcher.find_longest_match(0, len(cand.value), blo, bhi)
                 # If the current match length is 0, there was no common substring
                 # between all of the candidates found using this greedy strategy
@@ -588,7 +590,7 @@ class LogQLBackend(TextQueryBackend):
             start = match.b
             end = match.b + match.size
             return LogQLLineFilterInfo(
-                value=matcher.b[start:end],
+                value=value[start:end],
                 negated=False,
                 deftype=LogQLDeferredType.STR,
             )
@@ -761,6 +763,7 @@ class LogQLBackend(TextQueryBackend):
                         ]
                         if candidate_lfs and candidate_lfs[0] is not None:
                             value, negated, def_type = candidate_lfs[0]
+                            line_filter = None
                             if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
                                     states[index],
@@ -776,7 +779,7 @@ class LogQLBackend(TextQueryBackend):
                                 line_filter = LogQLDeferredUnboundCIDRExpression(
                                     states[index], value
                                 )
-                            if negated:
+                            if line_filter and negated:
                                 line_filter.negate()
 
                     error_state = "finalizing query for"
