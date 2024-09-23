@@ -74,12 +74,12 @@ def convert_str_to_re(
     )
 
 
-def escape_and_quote_re(r: SigmaRegularExpression) -> str:
+def escape_and_quote_re(r: SigmaRegularExpression, flag_prefix=True) -> str:
     """LogQL does not require any additional escaping for regular expressions if we
     can use the tilde character"""
     if "`" in r.regexp:
-        return '"' + r.escape(('"',)) + '"'
-    return "`" + r.regexp + "`"
+        return '"' + r.escape(('"',), flag_prefix=flag_prefix) + '"'
+    return "`" + r.escape((), "", False, flag_prefix) + "`"  # type: ignore
 
 
 def join_or_values_re(
