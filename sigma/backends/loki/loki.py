@@ -248,6 +248,7 @@ class LogQLBackend(TextQueryBackend):
     eq_token: ClassVar[str]
     field_null_expression: ClassVar[str]
     re_expression: ClassVar[str]
+    re_flag_prefix: bool = True
     cidr_expression: ClassVar[str]
     compare_op_expression: ClassVar[str]
     compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
@@ -835,7 +836,7 @@ class LogQLBackend(TextQueryBackend):
     def convert_value_re(
         self, r: SigmaRegularExpression, state: ConversionState
     ) -> str:
-        return escape_and_quote_re(r)
+        return escape_and_quote_re(r, self.re_flag_prefix)
 
     def convert_condition_or(
         self, cond: ConditionOR, state: ConversionState

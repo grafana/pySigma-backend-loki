@@ -38,8 +38,8 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "wide": ("valueA", "fieldA=~`(?i)^v\x00a\x00l\x00u\x00e\x00A\x00$`"),
     "windash": ("-foo", "fieldA=~`(?i)^\\-foo$` or fieldA=~`(?i)^/foo$`"),
     "re": (".*valueA$", "fieldA=~`.*valueA$`"),
-    "i": ("valueA", "valueA"),
-    "ignorecase": ("valueA", "valueA"),
+    "i": ("valueA", "fieldA=~`(?i)valueA`"),
+    "ignorecase": ("valueA", "fieldA=~`(?i)valueA`"),
     # Multiline modifier is not supported by LogQL, and the recommended way to handle
     # multiline logs can be found below:
     # https://grafana.com/docs/loki/latest/send-data/promtail/stages/multiline/
