@@ -406,9 +406,7 @@ def test_single_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
-    assert loki_rule == [
-        "{message=`testing`} | logfmt | msg=~`(?i)^testing$`"
-    ]
+    assert loki_rule == ["{message=`testing`} | logfmt | msg=~`(?i)^testing$`"]
 
 
 def test_simple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
@@ -452,18 +450,14 @@ def test_field_renamed_custom_log_source_pipeline(sigma_rules: SigmaCollection):
             ProcessingItem(
                 identifier="complex_custom_log_source",
                 transformation=CustomLogSourceTransformation(
-                    selection={
-                        "msg_lbl|fieldref": "message"
-                    }
+                    selection={"msg_lbl|fieldref": "message"}
                 ),
-            )
+            ),
         ],
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
-    assert loki_rule == [
-        "{msg_lbl=`testing`} | logfmt | message=~`(?i)^testing$`"
-    ]
+    assert loki_rule == ["{msg_lbl=`testing`} | logfmt | message=~`(?i)^testing$`"]
 
 
 def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
@@ -516,7 +510,53 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     ]
 
 
-def test_skip_both_negated_and_positive_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+def test_custom_log_source_rule_with_keywords():
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "job": ["a", "b", "c"],
+                        "message|fieldref": "msg",
+                        "env": "$product",
+                    },
+                    template=True,
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+        title: Test
+        status: test
+        logsource:
+            product: okta
+            service: okta
+        detection:
+            sel:
+                eventType:
+                    - policy.lifecycle.update
+                    - policy.lifecycle.del*
+                legacyeventtype: 'core.user_auth.login_failed'
+                msg: 'Failed login to Okta'
+            keywords:
+                - 'policy\\.life.*\\.'
+            condition: sel and keywords
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule[0].startswith(
+        "{job=~`a|b|c`,message=`Failed login to Okta`,env=`okta`}"
+    )
+
+
+def test_skip_both_negated_and_positive_custom_log_source_pipeline(
+    sigma_rules: SigmaCollection,
+):
     pipeline = ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
         priority=20,
@@ -600,7 +640,9 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     ]
 
 
-def test_unsupported_line_filter_custom_log_source_pipeline(sigma_rules: SigmaCollection):
+def test_unsupported_line_filter_custom_log_source_pipeline(
+    sigma_rules: SigmaCollection,
+):
     pipeline = ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
         priority=20,
@@ -674,7 +716,10 @@ def test_unsupported_filter_custom_log_source_pipeline(sigma_rules: SigmaCollect
     except Exception as e:
         raised_error = True
         assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
-        assert "only supports: string values, field references and regular expressions" in str(e)
+        assert (
+            "only supports: string values, field references and regular expressions"
+            in str(e)
+        )
     assert raised_error
 
 

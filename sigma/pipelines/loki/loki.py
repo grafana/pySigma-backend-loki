@@ -165,8 +165,12 @@ class CustomLogSourceTransformation(Transformation):
                     values = []
                     negated = None
                     for item in rule_conditions:
-                        if item.field == value.field and isinstance(
-                            item.value, (SigmaString, SigmaRegularExpression)
+                        if (
+                            isinstance(item, ConditionFieldEqualsValueExpression)
+                            and item.field == value.field
+                            and isinstance(
+                                item.value, (SigmaString, SigmaRegularExpression)
+                            )
                         ):
                             classes = item.parent_chain_condition_classes()
                             new_negated = count_negated(classes) % 2 == 1
