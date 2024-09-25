@@ -38,8 +38,10 @@ correlation:
 """
     )
     queries = loki_backend.convert(rules)
-    assert queries == ['count without (fieldB) (sum by (fieldB) (count_over_time({job=~".+"} | '
-                       'logfmt | fieldA=~`(?i)^valueA$` [30s]))) == 42']
+    assert queries == [
+        'count without (fieldB) (sum by (fieldB) (count_over_time({job=~".+"} | '
+        "logfmt | fieldA=~`(?i)^valueA$` [30s]))) == 42"
+    ]
 
 
 def test_loki_default_value_count_single_group(loki_backend: LogQLBackend):
@@ -71,8 +73,10 @@ correlation:
 """
     )
     queries = loki_backend.convert(rules)
-    assert queries == ['count without (fieldC) (sum by (fieldB, fieldC) (count_over_time('
-                       '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [5m]))) >= 1']
+    assert queries == [
+        "count without (fieldC) (sum by (fieldB, fieldC) (count_over_time("
+        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [5m]))) >= 1'
+    ]
 
 
 def test_loki_default_value_count_multiple_fields(loki_backend: LogQLBackend):
@@ -105,8 +109,10 @@ correlation:
 """
     )
     queries = loki_backend.convert(rules)
-    assert queries == ['count without (fieldD) (sum by (fieldB, fieldC, fieldD) (count_over_time('
-                       '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [1d]))) < 100']
+    assert queries == [
+        "count without (fieldD) (sum by (fieldB, fieldC, fieldD) (count_over_time("
+        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [1d]))) < 100'
+    ]
 
 
 def test_loki_okta_country_count():
@@ -154,9 +160,11 @@ level: high
     )
     loki_backend = LogQLBackend(processing_pipeline=pipeline)
     queries = loki_backend.convert(rules)
-    assert queries == ['count without (event_client_geographicalContext_country) '
-                       '(sum by (event_actor_alternateId, '
-                       'event_client_geographicalContext_country) '
-                       '(count_over_time({job=~".+"} | json | event_actor_alternateId!="" and '
-                       'event_client_geographicalContext_country!="" [1h]))) '
-                       '> 1']
+    assert queries == [
+        "count without (event_client_geographicalContext_country) "
+        "(sum by (event_actor_alternateId, "
+        "event_client_geographicalContext_country) "
+        '(count_over_time({job=~".+"} | json | event_actor_alternateId!="" and '
+        'event_client_geographicalContext_country!="" [1h]))) '
+        "> 1"
+    ]

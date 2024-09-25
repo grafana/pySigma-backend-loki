@@ -37,8 +37,10 @@ correlation:
 """
     )
     queries = loki_backend.convert(rules)
-    assert queries == ['sum(count_over_time({job=~".+"} | logfmt | '
-                       'fieldA=~`(?i)^valueA$` [30s])) == 42']
+    assert queries == [
+        'sum(count_over_time({job=~".+"} | logfmt | '
+        "fieldA=~`(?i)^valueA$` [30s])) == 42"
+    ]
 
 
 def test_loki_default_event_count_single_field(loki_backend: LogQLBackend):
@@ -69,8 +71,10 @@ correlation:
 """
     )
     queries = loki_backend.convert(rules)
-    assert queries == ['sum by (fieldB) (count_over_time({job=~".+"} | logfmt | '
-                       'fieldA=~`(?i)^valueA$` [5m])) >= 1']
+    assert queries == [
+        'sum by (fieldB) (count_over_time({job=~".+"} | logfmt | '
+        "fieldA=~`(?i)^valueA$` [5m])) >= 1"
+    ]
 
 
 def test_loki_default_event_count_multiple_fields(loki_backend: LogQLBackend):
@@ -102,8 +106,10 @@ correlation:
 """
     )
     queries = loki_backend.convert(rules)
-    assert queries == ['sum by (fieldB, fieldC) (count_over_time({job=~".+"} | logfmt | '
-                       'fieldA=~`(?i)^valueA$` [1d])) < 100']
+    assert queries == [
+        'sum by (fieldB, fieldC) (count_over_time({job=~".+"} | logfmt | '
+        "fieldA=~`(?i)^valueA$` [1d])) < 100"
+    ]
 
 
 def test_loki_default_event_count_field_mapping(loki_backend: LogQLBackend):
@@ -150,5 +156,7 @@ correlation:
     )
     loki_backend = LogQLBackend(processing_pipeline=pipeline)
     queries = loki_backend.convert(rules)
-    assert queries == ['sum by (fieldC) (count_over_time({job=~".+"} | logfmt | '
-                       'fieldA=~`(?i)^valueA$` and fieldC=~`(?i).*valueB.*` [36h])) <= 5000']
+    assert queries == [
+        'sum by (fieldC) (count_over_time({job=~".+"} | logfmt | '
+        "fieldA=~`(?i)^valueA$` and fieldC=~`(?i).*valueB.*` [36h])) <= 5000"
+    ]
