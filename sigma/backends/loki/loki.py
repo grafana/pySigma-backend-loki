@@ -764,7 +764,7 @@ class LogQLBackend(TextQueryBackend):
                         ]
                         if candidate_lfs and candidate_lfs[0] is not None:
                             value, negated, def_type = candidate_lfs[0]
-                            line_filter = None
+                            line_filter: Optional[DeferredQueryExpression] = None
                             if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
                                     states[index],
