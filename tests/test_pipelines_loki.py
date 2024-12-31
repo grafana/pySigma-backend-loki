@@ -807,3 +807,55 @@ correlation:
         updated_rule.custom_attributes["logsource_loki_selection"]
         == "{job=`mylogs`,filename=~`.*[\\d]+.log$`}"
     )
+
+def test_set_custom_log_source_correlation_rule():
+    """
+    Test that the custom attribute transformation can be applied to a correlation rule.
+    """
+    sigma_rules = SigmaCollection.from_yaml(
+        """
+title: Test
+name: failed_login
+status: test
+logsource:
+    product: okta
+    service: okta
+detection:
+    sel:
+        legacyeventtype: 'core.user_auth.login_failed'
+        displaymessage: 'Failed login to Okta'
+    condition: sel
+---
+title: Valid correlation
+status: test
+correlation:
+    type: event_count
+    rules: failed_login
+    group-by: actor.alternateid
+    timespan: 10m
+    condition:
+        gte: 10
+        """
+    )
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="set_loki_custom_logsource_selection",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "name": "okta-logs",
+                        "eventType|fieldref": "legacyeventtype",
+                    }
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    loki_rule = backend.convert(sigma_rules)
+    assert len(loki_rule) == 1
+    query = loki_rule[0]
+    assert query.startswith("sum by (actor_alternateid)")
+    assert "name=`okta-logs`" in query
+    assert "eventType=`core.user_auth.login_failed`" in query
