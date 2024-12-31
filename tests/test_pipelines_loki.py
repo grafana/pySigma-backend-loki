@@ -817,7 +817,7 @@ correlation:
 
 def test_set_custom_log_source_correlation_rule():
     """
-    Test that the custom attribute transformation can be applied to a correlation rule.
+    Test that the custom log source transformation can be applied to a correlation rule.
     """
     sigma_rules = SigmaCollection.from_yaml(
         """
