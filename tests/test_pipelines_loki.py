@@ -3,7 +3,6 @@ from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
-from sigma.correlations import SigmaCorrelationRule
 from sigma.processing.transformations import transformations, FieldMappingTransformation
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
@@ -772,8 +771,20 @@ def test_set_custom_attribute_correlation_rule():
     """
     Test that the custom attribute transformation can be applied to a correlation rule.
     """
-    rule = SigmaCorrelationRule.from_yaml(
+    sigma_rules = SigmaCollection.from_yaml(
         """
+title: Test
+name: failed_login
+status: test
+logsource:
+    product: okta
+    service: okta
+detection:
+    sel:
+        legacyeventtype: 'core.user_auth.login_failed'
+        displaymessage: 'Failed login to Okta'
+    condition: sel
+---
 title: Valid correlation
 status: test
 correlation:
@@ -798,15 +809,11 @@ correlation:
             )
         ],
     )
-    # FIXME: once the LogQL backend supports correlation rules, it'd be better to test this properly
-    #       with a conversion
-    assert "logsource_loki_selection" not in rule.custom_attributes
-    updated_rule = pipeline.apply(rule)
-    assert "logsource_loki_selection" in updated_rule.custom_attributes
-    assert (
-        updated_rule.custom_attributes["logsource_loki_selection"]
-        == "{job=`mylogs`,filename=~`.*[\\d]+.log$`}"
-    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    loki_rule = backend.convert(sigma_rules)
+    assert len(loki_rule) == 1
+    assert "job=`mylogs`" in loki_rule[0]
+    assert "filename=~`.*[\d]+.log$`" in loki_rule[0]
 
 def test_set_custom_log_source_correlation_rule():
     """
@@ -855,7 +862,6 @@ correlation:
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
     assert len(loki_rule) == 1
-    query = loki_rule[0]
-    assert query.startswith("sum by (actor_alternateid)")
-    assert "name=`okta-logs`" in query
-    assert "eventType=`core.user_auth.login_failed`" in query
+    assert loki_rule[0].startswith("sum by (actor_alternateid)")
+    assert "name=`okta-logs`" in loki_rule[0]
+    assert "eventType=`core.user_auth.login_failed`" in loki_rule[0]
