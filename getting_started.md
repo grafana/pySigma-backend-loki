@@ -23,7 +23,7 @@ This guide assumes you have:
 
 1. Ensure you have the following installed:
    * Git
-   * [Python 3](https://wiki.python.org/moin/BeginnersGuide/Download) (3.8 or newer, check with `python --version`)
+   * [Python 3](https://wiki.python.org/moin/BeginnersGuide/Download) (3.9 or newer, check with `python --version`)
 2. Use git to clone the Grafana Loki version of sigma-cli:
 ```
 git clone https://github.com/grafana/sigma-cli.git
