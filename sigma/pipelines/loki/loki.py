@@ -217,9 +217,8 @@ class CustomLogSourceTransformation(Transformation):
             ] = formatted_selectors
             super().apply(pipeline, rule)
         else:
-            raise SigmaFeatureNotSupportedByBackendError(
-                "custom log source transforms are not supported for Correlation rules"
-            )
+            for ruleref in rule.rules:
+                self.apply(pipeline, ruleref.rule)
 
 
 # Update pySigma transformations to include the above

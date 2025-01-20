@@ -764,7 +764,7 @@ class LogQLBackend(TextQueryBackend):
                         ]
                         if candidate_lfs and candidate_lfs[0] is not None:
                             value, negated, def_type = candidate_lfs[0]
-                            line_filter: DeferredQueryExpression
+                            line_filter: Optional[DeferredQueryExpression] = None
                             if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
                                     states[index],
@@ -1132,75 +1132,68 @@ class LogQLBackend(TextQueryBackend):
     ) -> Union[str, DeferredQueryExpression]:
         """Complete the conversion of the query, selecting an appropriate log parser if necessary,
         and pre-pending deferred line filters."""
-        if isinstance(rule, SigmaRule):
-            # selecting an appropriate log parser to use
-            log_parser = str(self.select_log_parser(rule))
-            query_log_parser = (
-                f"{'| ' if not log_parser.lstrip().startswith('|') else ''}{log_parser}"
-                f"{' |' if not log_parser.rstrip().endswith('|') else ''}"
-            )
-            if isinstance(query, DeferredQueryExpression):
-                query = self.deferred_only_query
-            elif query is not None and len(query) > 0:
-                query = f"{query_log_parser} {query}"
-            elif query is None:
-                query = ""
-            if state.has_deferred():
-                standard_deferred = [
-                    expression.finalize_expression()
-                    for expression in state.deferred
-                    if not isinstance(
-                        expression,
-                        (
-                            LogQLDeferredFieldRefExpression,
-                            LogQLDeferredFieldRefFilterExpression,
-                        ),
-                    )
-                ]
-                field_refs = [
-                    expression.finalize_expression()
-                    for expression in state.deferred
-                    if isinstance(expression, LogQLDeferredFieldRefExpression)
-                ]
-                field_ref_filters = [
-                    expression.finalize_expression()
-                    for expression in state.deferred
-                    if isinstance(expression, LogQLDeferredFieldRefFilterExpression)
-                ]
-                field_ref_expression = ""
-                field_ref_filters_expression = ""
-                if len(field_refs) > 0:
-                    label_fmt = ",".join(field_refs)
-                    field_ref_expression = (
-                        "| " if len(query) > 0 else f"{query_log_parser} "
-                    ) + f"label_format {label_fmt}"
-                    filter_fmt = " " + self.and_token + " "
-                    field_ref_filters_expression = (
-                        f" | {filter_fmt.join(field_ref_filters)}"
-                    )
+        # selecting an appropriate log parser to use
+        log_parser = str(self.select_log_parser(rule))
+        query_log_parser = (
+            f"{'| ' if not log_parser.lstrip().startswith('|') else ''}{log_parser}"
+            f"{' |' if not log_parser.rstrip().endswith('|') else ''}"
+        )
+        if isinstance(query, DeferredQueryExpression):
+            query = self.deferred_only_query
+        elif query is not None and len(query) > 0:
+            query = f"{query_log_parser} {query}"
+        elif query is None:
+            query = ""
+        if state.has_deferred():
+            standard_deferred = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if not isinstance(
+                    expression,
+                    (
+                        LogQLDeferredFieldRefExpression,
+                        LogQLDeferredFieldRefFilterExpression,
+                    ),
+                )
+            ]
+            field_refs = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if isinstance(expression, LogQLDeferredFieldRefExpression)
+            ]
+            field_ref_filters = [
+                expression.finalize_expression()
+                for expression in state.deferred
+                if isinstance(expression, LogQLDeferredFieldRefFilterExpression)
+            ]
+            field_ref_expression = ""
+            field_ref_filters_expression = ""
+            if len(field_refs) > 0:
+                label_fmt = ",".join(field_refs)
+                field_ref_expression = (
+                    "| " if len(query) > 0 else f"{query_log_parser} "
+                ) + f"label_format {label_fmt}"
+                filter_fmt = " " + self.and_token + " "
+                field_ref_filters_expression = (
+                    f" | {filter_fmt.join(field_ref_filters)}"
+                )
 
-                query = (
-                    self.deferred_separator.join(standard_deferred)
-                    + (" " + query if len(query) > 0 else "")
-                    + field_ref_expression
-                    + field_ref_filters_expression
-                )
-                # Since we've already processed the deferred parts, we can clear them
-                state.deferred.clear()
-            if rule.fields and len(rule.fields) > 0:
-                line_fmt_fields = " ".join(
-                    "{{." + sanitize_label_key(field) + "}}" for field in rule.fields
-                )
-                query = query + f' | line_format "{line_fmt_fields}"'
-            # Select an appropriate source based on the logsource
-            query = self.select_log_stream(rule) + " " + query
-            return super().finalize_query(rule, query, index, state, output_format)
-        elif isinstance(rule, SigmaCorrelationRule):
-            return super().finalize_query(rule, query, index, state, output_format)
-        else:
-            raise NotImplementedError(
-                "Rule type is not supported by backend."
+            query = (
+                self.deferred_separator.join(standard_deferred)
+                + (" " + query if len(query) > 0 else "")
+                + field_ref_expression
+                + field_ref_filters_expression
             )
+            # Since we've already processed the deferred parts, we can clear them
+            state.deferred.clear()
+        if rule.fields and len(rule.fields) > 0:
+            line_fmt_fields = " ".join(
+                "{{." + sanitize_label_key(field) + "}}" for field in rule.fields
+            )
+            query = query + f' | line_format "{line_fmt_fields}"'
+        # Select an appropriate source based on the logsource
+        query = self.select_log_stream(rule) + " " + query
+        return super().finalize_query(rule, query, index, state, output_format)
 
     def finalize_query_default(
         self, rule: SigmaRule, query: str, index: int, state: ConversionState
