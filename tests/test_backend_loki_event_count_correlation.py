@@ -160,3 +160,35 @@ correlation:
         'sum by (fieldC) (count_over_time({job=~".+"} | logfmt | '
         "fieldA=~`(?i)^valueA$` and fieldC=~`(?i).*valueB.*` [36h])) <= 5000"
     ]
+
+
+def test_loki_default_event_count_log_source(loki_backend: LogQLBackend):
+    rules = SigmaCollection.from_yaml(
+        """
+title: Test Rule
+name: test_rule
+status: test
+logsource:
+    category: network_connection
+    product: windows
+detection:
+    sel:
+        fieldA: valueA
+    condition: sel
+---
+title: Test Correlation
+status: test
+correlation:
+    type: event_count
+    rules:
+        - test_rule
+    timespan: 1d
+    condition:
+        gte: 100
+"""
+    )
+    queries = loki_backend.convert(rules)
+    assert queries == [
+        'sum(count_over_time({job=~"eventlog|winlog|windows|fluentbit.*"} | json | '
+        "fieldA=~`(?i)^valueA$` [1d])) >= 100"
+    ]

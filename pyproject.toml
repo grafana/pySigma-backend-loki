@@ -12,8 +12,8 @@ repository = "https://github.com/grafana/pySigma-backend-loki"
 packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
-python = "^3.8"
-pysigma = "0.11.14"
+python = "^3.9"
+pysigma = "^0.11.19"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.6.1"
