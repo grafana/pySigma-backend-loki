@@ -24,15 +24,10 @@ This guide assumes you have:
 1. Ensure you have the following installed:
    * Git
    * [Python 3](https://wiki.python.org/moin/BeginnersGuide/Download) (3.9 or newer, check with `python --version`)
-2. Use git to clone the Grafana Loki version of sigma-cli:
+2. Install the Sigma command line tool, e.g., by [following these instructions](https://sigmahq.io/docs/guide/getting-started.html)
+3. Once installed, install the Loki backend:
 ```
-git clone https://github.com/grafana/sigma-cli.git
-```
-3. Install sigma-cli:
-```
-cd sigma-cli
-python -m pip install poetry
-poetry install
+sigma plugin install loki
 ```
 
 ## Rule conversion - queries

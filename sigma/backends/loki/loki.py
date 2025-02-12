@@ -561,7 +561,7 @@ class LogQLBackend(TextQueryBackend):
             return None
         matcher = None
         match = None
-        value = None
+        value: Optional[str] = None
         # Finding the longest common substring of a list of strings, by repeatedly
         # calling SequenceMatcher's find_longest_match. The 1st candidate is cached
         # in the 2nd sequence (b), then following candidates are set as the 1st
@@ -569,11 +569,12 @@ class LogQLBackend(TextQueryBackend):
         # reducing the search region of b based on the previous match.
         # See: https://docs.python.org/3/library/difflib.html#difflib.SequenceMatcher
         for cand in candidates:
-            if matcher is None:
+            if cand is None:
+                return None  # prior check should have caught this, but double checking
+            if matcher is None or value is None:
                 # First iteration: initialise sequence matcher with the first
                 # candidate as sequence 2
-                # mypy doesn't spot that the previous check will prevent cand = None
-                value = cand.value  # type: ignore
+                value = cand.value
                 matcher = SequenceMatcher(None, b=value)
             else:
                 # Subsequent iterations: use the current candidate as sequence 1
@@ -587,7 +588,7 @@ class LogQLBackend(TextQueryBackend):
                 # between all of the candidates found using this greedy strategy
                 if match.size == 0:
                     return None
-        if matcher and match:
+        if matcher and match and value:
             start = match.b
             end = match.b + match.size
             return LogQLLineFilterInfo(
