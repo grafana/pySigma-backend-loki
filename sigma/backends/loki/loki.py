@@ -1,7 +1,6 @@
 import copy
 import math
 import re
-from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import Enum, auto
 from typing import (
@@ -32,6 +31,16 @@ from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
+
+from sigma.backends.loki.deferred import (
+    LogQLDeferredType,
+    LogQLDeferredUnboundStrExpression,
+    LogQLDeferredUnboundCIDRExpression,
+    LogQLDeferredUnboundRegexpExpression,
+    LogQLDeferredOrUnboundExpression,
+    LogQLDeferredLabelFormatExpression,
+    LogQLDeferredLabelFilterExpression,
+)
 from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
@@ -46,6 +55,8 @@ from sigma.types import (
     SigmaNull,
     SigmaNumber,
     SigmaFieldReference,
+    TimestampPart,
+    SigmaTimestampPart,
 )
 from warnings import warn
 from yaml import dump
@@ -53,7 +64,6 @@ from yaml import dump
 from sigma.shared import (
     sanitize_label_key,
     quote_string_value,
-    join_or_values_re,
     escape_and_quote_re,
     convert_str_to_re,
 )
@@ -83,111 +93,6 @@ class LogQLLogParser(
 
     def __str__(self):
         return self.value
-
-
-class LogQLDeferredType:
-    """The different types of deferred expressions that can be created by this backend"""
-
-    STR = auto()
-    CIDR = auto()
-    REGEXP = auto()
-    OR_STR = auto()
-    FIELD_REF = auto()
-
-
-@dataclass
-class LogQLDeferredUnboundStrExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
-
-    value: str
-    op: str = "|="  # default to matching
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        return f"{self.op} {self.value}"
-
-
-@dataclass
-class LogQLDeferredUnboundCIDRExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching of CIDR to pipelined command **BEFORE** main search expression."""
-
-    ip: str
-    op: str = "|="  # default to matching
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        return f'{self.op} ip("{self.ip}")'
-
-
-@dataclass
-class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching of regex to pipelined command **BEFORE** main search
-    expression."""
-
-    regexp: str
-    op: str = "|~"  # default to matching
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        if "`" in self.regexp:
-            value = '"' + SigmaRegularExpression(self.regexp).escape(('"',)) + '"'
-        else:
-            value = "`" + self.regexp + "`"
-        return f"{self.op} {value}"
-
-
-@dataclass
-class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
-    """'Defer' unbounded OR matching to pipelined command **BEFORE** main search expression."""
-
-    exprs: List[Union[SigmaString, SigmaRegularExpression]]
-    op: str = "|~"  # default to matching
-    case_insensitive: bool = True
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        return f"{self.op} {join_or_values_re(self.exprs, self.case_insensitive)}"
-
-
-@dataclass
-class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
-    """'Defer' field reference matching to pipelined command **AFTER** main search expression."""
-
-    field: str
-    value: str
-    field_tracker: int
-
-    def finalize_expression(self) -> str:
-        return f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
-
-
-@dataclass
-class LogQLDeferredFieldRefFilterExpression(DeferredQueryExpression):
-    """
-    'Defer' field reference matching to after the label_format expressions
-    """
-
-    field_tracker: int
-    op = "true"
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = "false"
-        return self
-
-    def finalize_expression(self) -> str:
-        return f"match_{self.field_tracker}=`{self.op}`"
 
 
 LogQLLineFilterInfo = NamedTuple(
@@ -235,13 +140,6 @@ class LogQLBackend(TextQueryBackend):
     anchor_replace_pattern: ClassVar[Pattern] = re.compile(
         "^(?P<ext>\\(\\?[^)]\\))?(?P<start>\\^)?(?P<body>.*?)(?P<end>\\$)?$"
     )
-
-    negated_line_filter_operator: ClassVar[Dict[str, str]] = {
-        "|=": "!=",
-        "!=": "|=",
-        "|~": "!~",
-        "!~": "|~",
-    }
 
     current_templates: ClassVar[Union[bool, None]] = None
     # Leave this to be set by the below function
@@ -354,13 +252,21 @@ class LogQLBackend(TextQueryBackend):
     value_count_condition_expression = {
         "default": "{op} {count}",
     }
+    # Taken from https://pkg.go.dev/time#pkg-constants
+    timestamp_part_mapping = {
+        TimestampPart.MINUTE: "04",
+        TimestampPart.HOUR: "15",
+        TimestampPart.DAY: "02",
+        TimestampPart.MONTH: "01",
+        TimestampPart.YEAR: "2006",
+    }
 
     # Loki-specific functionality
     add_line_filters: bool = False
     case_sensitive: bool = False
 
     # Field Ref Match Tracker
-    field_ref_tracker: int = 0
+    label_tracker: int = 0
 
     def __init__(
         self,
@@ -943,19 +849,52 @@ class LogQLBackend(TextQueryBackend):
                 field1, field2 = self.convert_condition_field_eq_field_escape_and_quote(
                     cond.field, cond.value.field
                 )
+                label = f"match_{self.label_tracker}"
                 # This gets added by the base class to the state, so we don't need
                 # to return this here, see __post_init__()
-                LogQLDeferredFieldRefExpression(
-                    state, field1, field2, self.field_ref_tracker
+                LogQLDeferredLabelFormatExpression(
+                    state,
+                    label,
+                    f"{{{{ if eq .{field1} .{field2} }}}}true{{{{ else }}}}false{{{{ end }}}}",
                 )
-                expr = LogQLDeferredFieldRefFilterExpression(
-                    state, self.field_ref_tracker
+                expr = LogQLDeferredLabelFilterExpression(
+                    state,
+                    label,
+                    "=",
+                    "true",
                 )
                 if getattr(cond, "negated", False):
                     expr.negate()
-                self.field_ref_tracker += 1
+                self.label_tracker += 1
 
                 return expr
+        return ""
+
+    def convert_condition_field_eq_val_timestamp_part(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Any:
+        """Return unsupported for week timestamp part, otherwise use deferred label format and filter"""
+        if isinstance(cond.value, SigmaTimestampPart):
+            if cond.value.timestamp_part == TimestampPart.WEEK:
+                raise SigmaFeatureNotSupportedByBackendError(
+                    "Field equals week value expressions are not supported by the backend"
+                )
+            field = self.escape_and_quote_field(cond.field)
+            timestamp_part = self.timestamp_part_mapping[cond.value.timestamp_part]
+            label = f"date_{self.label_tracker}"
+            # This gets added by the base class to the state, so we don't need
+            # to return this here, see __post_init__()
+            LogQLDeferredLabelFormatExpression(
+                state, label, f'{{{{ date "{timestamp_part}" (unixToTime .{field}) }}}}'
+            )
+            expr = LogQLDeferredLabelFilterExpression(
+                state, label, value=str(cond.value)
+            )
+            if getattr(cond, "negated", False):
+                expr.negate()
+            self.label_tracker += 1
+
+            return expr
         return ""
 
     def convert_condition_field_eq_val(
@@ -1153,31 +1092,31 @@ class LogQLBackend(TextQueryBackend):
                     if not isinstance(
                         expression,
                         (
-                            LogQLDeferredFieldRefExpression,
-                            LogQLDeferredFieldRefFilterExpression,
+                            LogQLDeferredLabelFormatExpression,
+                            LogQLDeferredLabelFilterExpression,
                         ),
                     )
                 ]
-                field_refs = [
+                label_formats = [
                     expression.finalize_expression()
                     for expression in state.deferred
-                    if isinstance(expression, LogQLDeferredFieldRefExpression)
+                    if isinstance(expression, LogQLDeferredLabelFormatExpression)
                 ]
-                field_ref_filters = [
+                label_field_filters = [
                     expression.finalize_expression()
                     for expression in state.deferred
-                    if isinstance(expression, LogQLDeferredFieldRefFilterExpression)
+                    if isinstance(expression, LogQLDeferredLabelFilterExpression)
                 ]
                 field_ref_expression = ""
                 field_ref_filters_expression = ""
-                if len(field_refs) > 0:
-                    label_fmt = ",".join(field_refs)
+                if len(label_formats) > 0:
+                    label_fmt = ",".join(label_formats)
                     field_ref_expression = (
                         "| " if len(query) > 0 else f"{query_log_parser} "
                     ) + f"label_format {label_fmt}"
                     filter_fmt = " " + self.and_token + " "
                     field_ref_filters_expression = (
-                        f" | {filter_fmt.join(field_ref_filters)}"
+                        f" | {filter_fmt.join(label_field_filters)}"
                     )
 
                 query = (

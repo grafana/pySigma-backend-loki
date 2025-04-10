@@ -126,7 +126,7 @@ def test_loki_field_ref_negated(loki_backend: LogQLBackend):
             )
         )
         == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1=`false`'
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1!=`true`'
         ]
     )
 

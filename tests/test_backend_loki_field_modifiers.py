@@ -56,10 +56,42 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "gte": (1, "fieldA>=1"),
     "fieldref": (
         "fieldA",
-        "label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`"
-        " | match_0=`true`",
+        'label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`,'
+        'match_1=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`'
+        ' | match_0=`true` and match_1!=`true`',
     ),
     "expand": ('"%test%"', "fieldA=~`(?i)^valueA$`"),
+    "minute": (
+        1,
+        'label_format date_0=`{{ date "04" (unixToTime .fieldA) }}`,'
+        'date_1=`{{ date "04" (unixToTime .fieldA) }}`'
+        ' | date_0=`1` and date_1!=`1`',
+    ),
+    "hour": (
+        1,
+        'label_format date_0=`{{ date "15" (unixToTime .fieldA) }}`,'
+        'date_1=`{{ date "15" (unixToTime .fieldA) }}`'
+        ' | date_0=`1` and date_1!=`1`',
+    ),
+    "day": (
+        1,
+        'label_format date_0=`{{ date "02" (unixToTime .fieldA) }}`,'
+        'date_1=`{{ date "02" (unixToTime .fieldA) }}`'
+        ' | date_0=`1` and date_1!=`1`',
+    ),
+    "week": (1, "---"),  # Unsupported by the datetime layout
+    "month": (
+        1,
+        'label_format date_0=`{{ date "01" (unixToTime .fieldA) }}`,'
+        'date_1=`{{ date "01" (unixToTime .fieldA) }}`'
+        ' | date_0=`1` and date_1!=`1`',
+    ),
+    "year": (
+        1,
+        'label_format date_0=`{{ date "2006" (unixToTime .fieldA) }}`,'
+        'date_1=`{{ date "2006" (unixToTime .fieldA) }}`'
+        ' | date_0=`1` and date_1!=`1`',
+    ),
 }
 
 
@@ -76,7 +108,9 @@ def generate_rule_with_field_modifier(
     detection:
         selection:
             fieldA|{modifier}: {value[0]}
-        condition: selection
+        neg:
+            fieldA|{modifier}: {value[0]}
+        condition: selection or not neg
     """
     # Ignorecase modifier is a special case of the regex (re) modifier.
     if modifier in ["i", "ignorecase"]:
