@@ -5,7 +5,11 @@ from typing import List, Union
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.types import SigmaRegularExpression, SigmaString
 
-from sigma.shared import join_or_values_re, negated_line_filter_operator
+from sigma.shared import (
+    join_or_values_re,
+    negated_line_filter_operator,
+    negated_label_filter_operator,
+)
 
 
 class LogQLDeferredType:
@@ -85,29 +89,29 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
 
 
 @dataclass
-class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
+class LogQLDeferredLabelFormatExpression(DeferredQueryExpression):
     """'Defer' field reference matching to pipelined command **AFTER** main search expression."""
 
-    field: str
-    value: str
-    field_tracker: int
+    label: str
+    template: str
 
     def finalize_expression(self) -> str:
-        return f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
+        return f"{self.label}=`{self.template}`"
 
 
 @dataclass
-class LogQLDeferredFieldRefFilterExpression(DeferredQueryExpression):
+class LogQLDeferredLabelFilterExpression(DeferredQueryExpression):
     """
-    'Defer' field reference matching to after the label_format expressions
+    'Defer' generated label matching to after the label_format expressions
     """
 
-    field_tracker: int
-    op = "true"
+    field: str
+    op: str = "="
+    value: str = "true"
 
     def negate(self) -> DeferredQueryExpression:
-        self.op = "false"
+        self.op = negated_label_filter_operator[self.op]
         return self
 
     def finalize_expression(self) -> str:
-        return f"match_{self.field_tracker}=`{self.op}`"
+        return f"{self.field}{self.op}`{self.value}`"

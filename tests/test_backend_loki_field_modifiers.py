@@ -60,6 +60,27 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
         " | match_0=`true`",
     ),
     "expand": ('"%test%"', "fieldA=~`(?i)^valueA$`"),
+    "minute": (
+        1,
+        'label_format date_0=`{{ date "04" (unixToTime .fieldA) }}` | date_0=`1`',
+    ),
+    "hour": (
+        1,
+        'label_format date_0=`{{ date "15" (unixToTime .fieldA) }}` | date_0=`1`',
+    ),
+    "day": (
+        1,
+        'label_format date_0=`{{ date "02" (unixToTime .fieldA) }}` | date_0=`1`',
+    ),
+    "week": (1, "---"),  # Unsupported by the datetime layout
+    "month": (
+        1,
+        'label_format date_0=`{{ date "01" (unixToTime .fieldA) }}` | date_0=`1`',
+    ),
+    "year": (
+        1,
+        'label_format date_0=`{{ date "2006" (unixToTime .fieldA) }}` | date_0=`1`',
+    ),
 }
 
 

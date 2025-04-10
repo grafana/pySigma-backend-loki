@@ -815,6 +815,7 @@ correlation:
     assert "job=`mylogs`" in loki_rule[0]
     assert "filename=~`.*[\d]+.log$`" in loki_rule[0]
 
+
 def test_set_custom_log_source_correlation_rule():
     """
     Test that the custom log source transformation can be applied to a correlation rule.

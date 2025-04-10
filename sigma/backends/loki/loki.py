@@ -32,10 +32,15 @@ from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 
-from sigma.backends.loki.deferred import LogQLDeferredType, LogQLDeferredUnboundStrExpression, \
-    LogQLDeferredUnboundCIDRExpression, LogQLDeferredUnboundRegexpExpression, \
-    LogQLDeferredOrUnboundExpression, LogQLDeferredFieldRefExpression, \
-    LogQLDeferredFieldRefFilterExpression
+from sigma.backends.loki.deferred import (
+    LogQLDeferredType,
+    LogQLDeferredUnboundStrExpression,
+    LogQLDeferredUnboundCIDRExpression,
+    LogQLDeferredUnboundRegexpExpression,
+    LogQLDeferredOrUnboundExpression,
+    LogQLDeferredLabelFormatExpression,
+    LogQLDeferredLabelFilterExpression,
+)
 from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
@@ -50,6 +55,8 @@ from sigma.types import (
     SigmaNull,
     SigmaNumber,
     SigmaFieldReference,
+    TimestampPart,
+    SigmaTimestampPart,
 )
 from warnings import warn
 from yaml import dump
@@ -245,13 +252,21 @@ class LogQLBackend(TextQueryBackend):
     value_count_condition_expression = {
         "default": "{op} {count}",
     }
+    # field_timestamp_part_expression = 'label_format extracted_date=`{{{{ date "{timestamp_part}" (unixToTime .{field}) }}}}` | extracted_date'
+    timestamp_part_mapping = {
+        TimestampPart.MINUTE: "04",
+        TimestampPart.HOUR: "15",
+        TimestampPart.DAY: "02",
+        TimestampPart.MONTH: "01",
+        TimestampPart.YEAR: "2006",
+    }
 
     # Loki-specific functionality
     add_line_filters: bool = False
     case_sensitive: bool = False
 
     # Field Ref Match Tracker
-    field_ref_tracker: int = 0
+    label_tracker: int = 0
 
     def __init__(
         self,
@@ -442,9 +457,9 @@ class LogQLBackend(TextQueryBackend):
         # will necessarily catch all arguments and we must return no filter
         any_issues = any(
             (
-                    cand is None
-                    or getattr(cand, "negated", False)
-                    or cand.deftype is not LogQLDeferredType.STR
+                cand is None
+                or getattr(cand, "negated", False)
+                or cand.deftype is not LogQLDeferredType.STR
             )
             for cand in candidates
         )
@@ -834,20 +849,53 @@ class LogQLBackend(TextQueryBackend):
                 field1, field2 = self.convert_condition_field_eq_field_escape_and_quote(
                     cond.field, cond.value.field
                 )
+                label = f"match_{self.label_tracker}"
                 # This gets added by the base class to the state, so we don't need
                 # to return this here, see __post_init__()
-                LogQLDeferredFieldRefExpression(
-                    state, field1, field2, self.field_ref_tracker
+                LogQLDeferredLabelFormatExpression(
+                    state,
+                    label,
+                    f"{{{{ if eq .{field1} .{field2} }}}}true{{{{ else }}}}false{{{{ end }}}}",
                 )
-                expr = LogQLDeferredFieldRefFilterExpression(
-                    state, self.field_ref_tracker
+                expr = LogQLDeferredLabelFilterExpression(
+                    state,
+                    label,
+                    "=",
+                    "true",
                 )
                 if getattr(cond, "negated", False):
                     expr.negate()
-                self.field_ref_tracker += 1
+                self.label_tracker += 1
 
                 return expr
         return ""
+
+    def convert_condition_field_eq_val_timestamp_part(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Any:
+        """Return unsupported for week timestamp part, otherwise use deferred label format and filter"""
+        if isinstance(cond.value, SigmaTimestampPart):
+            if cond.value.timestamp_part == TimestampPart.WEEK:
+                raise SigmaFeatureNotSupportedByBackendError(
+                    "Field equals week value expressions are not supported by the backend"
+                )
+            field = self.escape_and_quote_field(cond.field)
+            timestamp_part = self.timestamp_part_mapping[cond.value.timestamp_part]
+            label = f"date_{self.label_tracker}"
+            # This gets added by the base class to the state, so we don't need
+            # to return this here, see __post_init__()
+            LogQLDeferredLabelFormatExpression(
+                state, label, f'{{{{ date "{timestamp_part}" (unixToTime .{field}) }}}}'
+            )
+            expr = LogQLDeferredLabelFilterExpression(
+                state, label, value=str(cond.value)
+            )
+            if getattr(cond, "negated", False):
+                expr.negate()
+            self.label_tracker += 1
+
+            return expr
+        return None
 
     def convert_condition_field_eq_val(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
@@ -1044,31 +1092,31 @@ class LogQLBackend(TextQueryBackend):
                     if not isinstance(
                         expression,
                         (
-                            LogQLDeferredFieldRefExpression,
-                            LogQLDeferredFieldRefFilterExpression,
+                            LogQLDeferredLabelFormatExpression,
+                            LogQLDeferredLabelFilterExpression,
                         ),
                     )
                 ]
-                field_refs = [
+                label_formats = [
                     expression.finalize_expression()
                     for expression in state.deferred
-                    if isinstance(expression, LogQLDeferredFieldRefExpression)
+                    if isinstance(expression, LogQLDeferredLabelFormatExpression)
                 ]
-                field_ref_filters = [
+                label_field_filters = [
                     expression.finalize_expression()
                     for expression in state.deferred
-                    if isinstance(expression, LogQLDeferredFieldRefFilterExpression)
+                    if isinstance(expression, LogQLDeferredLabelFilterExpression)
                 ]
                 field_ref_expression = ""
                 field_ref_filters_expression = ""
-                if len(field_refs) > 0:
-                    label_fmt = ",".join(field_refs)
+                if len(label_formats) > 0:
+                    label_fmt = ",".join(label_formats)
                     field_ref_expression = (
                         "| " if len(query) > 0 else f"{query_log_parser} "
                     ) + f"label_format {label_fmt}"
                     filter_fmt = " " + self.and_token + " "
                     field_ref_filters_expression = (
-                        f" | {filter_fmt.join(field_ref_filters)}"
+                        f" | {filter_fmt.join(label_field_filters)}"
                     )
 
                 query = (

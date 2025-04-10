@@ -9,11 +9,21 @@ from sigma.types import (
 
 
 negated_line_filter_operator: Dict[str, str] = {
-        "|=": "!=",
-        "!=": "|=",
-        "|~": "!~",
-        "!~": "|~",
-    }
+    "|=": "!=",
+    "!=": "|=",
+    "|~": "!~",
+    "!~": "|~",
+}
+
+negated_label_filter_operator: Dict[str, str] = {
+    "=": "!=",
+    "==": "!=",
+    "!=": "=",
+    ">": "<=",
+    ">=": "<",
+    "<": ">=",
+    "<=": ">",
+}
 
 
 def sanitize_label_key(key: str, isprefix: bool = True) -> str:
