@@ -895,7 +895,7 @@ class LogQLBackend(TextQueryBackend):
             self.label_tracker += 1
 
             return expr
-        return None
+        return ""
 
     def convert_condition_field_eq_val(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
