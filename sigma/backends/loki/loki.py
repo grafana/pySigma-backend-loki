@@ -1,7 +1,6 @@
 import copy
 import math
 import re
-from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import Enum, auto
 from typing import (
@@ -32,6 +31,11 @@ from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
+
+from sigma.backends.loki.deferred import LogQLDeferredType, LogQLDeferredUnboundStrExpression, \
+    LogQLDeferredUnboundCIDRExpression, LogQLDeferredUnboundRegexpExpression, \
+    LogQLDeferredOrUnboundExpression, LogQLDeferredFieldRefExpression, \
+    LogQLDeferredFieldRefFilterExpression
 from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
@@ -53,7 +57,6 @@ from yaml import dump
 from sigma.shared import (
     sanitize_label_key,
     quote_string_value,
-    join_or_values_re,
     escape_and_quote_re,
     convert_str_to_re,
 )
@@ -83,111 +86,6 @@ class LogQLLogParser(
 
     def __str__(self):
         return self.value
-
-
-class LogQLDeferredType:
-    """The different types of deferred expressions that can be created by this backend"""
-
-    STR = auto()
-    CIDR = auto()
-    REGEXP = auto()
-    OR_STR = auto()
-    FIELD_REF = auto()
-
-
-@dataclass
-class LogQLDeferredUnboundStrExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching to pipelined command **BEFORE** main search expression."""
-
-    value: str
-    op: str = "|="  # default to matching
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        return f"{self.op} {self.value}"
-
-
-@dataclass
-class LogQLDeferredUnboundCIDRExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching of CIDR to pipelined command **BEFORE** main search expression."""
-
-    ip: str
-    op: str = "|="  # default to matching
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        return f'{self.op} ip("{self.ip}")'
-
-
-@dataclass
-class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
-    """'Defer' unbounded matching of regex to pipelined command **BEFORE** main search
-    expression."""
-
-    regexp: str
-    op: str = "|~"  # default to matching
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        if "`" in self.regexp:
-            value = '"' + SigmaRegularExpression(self.regexp).escape(('"',)) + '"'
-        else:
-            value = "`" + self.regexp + "`"
-        return f"{self.op} {value}"
-
-
-@dataclass
-class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
-    """'Defer' unbounded OR matching to pipelined command **BEFORE** main search expression."""
-
-    exprs: List[Union[SigmaString, SigmaRegularExpression]]
-    op: str = "|~"  # default to matching
-    case_insensitive: bool = True
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = LogQLBackend.negated_line_filter_operator[self.op]
-        return self
-
-    def finalize_expression(self) -> str:
-        return f"{self.op} {join_or_values_re(self.exprs, self.case_insensitive)}"
-
-
-@dataclass
-class LogQLDeferredFieldRefExpression(DeferredQueryExpression):
-    """'Defer' field reference matching to pipelined command **AFTER** main search expression."""
-
-    field: str
-    value: str
-    field_tracker: int
-
-    def finalize_expression(self) -> str:
-        return f"match_{self.field_tracker}=`{{{{ if eq .{self.field} .{self.value} }}}}true{{{{ else }}}}false{{{{ end }}}}`"
-
-
-@dataclass
-class LogQLDeferredFieldRefFilterExpression(DeferredQueryExpression):
-    """
-    'Defer' field reference matching to after the label_format expressions
-    """
-
-    field_tracker: int
-    op = "true"
-
-    def negate(self) -> DeferredQueryExpression:
-        self.op = "false"
-        return self
-
-    def finalize_expression(self) -> str:
-        return f"match_{self.field_tracker}=`{self.op}`"
 
 
 LogQLLineFilterInfo = NamedTuple(
@@ -235,13 +133,6 @@ class LogQLBackend(TextQueryBackend):
     anchor_replace_pattern: ClassVar[Pattern] = re.compile(
         "^(?P<ext>\\(\\?[^)]\\))?(?P<start>\\^)?(?P<body>.*?)(?P<end>\\$)?$"
     )
-
-    negated_line_filter_operator: ClassVar[Dict[str, str]] = {
-        "|=": "!=",
-        "!=": "|=",
-        "|~": "!~",
-        "!~": "|~",
-    }
 
     current_templates: ClassVar[Union[bool, None]] = None
     # Leave this to be set by the below function
@@ -551,9 +442,9 @@ class LogQLBackend(TextQueryBackend):
         # will necessarily catch all arguments and we must return no filter
         any_issues = any(
             (
-                cand is None
-                or getattr(cand, "negated", False)
-                or cand.deftype is not LogQLDeferredType.STR
+                    cand is None
+                    or getattr(cand, "negated", False)
+                    or cand.deftype is not LogQLDeferredType.STR
             )
             for cand in candidates
         )
