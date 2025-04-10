@@ -252,7 +252,7 @@ class LogQLBackend(TextQueryBackend):
     value_count_condition_expression = {
         "default": "{op} {count}",
     }
-    # field_timestamp_part_expression = 'label_format extracted_date=`{{{{ date "{timestamp_part}" (unixToTime .{field}) }}}}` | extracted_date'
+    # Taken from https://pkg.go.dev/time#pkg-constants
     timestamp_part_mapping = {
         TimestampPart.MINUTE: "04",
         TimestampPart.HOUR: "15",
