@@ -23,7 +23,7 @@ fi
 POETRY_CHANGED_FILES=$(echo "$CHANGED_FILES" | grep --extended-regexp "^(pyproject\.toml|poetry\.lock)$")
 if [ -n "$POETRY_CHANGED_FILES" ]; then
 	check "poetry check"
-	check "poetry lock --check"
+	check "poetry check --lock"
 	check "poetry install"
 fi
 
