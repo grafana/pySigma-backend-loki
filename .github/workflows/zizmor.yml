@@ -1,0 +1,23 @@
+name: Zizmor
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: grafana/shared-workflows/.github/workflows/reusable-zizmor.yml@171f9e59cd7282b7d751d04d626c39e995411a9a
+        with:
+          fail-severity: any
