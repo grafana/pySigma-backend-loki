@@ -1,23 +1,23 @@
-[tool.poetry]
+[project]
 name = "pySigma-backend-loki"
 version = "0.12.3"
 description = "pySigma Loki backend"
-readme = "README.md"
+readme = {file = "README.md", content-type = "text/markdown"}
 authors = [
-    "Nick Moore <nicholas.moore@grafana.com>",
-    "Mostafa Moradian <mostafa.moradian@grafana.com>",
+    {name = "Nick Moore", email = "nicholas.moore@grafana.com"},
+    {name = "Mostafa Moradian", email = "mostafa.moradian@grafana.com"},
 ]
 license = "AGPL-3.0-only"
 repository = "https://github.com/grafana/pySigma-backend-loki"
 packages = [{ include = "sigma" }]
-
-[tool.poetry.dependencies]
-python = "^3.9"
-pysigma = "^0.11.19"
+requires-python = ">=3.9,<4.0"
+dependencies = [
+    "pysigma>0.11.22",
+]
 
 [tool.poetry.group.dev.dependencies]
-coverage = "^7.6.12"
-mypy = { extras = ["faster-cache"], version = "^1.15.0" }
+coverage = "^7.8.2"
+mypy = { extras = ["faster-cache"], version = "^1.16.0" }
 pytest = "^7.4.4"
 pytest-cov = "^4.1.0"
 pytest-mypy = "^0.10.3"
