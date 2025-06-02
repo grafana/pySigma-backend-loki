@@ -1,6 +1,6 @@
 [project]
 name = "pySigma-backend-loki"
-version = "0.12.3"
+version = "0.12.4"
 description = "pySigma Loki backend"
 readme = {file = "README.md", content-type = "text/markdown"}
 authors = [
