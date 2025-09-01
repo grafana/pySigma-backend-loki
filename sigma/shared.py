@@ -112,7 +112,7 @@ def join_or_values_re(
             and case_insensitive
             and not isinstance(val, SigmaCasedString)
         )
-        or (isinstance(val, SigmaRegularExpression) and val.regexp.startswith("(?i)"))
+        or (isinstance(val, SigmaRegularExpression) and str(val.regexp).startswith("(?i)"))
         for val in exprs
     )
     vals = [
