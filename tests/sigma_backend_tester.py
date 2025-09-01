@@ -5,10 +5,12 @@ import os
 import subprocess
 from typing import Any, Dict
 
+from sigma.exceptions import SigmaError
+
 from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.pipelines.loki import loki_grafana_logfmt
-from sigma.rule import SigmaDetection, SigmaError
+from sigma.rule import SigmaDetection
 
 parser = argparse.ArgumentParser(
     description="A script to help test pySigma backends using Sigma signature files",
