@@ -11,6 +11,7 @@ from sigma.conditions import (
     ConditionItem,
     ConditionType,
     ConditionAND,
+    ConditionIdentifier,
 )
 from sigma.types import (
     SigmaString,
@@ -64,7 +65,7 @@ class SetCustomAttributeTransformation(PreprocessingTransformation):
 def traverse_conditions(item: ConditionType):
     queue: List[
         Union[
-            ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression
+            ConditionIdentifier, ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression, None
         ]
     ] = [item]
     while len(queue) > 0:
@@ -98,9 +99,11 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
             fields_set = set()
             args: List[
                 Union[
+                    ConditionIdentifier,
                     ConditionItem,
                     ConditionFieldEqualsValueExpression,
                     ConditionValueExpression,
+                    None
                 ]
             ] = []
             if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
@@ -156,8 +159,8 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
 
                 skip = False
                 rule_conditions = []
-                for conds in rule.detection.parsed_condition:
-                    rule_conditions.extend(traverse_conditions(conds.parsed))  # type: ignore
+                for parsed_conds in rule.detection.parsed_condition:
+                    rule_conditions.extend(traverse_conditions(parsed_conds.parsed)) # type: ignore
 
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
