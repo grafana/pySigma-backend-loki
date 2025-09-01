@@ -29,7 +29,7 @@ from sigma.processing.transformations import (
     transformations,
     Transformation,
     AddFieldnamePrefixTransformation,
-    FieldMappingTransformation,
+    FieldMappingTransformation, PreprocessingTransformation,
 )
 from sigma.shared import (
     sanitize_label_key,
@@ -49,16 +49,16 @@ class LokiCustomAttributes(Enum):
 
 
 @dataclass
-class SetCustomAttributeTransformation(Transformation):
+class SetCustomAttributeTransformation(PreprocessingTransformation):
     """Sets an arbitrary custom attribute on a rule, that will be used during processing."""
 
     attribute: str
     value: Any
 
     def apply(
-        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+        self, rule: Union[SigmaRule, SigmaCorrelationRule]
     ) -> None:
-        super().apply(pipeline, rule)
+        super().apply(rule)
         rule.custom_attributes[self.attribute] = self.value
 
 
@@ -81,7 +81,7 @@ def count_negated(classes: List[Type[Any]]) -> int:
 
 
 @dataclass
-class CustomLogSourceTransformation(Transformation):
+class CustomLogSourceTransformation(PreprocessingTransformation):
     """Allow the definition of a log source selector using YAML structured data, including
     referencing log source and/or detection fields from the rule"""
 
@@ -90,7 +90,7 @@ class CustomLogSourceTransformation(Transformation):
     template: bool = False
 
     def apply(
-        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+        self, rule: Union[SigmaRule, SigmaCorrelationRule]
     ):
         if isinstance(rule, SigmaRule):
             selectors: List[str] = []
@@ -215,10 +215,10 @@ class CustomLogSourceTransformation(Transformation):
             rule.custom_attributes[
                 LokiCustomAttributes.LOGSOURCE_SELECTION.value
             ] = formatted_selectors
-            super().apply(pipeline, rule)
+            super().apply(rule)
         else:
             for ruleref in rule.rules:
-                self.apply(pipeline, ruleref.rule)
+                self.apply(ruleref.rule)
 
 
 # Update pySigma transformations to include the above
