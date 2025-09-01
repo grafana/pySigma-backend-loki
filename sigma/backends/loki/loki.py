@@ -46,7 +46,8 @@ from sigma.types import (
     SigmaNumber,
     SigmaFieldReference,
     TimestampPart,
-    SigmaTimestampPart, CompareOperators,
+    SigmaTimestampPart,
+    CompareOperators,
 )
 from yaml import dump
 
