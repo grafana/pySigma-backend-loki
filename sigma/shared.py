@@ -126,7 +126,7 @@ def join_or_values_re(
             (
                 re.escape(str(val))
                 if isinstance(val, SigmaString)
-                else re.sub("^\\(\\?i\\)", "", val.regexp)
+                else re.sub("^\\(\\?i\\)", "", str(val.regexp))
             )
             for val in vals
         )
@@ -134,7 +134,7 @@ def join_or_values_re(
     if case_insensitive:
         or_value = "(?i)" + or_value
     if "`" in or_value:
-        or_value = '"' + SigmaRegularExpression(or_value).escape(('"',)) + '"'
+        or_value = '"' + SigmaRegularExpression(or_value).escape(['"']) + '"'
     else:
         or_value = "`" + or_value + "`"
     return or_value

@@ -417,7 +417,7 @@ class LogQLBackend(TextQueryBackend):
         elif isinstance(expr.value, SigmaRegularExpression):
             # Could include field name if entries are logfmt and doesn't start with wildcard
             regexp = expr.value.regexp
-            anchors = LogQLBackend.anchor_replace_pattern.match(expr.value.regexp)
+            anchors = LogQLBackend.anchor_replace_pattern.match(str(expr.value.regexp))
             if (
                 anchors
                 and anchors.group("body")
@@ -965,7 +965,7 @@ class LogQLBackend(TextQueryBackend):
         # Use a RE to determine if the RE starts and/or ends with .* (ignoring flags ^(?.+))
         outer_wildcards = re.match(
             "^(?P<flag>\\(\\?.+\\))?(?P<lead>\\.\\*)?(?P<body>.*?)(?P<trail>\\.\\*)?$",
-            cond.value.regexp,
+            str(cond.value.regexp),
         )
         # Ignoring optional captures, this regex resolves to ^(.*?)$ - which should
         # capture all possible inputs, but we should check just-in-case
