@@ -22,7 +22,8 @@ from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
     transformations,
     AddFieldnamePrefixTransformation,
-    FieldMappingTransformation, PreprocessingTransformation,
+    FieldMappingTransformation,
+    PreprocessingTransformation,
 )
 from sigma.rule import SigmaRule, SigmaDetection
 from sigma.types import (
