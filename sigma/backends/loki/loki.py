@@ -23,8 +23,8 @@ from sigma.conditions import (
     ConditionNOT,
     ConditionOR,
     ConditionValueExpression,
-    ParentChainMixin,
     ConditionType,
+    ConditionIdentifier,
 )
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
@@ -69,12 +69,11 @@ from sigma.shared import (
 )
 
 Conditions = Union[
+    ConditionIdentifier,
     ConditionItem,
-    ConditionNOT,
-    ConditionOR,
-    ConditionAND,
     ConditionFieldEqualsValueExpression,
     ConditionValueExpression,
+    None
 ]
 
 
@@ -352,7 +351,7 @@ class LogQLBackend(TextQueryBackend):
             condition_copy = copy.deepcopy(condition)
             # Find the top-OR and partition it
             found_or = False
-            conditions = Deque[ParentChainMixin]()
+            conditions = Deque[Conditions]()
             conditions.append(condition_copy)
             while conditions:
                 # breadth-first search the parse tree to find the highest OR
@@ -416,7 +415,7 @@ class LogQLBackend(TextQueryBackend):
             )
         elif isinstance(expr.value, SigmaRegularExpression):
             # Could include field name if entries are logfmt and doesn't start with wildcard
-            regexp = expr.value.regexp
+            regexp = str(expr.value.regexp)
             anchors = LogQLBackend.anchor_replace_pattern.match(str(expr.value.regexp))
             if (
                 anchors
@@ -505,7 +504,7 @@ class LogQLBackend(TextQueryBackend):
         return None
 
     def generate_candidate_line_filter(
-        self, cond: ParentChainMixin, log_parser: Union[str, LogQLLogParser]
+        self, cond: Conditions, log_parser: Union[str, LogQLLogParser]
     ) -> Optional[LogQLLineFilterInfo]:
         """Given a condition, attempt to find the longest string in queries that could
         be used as line filters, which should improve the overall performance of the
@@ -557,6 +556,8 @@ class LogQLBackend(TextQueryBackend):
           negation down the tree (flipping ANDs and ORs and swapping operators, i.e.,
           = becomes !=, etc.)
         """
+        if condition is None:
+            return condition
         if isinstance(
             condition,
             (ConditionFieldEqualsValueExpression, ConditionValueExpression),
@@ -573,7 +574,7 @@ class LogQLBackend(TextQueryBackend):
                     ),
                 )
         if isinstance(condition, ConditionItem):
-            if isinstance(condition, ConditionNOT):
+            if isinstance(condition, ConditionNOT) and condition.args[0] is not None:
                 negated = not negated
                 # Remove the ConditionNOT as the parent
                 condition.args[0].parent = condition.parent
@@ -588,10 +589,11 @@ class LogQLBackend(TextQueryBackend):
                     # Update the parent references to reflect the new structure
                     new_condition.parent = condition.parent
                     for i in range(len(condition.args)):
-                        condition.args[i].parent = new_condition
-                        condition.args[i] = self.update_parsed_conditions(
-                            condition.args[i], negated
-                        )
+                        if condition.args[i] is not None:
+                            condition.args[i].parent = new_condition # type: ignore
+                            condition.args[i] = self.update_parsed_conditions(
+                                condition.args[i], negated
+                            )
                     setattr(new_condition, "negated", negated)
                     return new_condition
                 else:
@@ -837,7 +839,7 @@ class LogQLBackend(TextQueryBackend):
         )
 
     def convert_condition_field_eq_field(
-        self, cond: SigmaFieldReference, state: ConversionState
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """
         Constructs a condition that compares two fields in a log line to enable us to
@@ -974,7 +976,7 @@ class LogQLBackend(TextQueryBackend):
         if outer_wildcards.group("lead") or outer_wildcards.group("trail"):
             if len(outer_wildcards.group("body")) > 0:
                 flag = outer_wildcards.group("flag") or ""
-                cond.value.regexp = flag + outer_wildcards.group("body")
+                cond.value.regexp = SigmaString(flag + outer_wildcards.group("body"))
             else:
                 # If there's no value between these wildcards, we can ignore the filter
                 return None
@@ -1064,7 +1066,7 @@ class LogQLBackend(TextQueryBackend):
     # stream selectors & parser
     def finalize_query(
         self,
-        rule: SigmaRule,
+        rule: Union[SigmaRule, SigmaCorrelationRule],
         query: Union[str, DeferredQueryExpression],
         index: int,
         state: ConversionState,
