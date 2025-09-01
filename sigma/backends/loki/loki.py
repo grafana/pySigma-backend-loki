@@ -56,7 +56,7 @@ from sigma.types import (
     SigmaNumber,
     SigmaFieldReference,
     TimestampPart,
-    SigmaTimestampPart,
+    SigmaTimestampPart, CompareOperators,
 )
 from warnings import warn
 from yaml import dump
@@ -149,7 +149,7 @@ class LogQLBackend(TextQueryBackend):
     re_flag_prefix: bool = True
     cidr_expression: ClassVar[str]
     compare_op_expression: ClassVar[str]
-    compare_operators: ClassVar[Dict[SigmaCompareExpression.CompareOperators, str]]
+    compare_operators: ClassVar[Dict[CompareOperators, str]]
     case_sensitive_match_expression: ClassVar[str]
     field_exists_expression: ClassVar[str]
     field_not_exists_expression: ClassVar[str]
