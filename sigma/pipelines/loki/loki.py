@@ -13,13 +13,6 @@ from sigma.conditions import (
     ConditionAND,
     ConditionIdentifier,
 )
-from sigma.types import (
-    SigmaString,
-    SigmaRegularExpression,
-    SigmaFieldReference,
-    SigmaType,
-)
-from sigma.rule import SigmaRule, SigmaDetection
 from sigma.correlations import SigmaCorrelationRule
 from sigma.exceptions import (
     SigmaFeatureNotSupportedByBackendError,
@@ -31,6 +24,14 @@ from sigma.processing.transformations import (
     AddFieldnamePrefixTransformation,
     FieldMappingTransformation, PreprocessingTransformation,
 )
+from sigma.rule import SigmaRule, SigmaDetection
+from sigma.types import (
+    SigmaString,
+    SigmaRegularExpression,
+    SigmaFieldReference,
+    SigmaType,
+)
+
 from sigma.shared import (
     sanitize_label_key,
     quote_string_value,

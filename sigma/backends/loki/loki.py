@@ -15,6 +15,7 @@ from typing import (
     Tuple,
     Union,
 )
+from warnings import warn
 
 from sigma.conditions import (
     ConditionAND,
@@ -31,17 +32,6 @@ from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
-
-from sigma.backends.loki.deferred import (
-    LogQLDeferredType,
-    LogQLDeferredUnboundStrExpression,
-    LogQLDeferredUnboundCIDRExpression,
-    LogQLDeferredUnboundRegexpExpression,
-    LogQLDeferredOrUnboundExpression,
-    LogQLDeferredLabelFormatExpression,
-    LogQLDeferredLabelFilterExpression,
-)
-from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
 from sigma.types import (
@@ -58,9 +48,18 @@ from sigma.types import (
     TimestampPart,
     SigmaTimestampPart, CompareOperators,
 )
-from warnings import warn
 from yaml import dump
 
+from sigma.backends.loki.deferred import (
+    LogQLDeferredType,
+    LogQLDeferredUnboundStrExpression,
+    LogQLDeferredUnboundCIDRExpression,
+    LogQLDeferredUnboundRegexpExpression,
+    LogQLDeferredOrUnboundExpression,
+    LogQLDeferredLabelFormatExpression,
+    LogQLDeferredLabelFilterExpression,
+)
+from sigma.pipelines.loki import LokiCustomAttributes
 from sigma.shared import (
     sanitize_label_key,
     quote_string_value,

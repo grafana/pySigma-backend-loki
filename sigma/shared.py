@@ -1,12 +1,12 @@
 import re
 from typing import Dict, List, Union
+
 from sigma.types import (
     SigmaCasedString,
     SigmaString,
     SigmaRegularExpression,
     SpecialChars,
 )
-
 
 negated_line_filter_operator: Dict[str, str] = {
     "|=": "!=",
