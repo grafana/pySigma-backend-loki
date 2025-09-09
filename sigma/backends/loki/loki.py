@@ -556,7 +556,7 @@ class LogQLBackend(TextQueryBackend):
           negation down the tree (flipping ANDs and ORs and swapping operators, i.e.,
           = becomes !=, etc.)
         """
-        if condition is None:
+        if not condition:
             return condition
         if isinstance(
             condition,
