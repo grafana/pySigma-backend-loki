@@ -813,7 +813,7 @@ correlation:
     loki_rule = backend.convert(sigma_rules)
     assert len(loki_rule) == 1
     assert "job=`mylogs`" in loki_rule[0]
-    assert "filename=~`.*[\d]+.log$`" in loki_rule[0]
+    assert "filename=~`.*[\\d]+.log$`" in loki_rule[0]
 
 
 def test_set_custom_log_source_correlation_rule():

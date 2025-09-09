@@ -1,12 +1,12 @@
 import re
 from typing import Dict, List, Union
+
 from sigma.types import (
     SigmaCasedString,
     SigmaString,
     SigmaRegularExpression,
     SpecialChars,
 )
-
 
 negated_line_filter_operator: Dict[str, str] = {
     "|=": "!=",
@@ -65,7 +65,7 @@ def quote_string_value(s: SigmaString) -> str:
         converted = s.convert()
     else:
         converted = s.convert(escape_char="\\", add_escaped='"\\')
-    return quote + converted + quote
+    return f"{quote}{converted}{quote}"
 
 
 def convert_str_to_re(
@@ -95,9 +95,9 @@ def convert_str_to_re(
 def escape_and_quote_re(r: SigmaRegularExpression, flag_prefix=True) -> str:
     """LogQL does not require any additional escaping for regular expressions if we
     can use the tilde character"""
-    if "`" in r.regexp:
-        return '"' + r.escape(('"',), flag_prefix=flag_prefix) + '"'
-    return "`" + r.escape((), "", False, flag_prefix) + "`"  # type: ignore
+    if "`" in str(r.regexp):
+        return '"' + r.escape(['"',], flag_prefix=flag_prefix) + '"'
+    return "`" + r.escape([], "", False, flag_prefix) + "`"
 
 
 def join_or_values_re(
@@ -112,7 +112,7 @@ def join_or_values_re(
             and case_insensitive
             and not isinstance(val, SigmaCasedString)
         )
-        or (isinstance(val, SigmaRegularExpression) and val.regexp.startswith("(?i)"))
+        or (isinstance(val, SigmaRegularExpression) and str(val.regexp).startswith("(?i)"))
         for val in exprs
     )
     vals = [
@@ -126,15 +126,15 @@ def join_or_values_re(
             (
                 re.escape(str(val))
                 if isinstance(val, SigmaString)
-                else re.sub("^\\(\\?i\\)", "", val.regexp)
+                else re.sub("^\\(\\?i\\)", "", str(val.regexp))
             )
             for val in vals
         )
     )
     if case_insensitive:
-        or_value = "(?i)" + or_value
+        or_value = f"(?i){or_value}"
     if "`" in or_value:
-        or_value = '"' + SigmaRegularExpression(or_value).escape(('"',)) + '"'
+        or_value = '"' + SigmaRegularExpression(or_value).escape(['"']) + '"'
     else:
-        or_value = "`" + or_value + "`"
+        or_value = f"`{or_value}`"
     return or_value

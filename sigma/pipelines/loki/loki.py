@@ -11,14 +11,8 @@ from sigma.conditions import (
     ConditionItem,
     ConditionType,
     ConditionAND,
+    ConditionIdentifier,
 )
-from sigma.types import (
-    SigmaString,
-    SigmaRegularExpression,
-    SigmaFieldReference,
-    SigmaType,
-)
-from sigma.rule import SigmaRule, SigmaDetection
 from sigma.correlations import SigmaCorrelationRule
 from sigma.exceptions import (
     SigmaFeatureNotSupportedByBackendError,
@@ -27,10 +21,18 @@ from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
     transformations,
-    Transformation,
     AddFieldnamePrefixTransformation,
     FieldMappingTransformation,
+    PreprocessingTransformation,
 )
+from sigma.rule import SigmaRule, SigmaDetection
+from sigma.types import (
+    SigmaString,
+    SigmaRegularExpression,
+    SigmaFieldReference,
+    SigmaType,
+)
+
 from sigma.shared import (
     sanitize_label_key,
     quote_string_value,
@@ -49,23 +51,23 @@ class LokiCustomAttributes(Enum):
 
 
 @dataclass
-class SetCustomAttributeTransformation(Transformation):
+class SetCustomAttributeTransformation(PreprocessingTransformation):
     """Sets an arbitrary custom attribute on a rule, that will be used during processing."""
 
     attribute: str
     value: Any
 
     def apply(
-        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+        self, rule: Union[SigmaRule, SigmaCorrelationRule]
     ) -> None:
-        super().apply(pipeline, rule)
+        super().apply(rule)
         rule.custom_attributes[self.attribute] = self.value
 
 
 def traverse_conditions(item: ConditionType):
     queue: List[
         Union[
-            ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression
+            ConditionIdentifier, ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression, None
         ]
     ] = [item]
     while len(queue) > 0:
@@ -81,7 +83,7 @@ def count_negated(classes: List[Type[Any]]) -> int:
 
 
 @dataclass
-class CustomLogSourceTransformation(Transformation):
+class CustomLogSourceTransformation(PreprocessingTransformation):
     """Allow the definition of a log source selector using YAML structured data, including
     referencing log source and/or detection fields from the rule"""
 
@@ -90,7 +92,7 @@ class CustomLogSourceTransformation(Transformation):
     template: bool = False
 
     def apply(
-        self, pipeline: ProcessingPipeline, rule: Union[SigmaRule, SigmaCorrelationRule]
+        self, rule: Union[SigmaRule, SigmaCorrelationRule]
     ):
         if isinstance(rule, SigmaRule):
             selectors: List[str] = []
@@ -99,9 +101,11 @@ class CustomLogSourceTransformation(Transformation):
             fields_set = set()
             args: List[
                 Union[
+                    ConditionIdentifier,
                     ConditionItem,
                     ConditionFieldEqualsValueExpression,
                     ConditionValueExpression,
+                    None
                 ]
             ] = []
             if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
@@ -157,8 +161,8 @@ class CustomLogSourceTransformation(Transformation):
 
                 skip = False
                 rule_conditions = []
-                for conds in rule.detection.parsed_condition:
-                    rule_conditions.extend(traverse_conditions(conds.parsed))  # type: ignore
+                for parsed_conds in rule.detection.parsed_condition:
+                    rule_conditions.extend(traverse_conditions(parsed_conds.parsed)) # type: ignore
 
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
@@ -215,10 +219,10 @@ class CustomLogSourceTransformation(Transformation):
             rule.custom_attributes[
                 LokiCustomAttributes.LOGSOURCE_SELECTION.value
             ] = formatted_selectors
-            super().apply(pipeline, rule)
+            super().apply(rule)
         else:
             for ruleref in rule.rules:
-                self.apply(pipeline, ruleref.rule)
+                self.apply(ruleref.rule)
 
 
 # Update pySigma transformations to include the above

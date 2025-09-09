@@ -5,7 +5,7 @@ plugin="loki"
 
 # Ensure current environment is up-to-date
 poetry install
-poetry run pip install sigma-cli
+poetry run pip install sigma-cli==1.1.0rc1
 
 sigma=$(poetry run sigma version)
 
@@ -20,14 +20,16 @@ echo "✅ PASS: pySigma-backend-$plugin was found in the plugin list"
 
 # Check that sigma-cli believes the plugin is compatible
 compatible=$(echo "$meta" | awk -F "|" '{print $6}' | awk '{$1=$1};1')
+force_arg=""
 if [ "$compatible" = "no" ]; then
-  echo "❌ FAIL: This version of pySigma-backend-$plugin is not compatible with the latest version of sigma-cli ($sigma) - the plugin directory may require updating: https://github.com/SigmaHQ/pySigma-plugin-directory/"
-  exit 2
+  echo "⚠️  WARN: This version of pySigma-backend-$plugin is not compatible with the latest version of sigma-cli ($sigma) - the plugin directory may require updating: https://github.com/SigmaHQ/pySigma-plugin-directory/"
+  force_arg=" --force-install"
+else
+  echo "✅ PASS: pySigma-backend-$plugin is compatible with the latest version of sigma-cli ($sigma)"
 fi
-echo "✅ PASS: pySigma-backend-$plugin is compatible with the latest version of sigma-cli ($sigma)"
 
 # Check the plugin can be successfully installed
-install_logs=$(poetry run sigma plugin install "$plugin") 
+install_logs=$(poetry run sigma plugin install $force_arg "$plugin")
 install_status=$(echo "$install_logs" | grep "Successfully installed plugin '$plugin'" | cat)
 if [ "$install_status" = "" ]; then
   echo "❌ FAIL: Installing this version of pySigma-backend-$plugin was not successful. The install logs were:"
