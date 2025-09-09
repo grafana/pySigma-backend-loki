@@ -65,7 +65,7 @@ def quote_string_value(s: SigmaString) -> str:
         converted = s.convert()
     else:
         converted = s.convert(escape_char="\\", add_escaped='"\\')
-    return quote + converted + quote
+    return f"{quote}{converted}{quote}"
 
 
 def convert_str_to_re(
@@ -132,9 +132,9 @@ def join_or_values_re(
         )
     )
     if case_insensitive:
-        or_value = "(?i)" + or_value
+        or_value = f"(?i){or_value}"
     if "`" in or_value:
         or_value = '"' + SigmaRegularExpression(or_value).escape(['"']) + '"'
     else:
-        or_value = "`" + or_value + "`"
+        or_value = f"`{or_value}`"
     return or_value

@@ -68,7 +68,7 @@ class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
         if "`" in self.regexp:
             value = '"' + SigmaRegularExpression(self.regexp).escape(['"']) + '"'
         else:
-            value = "`" + self.regexp + "`"
+            value = f"`{self.regexp}`"
         return f"{self.op} {value}"
 
 

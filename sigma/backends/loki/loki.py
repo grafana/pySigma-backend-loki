@@ -1116,7 +1116,7 @@ class LogQLBackend(TextQueryBackend):
                     field_ref_expression = (
                         "| " if len(query) > 0 else f"{query_log_parser} "
                     ) + f"label_format {label_fmt}"
-                    filter_fmt = " " + self.and_token + " "
+                    filter_fmt = f" {self.and_token} "
                     field_ref_filters_expression = (
                         f" | {filter_fmt.join(label_field_filters)}"
                     )
@@ -1133,9 +1133,9 @@ class LogQLBackend(TextQueryBackend):
                 line_fmt_fields = " ".join(
                     "{{." + sanitize_label_key(field) + "}}" for field in rule.fields
                 )
-                query = query + f' | line_format "{line_fmt_fields}"'
+                query = f'{query} | line_format "{line_fmt_fields}"'
             # Select an appropriate source based on the logsource
-            query = self.select_log_stream(rule) + " " + query
+            query = f"{self.select_log_stream(rule)} {query}"
             return super().finalize_query(rule, query, index, state, output_format)
         elif isinstance(rule, SigmaCorrelationRule):
             return super().finalize_query(rule, query, index, state, output_format)
