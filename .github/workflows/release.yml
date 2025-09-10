@@ -10,6 +10,9 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v2
         with:
@@ -31,11 +34,17 @@ jobs:
         run: poetry run pytest
       - name: Build packages
         run: poetry build
+      - name: Get service account token for PyPI
+        uses: grafana/shared-workflows/actions/get-vault-secrets@main
+        with:
+          repo_secrets: |
+            TEST_PYPI_API_TOKEN=pypi-deploy:pypi_test
+            PYPI_API_TOKEN=pypi-deploy:pypi_main
       - name: Configure Poetry
         run: |
           poetry config repositories.testpypi https://test.pypi.org/legacy/
-          poetry config pypi-token.testpypi ${{ secrets.TEST_PYPI_API_TOKEN }}
-          poetry config pypi-token.pypi "${{ secrets.PYPI_API_TOKEN }}"
+          poetry config pypi-token.testpypi "${{ env.TEST_PYPI_API_TOKEN }}"
+          poetry config pypi-token.pypi "${{ env.PYPI_API_TOKEN }}"
       - name: Publish to test PyPI
         if: ${{ github.event_name == 'push' }}
         run: poetry publish -r testpypi
