@@ -38,8 +38,7 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum(count_over_time({job=~".+"} | logfmt | '
-        "fieldA=~`(?i)^valueA$` [30s])) == 42"
+        'sum(count_over_time({job=~".+"} | logfmt | ' "fieldA=~`(?i)^valueA$` [30s])) == 42"
     ]
 
 
@@ -193,6 +192,7 @@ correlation:
         "fieldA=~`(?i)^valueA$` [1d])) >= 100"
     ]
 
+
 def test_loki_default_event_count_absent_over_time_eq_0(loki_backend: LogQLBackend):
     rules = SigmaCollection.from_yaml(
         """
@@ -220,8 +220,7 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum(absent_over_time({job=~".+"} | logfmt | '
-        "fieldA=~`(?i)^valueA$` [30s])) == 1"
+        'sum(absent_over_time({job=~".+"} | logfmt | ' "fieldA=~`(?i)^valueA$` [30s])) == 1"
     ]
 
 
