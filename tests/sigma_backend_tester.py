@@ -157,24 +157,16 @@ def process_file(file_path, test_file, args, counters):
                     prod = rule.logsource.product
                     serv = rule.logsource.service
                     if prod:
-                        counters["products"][prod] = (
-                            counters["products"].get(prod, 0) + 1
-                        )
+                        counters["products"][prod] = counters["products"].get(prod, 0) + 1
                     if serv:
-                        counters["services"][serv] = (
-                            counters["services"].get(serv, 0) + 1
-                        )
+                        counters["services"][serv] = counters["services"].get(serv, 0) + 1
                     if cat:
-                        counters["categories"][cat] = (
-                            counters["categories"].get(cat, 0) + 1
-                        )
+                        counters["categories"][cat] = counters["categories"].get(cat, 0) + 1
         except SigmaError as err:
             counters["parse_error"] += 1
             if args.unique:
                 error_type = type(err).__name__
-                counters["error_types"][error_type] = (
-                    counters["error_types"].get(error_type, 0) + 1
-                )
+                counters["error_types"][error_type] = counters["error_types"].get(error_type, 0) + 1
                 counters["error_messages"][str(err).strip()] = (
                     counters["error_messages"].get(str(err).strip(), 0) + 1
                 )
@@ -205,9 +197,7 @@ def process_file(file_path, test_file, args, counters):
             counters["convert_error"] += 1
             if args.unique:
                 error_type = type(err).__name__
-                counters["error_types"][error_type] = (
-                    counters["error_types"].get(error_type, 0) + 1
-                )
+                counters["error_types"][error_type] = counters["error_types"].get(error_type, 0) + 1
                 counters["error_messages"][str(err)] = (
                     counters["error_messages"].get(str(err), 0) + 1
                 )

@@ -57,9 +57,7 @@ class SetCustomAttributeTransformation(PreprocessingTransformation):
     attribute: str
     value: Any
 
-    def apply(
-        self, rule: Union[SigmaRule, SigmaCorrelationRule]
-    ) -> None:
+    def apply(self, rule: Union[SigmaRule, SigmaCorrelationRule]) -> None:
         super().apply(rule)
         rule.custom_attributes[self.attribute] = self.value
 
@@ -67,7 +65,11 @@ class SetCustomAttributeTransformation(PreprocessingTransformation):
 def traverse_conditions(item: ConditionType):
     queue: List[
         Union[
-            ConditionIdentifier, ConditionItem, ConditionFieldEqualsValueExpression, ConditionValueExpression, None
+            ConditionIdentifier,
+            ConditionItem,
+            ConditionFieldEqualsValueExpression,
+            ConditionValueExpression,
+            None,
         ]
     ] = [item]
     while len(queue) > 0:
@@ -91,9 +93,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
     case_insensitive: bool = False
     template: bool = False
 
-    def apply(
-        self, rule: Union[SigmaRule, SigmaCorrelationRule]
-    ):
+    def apply(self, rule: Union[SigmaRule, SigmaCorrelationRule]):
         if isinstance(rule, SigmaRule):
             selectors: List[str] = []
             logsource_detections = SigmaDetection.from_definition(self.selection)
@@ -105,7 +105,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                     ConditionItem,
                     ConditionFieldEqualsValueExpression,
                     ConditionValueExpression,
-                    None
+                    None,
                 ]
             ] = []
             if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
@@ -162,7 +162,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                 skip = False
                 rule_conditions = []
                 for parsed_conds in rule.detection.parsed_condition:
-                    rule_conditions.extend(traverse_conditions(parsed_conds.parsed)) # type: ignore
+                    rule_conditions.extend(traverse_conditions(parsed_conds.parsed))  # type: ignore
 
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
@@ -172,9 +172,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                         if (
                             isinstance(item, ConditionFieldEqualsValueExpression)
                             and item.field == value.field
-                            and isinstance(
-                                item.value, (SigmaString, SigmaRegularExpression)
-                            )
+                            and isinstance(item.value, (SigmaString, SigmaRegularExpression))
                         ):
                             classes = item.parent_chain_condition_classes()
                             new_negated = count_negated(classes) % 2 == 1
@@ -209,9 +207,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                     selectors.append(f"{sanitize_label_key(field)}{op}{value}")
             formatted_selectors = "{" + ",".join(selectors) + "}"
             if self.template:
-                formatted_selectors = string.Template(
-                    formatted_selectors
-                ).safe_substitute(
+                formatted_selectors = string.Template(formatted_selectors).safe_substitute(
                     category=rule.logsource.category,
                     product=rule.logsource.product,
                     service=rule.logsource.service,
