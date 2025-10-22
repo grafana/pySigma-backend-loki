@@ -192,3 +192,68 @@ correlation:
         'sum(count_over_time({job=~"eventlog|winlog|windows|fluentbit.*"} | json | '
         "fieldA=~`(?i)^valueA$` [1d])) >= 100"
     ]
+
+def test_loki_default_event_count_absent_over_time_eq_0(loki_backend: LogQLBackend):
+    rules = SigmaCollection.from_yaml(
+        """
+title: Test Rule
+name: test_rule
+status: test
+logsource:
+    category: test_category
+    product: test_product
+detection:
+    sel:
+        fieldA: valueA
+    condition: sel
+---
+title: Test Correlation
+status: test
+correlation:
+    type: event_count
+    rules:
+        - test_rule
+    timespan: 30s
+    condition:
+        eq: 0
+"""
+    )
+    queries = loki_backend.convert(rules)
+    assert queries == [
+        'sum(absent_over_time({job=~".+"} | logfmt | '
+        "fieldA=~`(?i)^valueA$` [30s])) == 1"
+    ]
+
+
+def test_loki_default_event_count_absent_over_time_lt_1(loki_backend: LogQLBackend):
+    rules = SigmaCollection.from_yaml(
+        """
+title: Test Rule
+name: test_rule
+status: test
+logsource:
+    category: test_category
+    product: test_product
+detection:
+    sel:
+        fieldA: valueA
+    condition: sel
+---
+title: Test Correlation
+status: test
+correlation:
+    type: event_count
+    rules:
+        - test_rule
+    group-by:
+        - fieldB
+    timespan: 5m
+    condition:
+        lt: 1
+"""
+    )
+    queries = loki_backend.convert(rules)
+    assert queries == [
+        'sum by (fieldB) (absent_over_time({job=~".+"} | logfmt | '
+        "fieldA=~`(?i)^valueA$` [5m])) == 1"
+    ]
