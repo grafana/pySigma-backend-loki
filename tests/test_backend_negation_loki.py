@@ -11,10 +11,9 @@ def loki_backend():
 
 # Simple field equality test
 def test_loki_field_not_eq(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -25,17 +24,14 @@ def test_loki_field_not_eq(loki_backend: LogQLBackend):
                     fieldA: valueA
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$`']
 
 
 def test_loki_field_not_eq_num(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -46,17 +42,14 @@ def test_loki_field_not_eq_num(loki_backend: LogQLBackend):
                     fieldA: 100
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!=100']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!=100']
 
 
 def test_loki_field_not_not_eq(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -67,18 +60,15 @@ def test_loki_field_not_not_eq(loki_backend: LogQLBackend):
                     fieldA: valueA
                 condition: not (not sel)
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$`']
 
 
 # Testing boolean logic
 def test_loki_not_and_expression(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -90,17 +80,14 @@ def test_loki_not_and_expression(loki_backend: LogQLBackend):
                     fieldB: valueB
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` or fieldB!~`(?i)^valueB$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` or fieldB!~`(?i)^valueB$`']
 
 
 def test_loki_not_or_expression(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -113,17 +100,14 @@ def test_loki_not_or_expression(loki_backend: LogQLBackend):
                     fieldB: valueB
                 condition: not 1 of sel*
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`']
 
 
 def test_loki_not_and_or_expression(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -139,20 +123,17 @@ def test_loki_not_and_or_expression(loki_backend: LogQLBackend):
                         - valueB2
                 condition: not sel
         """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA1$` and fieldA!~`(?i)^valueA2$` '
-            "or fieldB!~`(?i)^valueB1$` and fieldB!~`(?i)^valueB2$`"
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA1$` and fieldA!~`(?i)^valueA2$` '
+        "or fieldB!~`(?i)^valueB1$` and fieldB!~`(?i)^valueB2$`"
+    ]
 
 
 def test_loki_not_or_and_expression(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -167,21 +148,18 @@ def test_loki_not_or_and_expression(loki_backend: LogQLBackend):
                     fieldB: valueB2
                 condition: not 1 of sel*
         """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | (fieldA!~`(?i)^valueA1$` or fieldB!~`(?i)^valueB1$`) and '
-            "(fieldA!~`(?i)^valueA2$` or fieldB!~`(?i)^valueB2$`)"
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | (fieldA!~`(?i)^valueA1$` or fieldB!~`(?i)^valueB1$`) and '
+        "(fieldA!~`(?i)^valueA2$` or fieldB!~`(?i)^valueB2$`)"
+    ]
 
 
 # Loki doesn't support in expressions, so in this case, multiple or conditions should be produced
 def test_loki_not_in_expression(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -195,20 +173,17 @@ def test_loki_not_in_expression(loki_backend: LogQLBackend):
                         - valueC
                 condition: not sel
         """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldA!~`(?i)^valueB$` and '
-            "fieldA!~`(?i)^valueC$`"
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldA!~`(?i)^valueB$` and '
+        "fieldA!~`(?i)^valueC$`"
+    ]
 
 
 def test_loki_not_all_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -221,17 +196,14 @@ def test_loki_not_all_query(loki_backend: LogQLBackend):
                         - valueB
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` or fieldA!~`(?i)^valueB$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` or fieldA!~`(?i)^valueB$`']
 
 
 def test_loki_not_all_bracket_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -248,20 +220,17 @@ def test_loki_not_all_bracket_query(loki_backend: LogQLBackend):
                         - valueD
                 condition: sel and not filter
         """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$`) and '
-            "(fieldB!~`(?i)^valueC$` or fieldB!~`(?i)^valueD$`)"
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$`) and '
+        "(fieldB!~`(?i)^valueC$` or fieldB!~`(?i)^valueD$`)"
+    ]
 
 
 def test_loki_not_base64_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -272,17 +241,14 @@ def test_loki_not_base64_query(loki_backend: LogQLBackend):
                     fieldA|base64: value
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdWU=$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdWU=$`']
 
 
 def test_loki_not_base64offset_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -293,21 +259,18 @@ def test_loki_not_base64offset_query(loki_backend: LogQLBackend):
                     fieldA|base64offset: value
                 condition: not sel
         """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdW$` and fieldA!~`(?i)^ZhbHVl$` and '
-            "fieldA!~`(?i)^2YWx1Z$`"
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdW$` and fieldA!~`(?i)^ZhbHVl$` and '
+        "fieldA!~`(?i)^2YWx1Z$`"
+    ]
 
 
 # Testing different search identifiers
 def test_loki_not_null(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -318,18 +281,15 @@ def test_loki_not_null(loki_backend: LogQLBackend):
                     fieldA: null
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!=``']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!=``']
 
 
 # Loki does not support wildcards, so we use case-insensitive regular expressions instead
 def test_loki_not_wildcard_single(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -340,17 +300,14 @@ def test_loki_not_wildcard_single(loki_backend: LogQLBackend):
                     fieldA: va?ue
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^va.ue$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^va.ue$`']
 
 
 def test_loki_not_wildcard_multi(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -361,17 +318,14 @@ def test_loki_not_wildcard_multi(loki_backend: LogQLBackend):
                     fieldA: value*
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`(?i)^value.*`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^value.*`']
 
 
 def test_loki_not_wildcard_unbound(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -382,17 +336,14 @@ def test_loki_not_wildcard_unbound(loki_backend: LogQLBackend):
                     - va?ue*
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} !~ `(?i)va.ue`']
-    )
+    ) == ['{job=~".+"} !~ `(?i)va.ue`']
 
 
 def test_loki_not_regex_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -404,17 +355,14 @@ def test_loki_not_regex_query(loki_backend: LogQLBackend):
                     fieldB: foo
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!~`foo.*bar` or fieldB!~`(?i)^foo$`']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!~`foo.*bar` or fieldB!~`(?i)^foo$`']
 
 
 def test_loki_not_cidr_query(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -425,18 +373,15 @@ def test_loki_not_cidr_query(loki_backend: LogQLBackend):
                     fieldA|cidr: 192.168.0.0/16
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!=ip("192.168.0.0/16")']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!=ip("192.168.0.0/16")']
 
 
 def test_loki_not_unbound_case_sensitive(loki_backend: LogQLBackend):
     loki_backend.case_sensitive = True
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -447,17 +392,14 @@ def test_loki_not_unbound_case_sensitive(loki_backend: LogQLBackend):
                     value
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} != `value`']
-    )
+    ) == ['{job=~".+"} != `value`']
 
 
 def test_loki_not_unbound(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -468,17 +410,14 @@ def test_loki_not_unbound(loki_backend: LogQLBackend):
                     value
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} !~ `(?i)value`']
-    )
+    ) == ['{job=~".+"} !~ `(?i)value`']
 
 
 def test_loki_not_unbound_num(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -489,17 +428,14 @@ def test_loki_not_unbound_num(loki_backend: LogQLBackend):
                     100
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} != 100']
-    )
+    ) == ['{job=~".+"} != 100']
 
 
 def test_loki_not_unbound_re_wildcard(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -510,17 +446,14 @@ def test_loki_not_unbound_re_wildcard(loki_backend: LogQLBackend):
                     '|re': 'value.*'
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} !~ `value`']
-    )
+    ) == ['{job=~".+"} !~ `value`']
 
 
 def test_loki_not_and_unbound(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -533,17 +466,14 @@ def test_loki_not_and_unbound(loki_backend: LogQLBackend):
                     valueB
                 condition: not (keyword1 and keyword2)
         """
-            )
         )
-        == ['{job=~".+"} !~ `(?i)valueA|valueB`']
-    )
+    ) == ['{job=~".+"} !~ `(?i)valueA|valueB`']
 
 
 def test_loki_not_unbound_or_field(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: test
             status: test
             logsource:
@@ -556,10 +486,8 @@ def test_loki_not_unbound_or_field(loki_backend: LogQLBackend):
                     fieldA: valueB
                 condition: not (keywords or sel)
         """
-            )
         )
-        == ['{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueB$`']
-    )
+    ) == ['{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueB$`']
 
 
 def test_loki_not_unbound_and_field(loki_backend: LogQLBackend):
@@ -607,10 +535,9 @@ def test_loki_not_multi_or_unbound(loki_backend: LogQLBackend):
 
 
 def test_loki_not_or_unbound(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -622,17 +549,14 @@ def test_loki_not_or_unbound(loki_backend: LogQLBackend):
                     - valueB
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} !~ `(?i)valueA` !~ `(?i)valueB`']
-    )
+    ) == ['{job=~".+"} !~ `(?i)valueA` !~ `(?i)valueB`']
 
 
 def test_loki_not_unbound_wildcard(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -643,17 +567,14 @@ def test_loki_not_unbound_wildcard(loki_backend: LogQLBackend):
                     value*
                 condition: not keywords
         """
-            )
         )
-        == ['{job=~".+"} !~ `(?i)value`']
-    )
+    ) == ['{job=~".+"} !~ `(?i)value`']
 
 
 def test_loki_field_and_not_multi_unbound_expression(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -667,19 +588,14 @@ def test_loki_field_and_not_multi_unbound_expression(loki_backend: LogQLBackend)
                     - valueC
                 condition: sel and not keywords
         """
-            )
         )
-        == [
-            '{job=~".+"} !~ `(?i)valueB` !~ `(?i)valueC` | logfmt | fieldA=~`(?i)^valueA$`'
-        ]
-    )
+    ) == ['{job=~".+"} !~ `(?i)valueB` !~ `(?i)valueC` | logfmt | fieldA=~`(?i)^valueA$`']
 
 
 def test_loki_field_exists_negated(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -690,17 +606,14 @@ def test_loki_field_exists_negated(loki_backend: LogQLBackend):
                     fieldA|exists: yes
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA=""']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA=""']
 
 
 def test_loki_field_not_exists_negated(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -711,7 +624,5 @@ def test_loki_field_not_exists_negated(loki_backend: LogQLBackend):
                     fieldA|exists: no
                 condition: not sel
         """
-            )
         )
-        == ['{job=~".+"} | logfmt | fieldA!=""']
-    )
+    ) == ['{job=~".+"} | logfmt | fieldA!=""']

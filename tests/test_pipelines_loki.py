@@ -81,12 +81,15 @@ def test_windows_grafana_pipeline():
         """
     )
     loki_rule = backend.convert(sigma_rule)
-    assert loki_rule == [
-        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
-        '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
-        '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
-        "| logfmt | Image=~`(?i).*\\.exe$` and event_id=1"
-    ]
+    assert (
+        loki_rule
+        == [
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
+            '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
+            '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
+            "| logfmt | Image=~`(?i).*\\.exe$` and event_id=1"
+        ]
+    )
 
 
 def test_okta_json_pipeline():
@@ -150,9 +153,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "client.useragent.rawuseragent",
-            [
-                '{job=~".+"} | json | event_client_userAgent_rawUserAgent=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_client_userAgent_rawUserAgent=~`(?i)^test_value$`'],
         ),
         (
             "client.useragent.os",
@@ -178,21 +179,15 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "client.geographicalcontext.city",
-            [
-                '{job=~".+"} | json | event_client_geographicalContext_city=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_client_geographicalContext_city=~`(?i)^test_value$`'],
         ),
         (
             "client.geographicalcontext.state",
-            [
-                '{job=~".+"} | json | event_client_geographicalContext_state=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_client_geographicalContext_state=~`(?i)^test_value$`'],
         ),
         (
             "client.geographicalcontext.country",
-            [
-                '{job=~".+"} | json | event_client_geographicalContext_country=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_client_geographicalContext_country=~`(?i)^test_value$`'],
         ),
         (
             "client.geographicalcontext.postalcode",
@@ -207,9 +202,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "debugcontext.debugdata.requesturi",
-            [
-                '{job=~".+"} | json | event_debugContext_debugData_requestUri=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_debugContext_debugData_requestUri=~`(?i)^test_value$`'],
         ),
         (
             "debugcontext.debugdata.originalprincipal.id",
@@ -241,9 +234,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "debugcontext.debugdata.behaviors",
-            [
-                '{job=~".+"} | json | event_debugContext_debugData_behaviors=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_debugContext_debugData_behaviors=~`(?i)^test_value$`'],
         ),
         (
             "debugcontext.debugdata.logonlysecuritydata",
@@ -282,15 +273,11 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "authenticationcontext.issuer.id",
-            [
-                '{job=~".+"} | json | event_authenticationContext_issuer_id=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_authenticationContext_issuer_id=~`(?i)^test_value$`'],
         ),
         (
             "authenticationcontext.issuer.type",
-            [
-                '{job=~".+"} | json | event_authenticationContext_issuer_type=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_authenticationContext_issuer_type=~`(?i)^test_value$`'],
         ),
         (
             "authenticationcontext.externalsessionid",
@@ -301,9 +288,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "authenticationcontext.interface",
-            [
-                '{job=~".+"} | json | event_authenticationContext_interface=~`(?i)^test_value$`'
-            ],
+            ['{job=~".+"} | json | event_authenticationContext_interface=~`(?i)^test_value$`'],
         ),
         (
             "securitycontext.asnumber",
@@ -361,9 +346,7 @@ def test_loki_parser_pipeline(sigma_rules: SigmaCollection):
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
-    assert loki_rule == [
-        '{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`'
-    ]
+    assert loki_rule == ['{job=~".+"} | pattern `<ip> <ts> <msg>` | msg=~`(?i)^testing$`']
 
 
 def test_loki_logsource_selection_pipeline(sigma_rules: SigmaCollection):
@@ -382,9 +365,7 @@ def test_loki_logsource_selection_pipeline(sigma_rules: SigmaCollection):
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
     loki_rule = backend.convert(sigma_rules)
-    assert loki_rule == [
-        "{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=~`(?i)^testing$`"
-    ]
+    assert loki_rule == ["{job=`mylogs`,filename=~`.*[\\d]+.log$`} | logfmt | msg=~`(?i)^testing$`"]
 
 
 def test_single_custom_log_source_pipeline(sigma_rules: SigmaCollection):
@@ -548,9 +529,7 @@ def test_custom_log_source_rule_with_keywords():
         """
     )
     loki_rule = backend.convert(sigma_rule)
-    assert loki_rule[0].startswith(
-        "{job=~`a|b|c`,message=`Failed login to Okta`,env=`okta`}"
-    )
+    assert loki_rule[0].startswith("{job=~`a|b|c`,message=`Failed login to Okta`,env=`okta`}")
 
 
 def test_skip_both_negated_and_positive_custom_log_source_pipeline(
@@ -715,10 +694,7 @@ def test_unsupported_filter_custom_log_source_pipeline(sigma_rules: SigmaCollect
     except Exception as e:
         raised_error = True
         assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
-        assert (
-            "only supports: string values, field references and regular expressions"
-            in str(e)
-        )
+        assert "only supports: string values, field references and regular expressions" in str(e)
     assert raised_error
 
 
@@ -758,13 +734,9 @@ def test_processing_pipeline_custom_attribute_from_dict():
     assert processing_item.transformation is not None
     assert isinstance(processing_item.transformation, SetCustomAttributeTransformation)
     assert (
-        processing_item.transformation.attribute
-        == pipeline_dict["transformations"][0]["attribute"]
+        processing_item.transformation.attribute == pipeline_dict["transformations"][0]["attribute"]
     )
-    assert (
-        processing_item.transformation.value
-        == pipeline_dict["transformations"][0]["value"]
-    )
+    assert processing_item.transformation.value == pipeline_dict["transformations"][0]["value"]
 
 
 def test_set_custom_attribute_correlation_rule():

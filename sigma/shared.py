@@ -78,17 +78,9 @@ def convert_str_to_re(
     case-insensitive matching"""
     return SigmaRegularExpression(
         ("(?i)" if case_insensitive else "")
-        + (
-            "^"
-            if field_filter and not value.startswith(SpecialChars.WILDCARD_MULTI)
-            else ""
-        )
+        + ("^" if field_filter and not value.startswith(SpecialChars.WILDCARD_MULTI) else "")
         + re.escape(str(value)).replace("\\?", ".").replace("\\*", ".*")
-        + (
-            "$"
-            if field_filter and not value.endswith(SpecialChars.WILDCARD_MULTI)
-            else ""
-        )
+        + ("$" if field_filter and not value.endswith(SpecialChars.WILDCARD_MULTI) else "")
     )
 
 
@@ -96,7 +88,16 @@ def escape_and_quote_re(r: SigmaRegularExpression, flag_prefix=True) -> str:
     """LogQL does not require any additional escaping for regular expressions if we
     can use the tilde character"""
     if "`" in str(r.regexp):
-        return '"' + r.escape(['"',], flag_prefix=flag_prefix) + '"'
+        return (
+            '"'
+            + r.escape(
+                [
+                    '"',
+                ],
+                flag_prefix=flag_prefix,
+            )
+            + '"'
+        )
     return "`" + r.escape([], "", False, flag_prefix) + "`"
 
 
@@ -116,9 +117,7 @@ def join_or_values_re(
         for val in exprs
     )
     vals = [
-        convert_str_to_re(val)
-        if isinstance(val, SigmaString) and val.contains_special()
-        else val
+        convert_str_to_re(val) if isinstance(val, SigmaString) and val.contains_special() else val
         for val in exprs
     ]
     or_value = "|".join(

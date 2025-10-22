@@ -56,48 +56,46 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "gte": (1, "fieldA>=1"),
     "fieldref": (
         "fieldA",
-        'label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`,'
-        'match_1=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`'
-        ' | match_0=`true` and match_1!=`true`',
+        "label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`,"
+        "match_1=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`"
+        " | match_0=`true` and match_1!=`true`",
     ),
     "expand": ('"%test%"', "fieldA=~`(?i)^valueA$`"),
     "minute": (
         1,
         'label_format date_0=`{{ date "04" (unixToTime .fieldA) }}`,'
         'date_1=`{{ date "04" (unixToTime .fieldA) }}`'
-        ' | date_0=`1` and date_1!=`1`',
+        " | date_0=`1` and date_1!=`1`",
     ),
     "hour": (
         1,
         'label_format date_0=`{{ date "15" (unixToTime .fieldA) }}`,'
         'date_1=`{{ date "15" (unixToTime .fieldA) }}`'
-        ' | date_0=`1` and date_1!=`1`',
+        " | date_0=`1` and date_1!=`1`",
     ),
     "day": (
         1,
         'label_format date_0=`{{ date "02" (unixToTime .fieldA) }}`,'
         'date_1=`{{ date "02" (unixToTime .fieldA) }}`'
-        ' | date_0=`1` and date_1!=`1`',
+        " | date_0=`1` and date_1!=`1`",
     ),
     "week": (1, "---"),  # Unsupported by the datetime layout
     "month": (
         1,
         'label_format date_0=`{{ date "01" (unixToTime .fieldA) }}`,'
         'date_1=`{{ date "01" (unixToTime .fieldA) }}`'
-        ' | date_0=`1` and date_1!=`1`',
+        " | date_0=`1` and date_1!=`1`",
     ),
     "year": (
         1,
         'label_format date_0=`{{ date "2006" (unixToTime .fieldA) }}`,'
         'date_1=`{{ date "2006" (unixToTime .fieldA) }}`'
-        ' | date_0=`1` and date_1!=`1`',
+        " | date_0=`1` and date_1!=`1`",
     ),
 }
 
 
-def generate_rule_with_field_modifier(
-    modifier: str, value: Tuple[Any, str]
-) -> Tuple[str, str]:
+def generate_rule_with_field_modifier(modifier: str, value: Tuple[Any, str]) -> Tuple[str, str]:
     """Generate a Sigma rule with a field modifier."""
     rule = """
     title: Test
@@ -133,15 +131,11 @@ def test_modifiers(loki_backend: LogQLBackend):
 
 @pytest.mark.parametrize("label", modifier_mapping.keys())
 def test_loki_field_modifiers(loki_backend: LogQLBackend, label: str):
-    input_rule, output_expr = generate_rule_with_field_modifier(
-        label, modifier_sample_data[label]
-    )
+    input_rule, output_expr = generate_rule_with_field_modifier(label, modifier_sample_data[label])
     try:
         query = loki_backend.convert(SigmaCollection.from_yaml(input_rule))
         assert output_expr in query[0]
     except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError):
-        pytest.skip(
-            f"Backend does not support {modifier_mapping[label].__name__} modifier"
-        )
+        pytest.skip(f"Backend does not support {modifier_mapping[label].__name__} modifier")
     except Exception as e:
         pytest.fail(f"Unexpected exception: {e}")

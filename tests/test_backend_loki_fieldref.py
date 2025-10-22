@@ -11,10 +11,9 @@ def loki_backend():
 
 # Testing line filters introduction
 def test_loki_field_ref_single(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -25,19 +24,16 @@ def test_loki_field_ref_single(loki_backend: LogQLBackend):
                     field|fieldref: fieldA
                 condition: sel
         """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+    ]
 
 
 def test_loki_field_ref_multi(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -49,19 +45,16 @@ def test_loki_field_ref_multi(loki_backend: LogQLBackend):
                     field2|fieldref: fieldB
                 condition: sel
             """
-            )
         )
-        == [
-            '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1=`true`'
-        ]
-    )
+    ) == [
+        '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1=`true`'
+    ]
 
 
 def test_loki_field_ref_json(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -72,19 +65,16 @@ def test_loki_field_ref_json(loki_backend: LogQLBackend):
                     field|fieldref: fieldA
                 condition: sel
             """
-            )
         )
-        == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
-        ]
-    )
+    ) == [
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+    ]
 
 
 def test_loki_field_ref_json_multi_selection(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -96,21 +86,18 @@ def test_loki_field_ref_json_multi_selection(loki_backend: LogQLBackend):
                     field2: Something
                 condition: sel
             """
-            )
         )
-        == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)^Something$`'
-            "| label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` "
-            "| match_0=`true`"
-        ]
-    )
+    ) == [
+        '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)^Something$`'
+        "| label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` "
+        "| match_0=`true`"
+    ]
 
 
 def test_loki_field_ref_negated(loki_backend: LogQLBackend):
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -123,12 +110,10 @@ def test_loki_field_ref_negated(loki_backend: LogQLBackend):
                     field2|fieldref: fieldB
                 condition: sel and not sel2
             """
-            )
         )
-        == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1!=`true`'
-        ]
-    )
+    ) == [
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1!=`true`'
+    ]
 
 
 def test_loki_field_ref_with_pipeline(loki_backend: LogQLBackend):
@@ -144,10 +129,9 @@ def test_loki_field_ref_with_pipeline(loki_backend: LogQLBackend):
     )
     loki_backend.processing_pipeline = pipeline
 
-    assert (
-        loki_backend.convert(
-            SigmaCollection.from_yaml(
-                """
+    assert loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
             title: Test
             status: test
             logsource:
@@ -158,9 +142,7 @@ def test_loki_field_ref_with_pipeline(loki_backend: LogQLBackend):
                     field|fieldref: fieldA
                 condition: sel
             """
-            )
         )
-        == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .event_field .event_fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
-        ]
-    )
+    ) == [
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .event_field .event_fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+    ]

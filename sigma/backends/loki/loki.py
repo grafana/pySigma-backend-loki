@@ -30,7 +30,11 @@ from sigma.conditions import (
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
-from sigma.correlations import SigmaCorrelationRule, SigmaCorrelationTypeLiteral
+from sigma.correlations import (
+    SigmaCorrelationRule,
+    SigmaCorrelationTypeLiteral,
+    SigmaCorrelationConditionOperator,
+)
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaError
 from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
@@ -73,13 +77,11 @@ Conditions = Union[
     ConditionItem,
     ConditionFieldEqualsValueExpression,
     ConditionValueExpression,
-    None
+    None,
 ]
 
 
-class LogQLLogParser(
-    Enum
-):  # would be a little nicer as a StrEnum, requires Python 3.11
+class LogQLLogParser(Enum):  # would be a little nicer as a StrEnum, requires Python 3.11
     """The different log parsers available in LogQL.
 
     See: https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression"""
@@ -227,12 +229,12 @@ class LogQLBackend(TextQueryBackend):
     }
     correlation_search_single_rule_expression = "{query}"
     event_count_aggregation_expression = {
-        "default": "sum{groupby}(count_over_time({search} [{timespan}]))",
+        "default": "sum{groupby}({range_vector_function}({search} [{timespan}]))",
     }
     # Note: here groupby includes field appended to the end, due to the overriden implementation of
     #       convert_correlation_aggregation_from_template
     value_count_aggregation_expression = {
-        "default": "count without ({field}) (sum{groupby}(count_over_time({search} [{timespan}])))",
+        "default": "count without ({field}) (sum{groupby}({range_vector_function}({search} [{timespan}])))",
     }
     # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
     timespan_mapping = {}
@@ -276,9 +278,7 @@ class LogQLBackend(TextQueryBackend):
     ):
         super().__init__(processing_pipeline, collect_errors)
         # mypy type: ignore required due to incorrect typing on Backend
-        self.last_processing_pipeline: Optional[
-            ProcessingPipeline
-        ] = processing_pipeline  # type: ignore[assignment]
+        self.last_processing_pipeline: Optional[ProcessingPipeline] = processing_pipeline  # type: ignore[assignment]
 
         if isinstance(add_line_filters, bool):
             self.add_line_filters = add_line_filters
@@ -320,9 +320,7 @@ class LogQLBackend(TextQueryBackend):
         """Select a logstream based on the logsource information included within a rule and
         following the assumptions described in select_log_parser."""
         if LokiCustomAttributes.LOGSOURCE_SELECTION.value in rule.custom_attributes:
-            return rule.custom_attributes[
-                LokiCustomAttributes.LOGSOURCE_SELECTION.value
-            ]
+            return rule.custom_attributes[LokiCustomAttributes.LOGSOURCE_SELECTION.value]
         logsource = rule.logsource
         if logsource.product == "windows":
             return '{job=~"eventlog|winlog|windows|fluentbit.*"}'
@@ -331,9 +329,7 @@ class LogQLBackend(TextQueryBackend):
         # By default, bring back all log streams
         return '{job=~".+"}'
 
-    def partition_rule(
-        self, condition: Conditions, partitions: int
-    ) -> List[Conditions]:
+    def partition_rule(self, condition: Conditions, partitions: int) -> List[Conditions]:
         """Given a rule that is (probably) going to generate a query that is longer
         than the maximum query length for LogQL, break it into smaller conditions, by
         identifying the highest level OR in the parse tree and equally dividing its
@@ -405,9 +401,9 @@ class LogQLBackend(TextQueryBackend):
                 negated=getattr(expr, "negated", False),
                 deftype=LogQLDeferredType.STR,
             )
-        elif isinstance(
-            expr.value, (SigmaString, SigmaNumber, SigmaBool)
-        ) and not getattr(expr, "negated", False):
+        elif isinstance(expr.value, (SigmaString, SigmaNumber, SigmaBool)) and not getattr(
+            expr, "negated", False
+        ):
             return LogQLLineFilterInfo(
                 value=str(expr.value),
                 negated=getattr(expr, "negated", False),
@@ -422,9 +418,9 @@ class LogQLBackend(TextQueryBackend):
                 and anchors.group("body")
                 and (anchors.group("start") or anchors.group("end"))
             ):
-                regexp = (
-                    anchors.group("ext") if anchors.group("ext") else ""
-                ) + anchors.group("body")
+                regexp = (anchors.group("ext") if anchors.group("ext") else "") + anchors.group(
+                    "body"
+                )
             return LogQLLineFilterInfo(
                 value=regexp,
                 negated=getattr(expr, "negated", False),
@@ -513,10 +509,7 @@ class LogQLBackend(TextQueryBackend):
             return self.convert_field_expression_to_line_filter(cond, log_parser)
         # AND clauses: any of the values could be true - so pick the longest one
         if isinstance(cond, ConditionAND):
-            candidates = [
-                self.generate_candidate_line_filter(arg, log_parser)
-                for arg in cond.args
-            ]
+            candidates = [self.generate_candidate_line_filter(arg, log_parser) for arg in cond.args]
             longest = None
             for cand in candidates:
                 if cand and (longest is None or len(cand.value) > len(longest.value)):
@@ -525,23 +518,16 @@ class LogQLBackend(TextQueryBackend):
         # OR clauses: all of the values must be possible, so we can use the LCS of
         # them all
         elif isinstance(cond, ConditionOR):
-            candidates = [
-                self.generate_candidate_line_filter(arg, log_parser)
-                for arg in cond.args
-            ]
+            candidates = [self.generate_candidate_line_filter(arg, log_parser) for arg in cond.args]
             # The longest common substring of all the arguments is permissible as a
             # line filter, as every candidate must contain at least that string
             return self.find_longest_common_string_line_filter(candidates, log_parser)
         else:  # pragma: no cover
             # The above should cover all existing Sigma classes, but just in case...
             # (Helpful for spotting ConditionNOTs that somehow got through)
-            raise SigmaError(
-                f"Unhandled type by Loki backend: {str(cond.__class__.__name__)}"
-            )
+            raise SigmaError(f"Unhandled type by Loki backend: {str(cond.__class__.__name__)}")
 
-    def update_parsed_conditions(
-        self, condition: Conditions, negated: bool = False
-    ) -> Conditions:
+    def update_parsed_conditions(self, condition: Conditions, negated: bool = False) -> Conditions:
         """Do a depth-first recursive search of the parsed items and update conditions
         to meet LogQL's structural requirements:
 
@@ -569,9 +555,7 @@ class LogQLBackend(TextQueryBackend):
             ):
                 condition.value = convert_str_to_re(
                     condition.value,
-                    field_filter=isinstance(
-                        condition, ConditionFieldEqualsValueExpression
-                    ),
+                    field_filter=isinstance(condition, ConditionFieldEqualsValueExpression),
                 )
         if isinstance(condition, ConditionItem):
             if isinstance(condition, ConditionNOT) and condition.args[0] is not None:
@@ -590,7 +574,7 @@ class LogQLBackend(TextQueryBackend):
                     new_condition.parent = condition.parent
                     for i in range(len(condition.args)):
                         if condition.args[i] is not None:
-                            condition.args[i].parent = new_condition # type: ignore
+                            condition.args[i].parent = new_condition  # type: ignore
                             condition.args[i] = self.update_parsed_conditions(
                                 condition.args[i], negated
                             )
@@ -622,17 +606,13 @@ class LogQLBackend(TextQueryBackend):
             self.last_processing_pipeline = (
                 self.backend_processing_pipeline
                 + self.processing_pipeline
-                + self.output_format_processing_pipeline[
-                    output_format or self.default_format
-                ]
+                + self.output_format_processing_pipeline[output_format or self.default_format]
             )
 
             error_state = "applying processing pipeline on"
             self.last_processing_pipeline.apply(rule)  # 1. Apply transformations
             states = [
-                ConversionState(
-                    processing_state=dict(self.last_processing_pipeline.state)
-                )
+                ConversionState(processing_state=dict(self.last_processing_pipeline.state))
                 for _ in rule.detection.parsed_condition
             ]
 
@@ -677,9 +657,7 @@ class LogQLBackend(TextQueryBackend):
                             if def_type is LogQLDeferredType.STR:
                                 line_filter = LogQLDeferredUnboundStrExpression(
                                     states[index],
-                                    self.convert_value_str(
-                                        SigmaString(value), states[index]
-                                    ),
+                                    self.convert_value_str(SigmaString(value), states[index]),
                                 )
                             elif def_type is LogQLDeferredType.REGEXP:
                                 line_filter = LogQLDeferredUnboundRegexpExpression(
@@ -742,9 +720,7 @@ class LogQLBackend(TextQueryBackend):
                 e.args = (e.args[0] + msg,)
             raise
 
-    def convert_value_re(
-        self, r: SigmaRegularExpression, state: ConversionState
-    ) -> str:
+    def convert_value_re(self, r: SigmaRegularExpression, state: ConversionState) -> str:
         return escape_and_quote_re(r, self.re_flag_prefix)
 
     def convert_condition_or(
@@ -889,9 +865,7 @@ class LogQLBackend(TextQueryBackend):
             LogQLDeferredLabelFormatExpression(
                 state, label, f'{{{{ date "{timestamp_part}" (unixToTime .{field}) }}}}'
             )
-            expr = LogQLDeferredLabelFilterExpression(
-                state, label, value=str(cond.value)
-            )
+            expr = LogQLDeferredLabelFilterExpression(state, label, value=str(cond.value))
             if getattr(cond, "negated", False):
                 expr.negate()
             self.label_tracker += 1
@@ -911,11 +885,7 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_field_eq_val_str(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        if (
-            not self.case_sensitive
-            and isinstance(cond.value, SigmaString)
-            and len(cond.value) > 0
-        ):
+        if not self.case_sensitive and isinstance(cond.value, SigmaString) and len(cond.value) > 0:
             cond.value = convert_str_to_re(cond.value, True, True)
             return super().convert_condition_field_eq_val_re(cond, state)
         return super().convert_condition_field_eq_val_str(cond, state)
@@ -993,14 +963,11 @@ class LogQLBackend(TextQueryBackend):
         """Select appropriate condition to join together field values and push down
         negation"""
         if not isinstance(cond.value, SigmaExpansion):
-            raise SigmaError(
-                "convert_condition_field_eq_expansion called on non-expansion value"
-            )
+            raise SigmaError("convert_condition_field_eq_expansion called on non-expansion value")
         is_negated = getattr(cond, "negated", False)
         LogQLBackend.set_expression_templates(is_negated)
         exprs = [
-            ConditionFieldEqualsValueExpression(cond.field, value)
-            for value in cond.value.values
+            ConditionFieldEqualsValueExpression(cond.field, value) for value in cond.value.values
         ]
         # Fun fact: map(lamdba expr: setattr(expr, "negated", is_negated), exprs)
         # does nothing!
@@ -1041,24 +1008,33 @@ class LogQLBackend(TextQueryBackend):
         template = templates[method]
         # When doing a value_count correlation, Loki must append the value field to the group-by
         groups = rule.group_by
-        if (
-            correlation_type == "value_count"
-            and rule.condition
-            and rule.condition.fieldref
-        ):
+        if correlation_type == "value_count" and rule.condition and rule.condition.fieldref:
             if not groups:
                 groups = [rule.condition.fieldref]
             else:
                 groups.append(rule.condition.fieldref)
+        range_vector_function = "count_over_time"
+        if (correlation_type in ("value_count", "event_count")) and rule.condition:
+            if (
+                rule.condition.count == 0
+                and rule.condition.op
+                in (SigmaCorrelationConditionOperator.EQ, SigmaCorrelationConditionOperator.LTE)
+            ) or (
+                rule.condition.count == 1
+                and rule.condition.op == SigmaCorrelationConditionOperator.LT
+            ):
+                range_vector_function = "absent_over_time"
+                # Since absent_over_time returns a 1 when the condition is true, we need to update the condition to an equality condition
+                rule.condition.op = SigmaCorrelationConditionOperator.EQ
+                rule.condition.count = 1
         return template.format(
             rule=rule,
             referenced_rules=self.convert_referenced_rules(rule.rules, method),
             field=rule.condition.fieldref if rule.condition else None,
             timespan=self.convert_timespan(rule.timespan, method),
-            groupby=self.convert_correlation_aggregation_groupby_from_template(
-                groups, method
-            ),
+            groupby=self.convert_correlation_aggregation_groupby_from_template(groups, method),
             search=search,
+            range_vector_function=range_vector_function,
         )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
@@ -1117,9 +1093,7 @@ class LogQLBackend(TextQueryBackend):
                         "| " if len(query) > 0 else f"{query_log_parser} "
                     ) + f"label_format {label_fmt}"
                     filter_fmt = f" {self.and_token} "
-                    field_ref_filters_expression = (
-                        f" | {filter_fmt.join(label_field_filters)}"
-                    )
+                    field_ref_filters_expression = f" | {filter_fmt.join(label_field_filters)}"
 
                 query = (
                     self.deferred_separator.join(standard_deferred)
