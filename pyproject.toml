@@ -21,7 +21,7 @@ mypy = { extras = ["faster-cache"], version = "^1.16.1" }
 pytest = "^7.4.4"
 pytest-cov = "^4.1.0"
 pytest-mypy = "^0.10.3"
-ruff = "^0.2.2"
+ruff = "^0.14.0"
 types-pyyaml = "^6.0.12"
 
 [tool.ruff]
