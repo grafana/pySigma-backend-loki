@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Move closed issues and merged PRs to the "✅ Done" column
-        uses: grafana/auto-mate@v1
+        uses: grafana/auto-mate@fec4390aee45a9b143209fc465315b82a7032e00 # v1
         with:
           token: ${{ secrets.AUTO_MATE_TOKEN }}
           projectNo: 346
