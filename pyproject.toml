@@ -16,13 +16,13 @@ python = "^3.9"
 pysigma = "^1.0.0rc2"
 
 [tool.poetry.group.dev.dependencies]
-coverage = "^7.10.6"
-mypy = { extras = ["faster-cache"], version = "^1.16.1" }
-pytest = "^8.0.0"
-pytest-cov = "^7.0.0"
-pytest-mypy = "^1.0.0"
-ruff = "^0.14.0"
-types-pyyaml = "^6.0.12"
+coverage = "7.10.7"
+mypy = { extras = ["faster-cache"], version = "1.18.2" }
+pytest = "8.4.2"
+pytest-cov = "7.0.0"
+pytest-mypy = "1.0.1"
+ruff = "0.14.1"
+types-pyyaml = "6.0.12"
 
 [tool.ruff]
 exclude = ["dist", "build", "env", "venv", ".env", ".venv"]
