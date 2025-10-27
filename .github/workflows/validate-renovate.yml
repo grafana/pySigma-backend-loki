@@ -1,0 +1,23 @@
+name: Validate Renovate Config
+
+on:
+  pull_request:
+    paths:
+      - "renovate.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "renovate.json"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - name: Validate Renovate Config
+        uses: grafana/shared-workflows/actions/validate-renovate-config@4178c5d9a0403e8b8e123baebc66e224d9c4f3cd # v0.1.0
+
