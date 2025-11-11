@@ -18,7 +18,7 @@ pysigma = "^1.0.0rc2"
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.10.6"
 mypy = { extras = ["faster-cache"], version = "^1.16.1" }
-pytest = "^8.0.0"
+pytest = "^9.0.0"
 pytest-cov = "^7.0.0"
 pytest-mypy = "^1.0.0"
 ruff = "^0.14.0"
