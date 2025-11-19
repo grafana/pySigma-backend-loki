@@ -5,20 +5,19 @@ description = "pySigma Loki backend"
 readme = "README.md"
 authors = [
     "Nick Moore <nicholas.moore@grafana.com>",
-    "Mostafa Moradian <mostafa.moradian@grafana.com>",
 ]
 license = "AGPL-3.0-only"
 repository = "https://github.com/grafana/pySigma-backend-loki"
 packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 pysigma = "^1.0.0rc2"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.10.6"
 mypy = { extras = ["faster-cache"], version = "^1.16.1" }
-pytest = "^8.0.0"
+pytest = "^9.0.0"
 pytest-cov = "^7.0.0"
 pytest-mypy = "^1.0.0"
 ruff = "^0.14.0"
