@@ -81,15 +81,12 @@ def test_windows_grafana_pipeline():
         """
     )
     loki_rule = backend.convert(sigma_rule)
-    assert (
-        loki_rule
-        == [
-            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
-            '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
-            '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
-            "| logfmt | Image=~`(?i).*\\.exe$` and event_id=1"
-        ]
-    )
+    assert loki_rule == [
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
+        '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
+        '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
+        "| logfmt | Image=~`(?i).*\\.exe$` and event_id=1"
+    ]
 
 
 def test_okta_json_pipeline():
@@ -266,10 +263,7 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         ),
         (
             "authenticationcontext.credentialtype",
-            [
-                '{job=~".+"} | json | event_authenticationContext_credentialType=~`(?i)^test_'
-                "value$`"
-            ],
+            ['{job=~".+"} | json | event_authenticationContext_credentialType=~`(?i)^test_value$`'],
         ),
         (
             "authenticationcontext.issuer.id",

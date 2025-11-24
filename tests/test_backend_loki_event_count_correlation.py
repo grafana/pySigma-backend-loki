@@ -38,7 +38,7 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum(count_over_time({job=~".+"} | logfmt | ' "fieldA=~`(?i)^valueA$` [30s])) == 42"
+        'sum(count_over_time({job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [30s])) == 42'
     ]
 
 
@@ -71,8 +71,7 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum by (fieldB) (count_over_time({job=~".+"} | logfmt | '
-        "fieldA=~`(?i)^valueA$` [5m])) >= 1"
+        'sum by (fieldB) (count_over_time({job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [5m])) >= 1'
     ]
 
 
@@ -220,7 +219,7 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum(absent_over_time({job=~".+"} | logfmt | ' "fieldA=~`(?i)^valueA$` [30s])) == 1"
+        'sum(absent_over_time({job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [30s])) == 1'
     ]
 
 

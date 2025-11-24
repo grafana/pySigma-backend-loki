@@ -212,9 +212,9 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                     product=rule.logsource.product,
                     service=rule.logsource.service,
                 )
-            rule.custom_attributes[
-                LokiCustomAttributes.LOGSOURCE_SELECTION.value
-            ] = formatted_selectors
+            rule.custom_attributes[LokiCustomAttributes.LOGSOURCE_SELECTION.value] = (
+                formatted_selectors
+            )
             super().apply(rule)
         else:
             for ruleref in rule.rules:

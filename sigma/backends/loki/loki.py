@@ -375,8 +375,7 @@ class LogQLBackend(TextQueryBackend):
                 # No OR statement within the large query, so probably no way of
                 # dividing query
                 warn(
-                    "Cannot partition a rule that exceeds query length limits "
-                    "due to lack of ORs",
+                    "Cannot partition a rule that exceeds query length limits due to lack of ORs",
                 )
                 return [condition]
             new_conditions.append(condition_copy)
@@ -594,7 +593,10 @@ class LogQLBackend(TextQueryBackend):
 
     # Overriding Sigma TextQueryBackend functionality as necessary
     def convert_rule(
-        self, rule: SigmaRule, output_format: Optional[str] = None, callback: Optional[Callable[[SigmaRule, Optional[str], int, Any, Any], Any]] = None,
+        self,
+        rule: SigmaRule,
+        output_format: Optional[str] = None,
+        callback: Optional[Callable[[SigmaRule, Optional[str], int, Any, Any], Any]] = None,
     ) -> List[Union[str, DeferredQueryExpression]]:
         """Convert a single Sigma rule into one or more queries, based on the maximum
         estimated length of a generated query, and updating the parse tree

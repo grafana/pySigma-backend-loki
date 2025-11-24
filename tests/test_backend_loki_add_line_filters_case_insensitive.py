@@ -122,8 +122,7 @@ def test_loki_lf_and_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)^valueA$` '
-        "and fieldB=~`(?i)^valueB$`"
+        '{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)^valueA$` and fieldB=~`(?i)^valueB$`'
     ]
 
 
@@ -186,8 +185,7 @@ def test_loki_lf_not_or_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueA$` and '
-        "fieldB!~`(?i)^valueB$`"
+        '{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`'
     ]
 
 
@@ -308,8 +306,7 @@ def test_loki_lf_all_query(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)^valueA$` and '
-        "fieldA=~`(?i)^valueB$`"
+        '{job=~".+"} |~ `(?i)valueA` | logfmt | fieldA=~`(?i)^valueA$` and fieldA=~`(?i)^valueB$`'
     ]
 
 
@@ -797,9 +794,9 @@ def test_loki_lf_very_long_query_or_right_filters(loki_backend: LogQLBackend):
                 product: test_product
             detection:
                 sel_A:
-                    fieldA: value{'A'*4000}
+                    fieldA: value{"A" * 4000}
                 sel_B:
-                    fieldB: value{'B'*4000}
+                    fieldB: value{"B" * 4000}
                 condition: 1 of sel_*
             """
     test = loki_backend.convert(SigmaCollection.from_yaml(yaml))

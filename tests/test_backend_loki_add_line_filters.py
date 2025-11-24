@@ -789,9 +789,9 @@ def test_loki_lf_very_long_query_or_right_filters(loki_backend: LogQLBackend):
                 product: test_product
             detection:
                 sel_A:
-                    fieldA: value{'A'*4000}
+                    fieldA: value{"A" * 4000}
                 sel_B:
-                    fieldB: value{'B'*4000}
+                    fieldB: value{"B" * 4000}
                 condition: 1 of sel_*
             """
     test = loki_backend.convert(SigmaCollection.from_yaml(yaml))
