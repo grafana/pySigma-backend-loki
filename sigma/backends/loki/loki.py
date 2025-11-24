@@ -1,3 +1,4 @@
+from calendar import c
 import copy
 import math
 import re
@@ -639,11 +640,13 @@ class LogQLBackend(TextQueryBackend):
                     attempt_shortening = False
 
                 error_state = "converting"
-                # mypy type: ignore required due to ConditionItem (an ABC) being in Conditions
-                queries = [  # 2. Convert condition
-                    (index, self.convert_condition(cond, states[index]))  # type: ignore[arg-type]
-                    for index, cond in conditions
-                ]
+                # 2. Convert conditions
+                queries = []
+                for index, cond in conditions:
+                    query = self.convert_condition(cond, states[index])
+                    if callback is not None:
+                        query = callback(rule, output_format, index, cond, query)
+                    queries.append((index, query))
 
                 for index, query in queries:
                     if not states[index].has_deferred() and self.add_line_filters:
