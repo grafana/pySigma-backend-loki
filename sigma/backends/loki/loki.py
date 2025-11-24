@@ -831,32 +831,20 @@ class LogQLBackend(TextQueryBackend):
                     cond.field, cond.value.field
                 )
                 label = f"match_{self.label_tracker}"
+                comparison = "eq"
+                if cond.value.starts_with and cond.value.ends_with:
+                    comparison = "contains"
+                elif cond.value.starts_with:
+                    comparison = "hasPrefix"
+                elif cond.value.ends_with:
+                    comparison = "hasSuffix"
                 # This gets added by the base class to the state, so we don't need
                 # to return this here, see __post_init__()
-                if cond.value.starts_with and cond.value.ends_with:
-                    LogQLDeferredLabelFormatExpression(
-                        state,
-                        label,
-                        f"{{{{ if contains .{field2} .{field1} }}}}true{{{{ else }}}}false{{{{ end }}}}",
-                    )
-                elif cond.value.starts_with:
-                    LogQLDeferredLabelFormatExpression(
-                        state,
-                        label,
-                        f"{{{{ if hasPrefix .{field2} .{field1} }}}}true{{{{ else }}}}false{{{{ end }}}}",
-                    )
-                elif cond.value.ends_with:
-                    LogQLDeferredLabelFormatExpression(
-                        state,
-                        label,
-                        f"{{{{ if hasSuffix .{field2} .{field1} }}}}true{{{{ else }}}}false{{{{ end }}}}",
-                    )
-                else:
-                    LogQLDeferredLabelFormatExpression(
-                        state,
-                        label,
-                        f"{{{{ if eq .{field1} .{field2} }}}}true{{{{ else }}}}false{{{{ end }}}}",
-                    )
+                LogQLDeferredLabelFormatExpression(
+                    state,
+                    label,
+                    f"{{{{ if {comparison} .{field2} .{field1} }}}}true{{{{ else }}}}false{{{{ end }}}}",
+                )
                 expr = LogQLDeferredLabelFilterExpression(
                     state,
                     label,

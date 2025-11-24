@@ -26,7 +26,7 @@ def test_loki_field_ref_single(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+        '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .fieldA .field }}true{{ else }}false{{ end }}` | match_0=`true`'
     ]
 
 
@@ -47,7 +47,7 @@ def test_loki_field_ref_multi(loki_backend: LogQLBackend):
             """
         )
     ) == [
-        '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1=`true`'
+        '{job=~".+"} | logfmt | label_format match_0=`{{ if eq .fieldA .field1 }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .fieldB .field2 }}true{{ else }}false{{ end }}` | match_0=`true` and match_1=`true`'
     ]
 
 
@@ -67,7 +67,7 @@ def test_loki_field_ref_json(loki_backend: LogQLBackend):
             """
         )
     ) == [
-        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .fieldA .field }}true{{ else }}false{{ end }}` | match_0=`true`'
     ]
 
 
@@ -89,7 +89,7 @@ def test_loki_field_ref_json_multi_selection(loki_backend: LogQLBackend):
         )
     ) == [
         '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)^Something$`'
-        "| label_format match_0=`{{ if eq .field1 .fieldA }}true{{ else }}false{{ end }}` "
+        "| label_format match_0=`{{ if eq .fieldA .field1 }}true{{ else }}false{{ end }}` "
         "| match_0=`true`"
     ]
 
@@ -112,7 +112,7 @@ def test_loki_field_ref_negated(loki_backend: LogQLBackend):
             """
         )
     ) == [
-        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .field .fieldA }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .field2 .fieldB }}true{{ else }}false{{ end }}` | match_0=`true` and match_1!=`true`'
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .fieldA .field }}true{{ else }}false{{ end }}`,match_1=`{{ if eq .fieldB .field2 }}true{{ else }}false{{ end }}` | match_0=`true` and match_1!=`true`'
     ]
 
 
@@ -144,7 +144,7 @@ def test_loki_field_ref_with_pipeline(loki_backend: LogQLBackend):
             """
         )
     ) == [
-        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .event_field .event_fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
+        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .event_fieldA .event_field }}true{{ else }}false{{ end }}` | match_0=`true`'
     ]
 
 

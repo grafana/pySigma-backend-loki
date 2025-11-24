@@ -55,9 +55,9 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "gt": (1, "fieldA>1"),
     "gte": (1, "fieldA>=1"),
     "fieldref": (
-        "fieldA",
-        "label_format match_0=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`,"
-        "match_1=`{{ if eq .fieldA .fieldA }}true{{ else }}false{{ end }}`"
+        "fieldB",
+        "label_format match_0=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`,"
+        "match_1=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`"
         " | match_0=`true` and match_1!=`true`",
     ),
     "expand": ('"%test%"', "fieldA=~`(?i)^valueA$`"),
