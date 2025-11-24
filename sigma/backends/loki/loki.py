@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 from enum import Enum, auto
 from typing import (
     Any,
+    Callable,
     ClassVar,
     Deque,
     Dict,
@@ -374,8 +375,7 @@ class LogQLBackend(TextQueryBackend):
                 # No OR statement within the large query, so probably no way of
                 # dividing query
                 warn(
-                    "Cannot partition a rule that exceeds query length limits "
-                    "due to lack of ORs",
+                    "Cannot partition a rule that exceeds query length limits due to lack of ORs",
                 )
                 return [condition]
             new_conditions.append(condition_copy)
@@ -593,7 +593,10 @@ class LogQLBackend(TextQueryBackend):
 
     # Overriding Sigma TextQueryBackend functionality as necessary
     def convert_rule(
-        self, rule: SigmaRule, output_format: Optional[str] = None
+        self,
+        rule: SigmaRule,
+        output_format: Optional[str] = None,
+        callback: Optional[Callable[[SigmaRule, Optional[str], int, Any, Any], Any]] = None,
     ) -> List[Union[str, DeferredQueryExpression]]:
         """Convert a single Sigma rule into one or more queries, based on the maximum
         estimated length of a generated query, and updating the parse tree
@@ -636,11 +639,13 @@ class LogQLBackend(TextQueryBackend):
                     attempt_shortening = False
 
                 error_state = "converting"
-                # mypy type: ignore required due to ConditionItem (an ABC) being in Conditions
-                queries = [  # 2. Convert condition
-                    (index, self.convert_condition(cond, states[index]))  # type: ignore[arg-type]
-                    for index, cond in conditions
-                ]
+                # 2. Convert conditions
+                queries = []
+                for index, cond in conditions:
+                    query = self.convert_condition(cond, states[index])
+                    if callback is not None:
+                        query = callback(rule, output_format, index, cond, query)
+                    queries.append((index, query))
 
                 for index, query in queries:
                     if not states[index].has_deferred() and self.add_line_filters:
@@ -828,12 +833,19 @@ class LogQLBackend(TextQueryBackend):
                     cond.field, cond.value.field
                 )
                 label = f"match_{self.label_tracker}"
+                comparison = "eq"
+                if cond.value.starts_with and cond.value.ends_with:
+                    comparison = "contains"
+                elif cond.value.starts_with:
+                    comparison = "hasPrefix"
+                elif cond.value.ends_with:
+                    comparison = "hasSuffix"
                 # This gets added by the base class to the state, so we don't need
                 # to return this here, see __post_init__()
                 LogQLDeferredLabelFormatExpression(
                     state,
                     label,
-                    f"{{{{ if eq .{field1} .{field2} }}}}true{{{{ else }}}}false{{{{ end }}}}",
+                    f"{{{{ if {comparison} .{field2} .{field1} }}}}true{{{{ else }}}}false{{{{ end }}}}",
                 )
                 expr = LogQLDeferredLabelFilterExpression(
                     state,
@@ -1010,9 +1022,11 @@ class LogQLBackend(TextQueryBackend):
         groups = rule.group_by
         if correlation_type == "value_count" and rule.condition and rule.condition.fieldref:
             if not groups:
-                groups = [rule.condition.fieldref]
-            else:
+                groups = []
+            if isinstance(rule.condition.fieldref, str):
                 groups.append(rule.condition.fieldref)
+            else:
+                groups.extend(rule.condition.fieldref)
         range_vector_function = "count_over_time"
         if (correlation_type in ("value_count", "event_count")) and rule.condition:
             if (
