@@ -147,7 +147,7 @@ def test_loki_field_ref_with_pipeline(loki_backend: LogQLBackend):
         '{job=~"eventlog|winlog|windows|fluentbit.*"} | json | label_format match_0=`{{ if eq .event_field .event_fieldA }}true{{ else }}false{{ end }}` | match_0=`true`'
     ]
 
-def test_loki_field_ref_negated(loki_backend: LogQLBackend):
+def test_loki_field_ref_substring_matching(loki_backend: LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml(
             """
