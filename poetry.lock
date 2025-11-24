@@ -257,6 +257,33 @@ tomli = {version = "*", optional = true, markers = "python_full_version <= \"3.1
 toml = ["tomli ; python_full_version <= \"3.11.0a6\""]
 
 [[package]]
+name = "diskcache"
+version = "5.6.3"
+description = "Disk Cache -- Disk and file backed persistent cache."
+optional = false
+python-versions = ">=3"
+groups = ["main"]
+files = [
+    {file = "diskcache-5.6.3-py3-none-any.whl", hash = "sha256:5e31b2d5fbad117cc363ebaf6b689474db18a1f6438bc82358b024abd4c2ca19"},
+    {file = "diskcache-5.6.3.tar.gz", hash = "sha256:2c3a3fa2743d8535d832ec61c2054a1641f41775aa7c556758a109941e33e4fc"},
+]
+
+[[package]]
+name = "diskcache-stubs"
+version = "5.6.3.6.20240818"
+description = "diskcache stubs"
+optional = false
+python-versions = ">=3"
+groups = ["main"]
+files = [
+    {file = "diskcache_stubs-5.6.3.6.20240818-py3-none-any.whl", hash = "sha256:e1db90940b344140730976abe79f57f5b43ca296cbb43fa95da0c69b12d5de4f"},
+    {file = "diskcache_stubs-5.6.3.6.20240818.tar.gz", hash = "sha256:b6eb43899e906b3167a20ac09a9a226f30267a306a96542ea720ebbfc3282796"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.4.0"
+
+[[package]]
 name = "exceptiongroup"
 version = "1.3.0"
 description = "Backport of PEP 654 (exception groups)"
@@ -674,23 +701,26 @@ diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
 name = "pysigma"
-version = "1.0.0rc2"
+version = "1.0.0"
 description = "Sigma rule processing and conversion tools"
 optional = false
-python-versions = "<4.0,>=3.9"
+python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "pysigma-1.0.0rc2-py3-none-any.whl", hash = "sha256:e0fc28c5d9da3ccc4411a1e5d78884c2612e38fb2f234122ae7d9e78e918d370"},
-    {file = "pysigma-1.0.0rc2.tar.gz", hash = "sha256:6b9fe06216769463db15fa674a99ee1e9337a1a33fa97af1ccb6c74cfd751443"},
+    {file = "pysigma-1.0.0-py3-none-any.whl", hash = "sha256:05e60574853c41011a571a8b125b0ed5e12a8c845439cd23671308d88ffc3fab"},
+    {file = "pysigma-1.0.0.tar.gz", hash = "sha256:1d7fab15f32908096db927c45698b8c089100bc65df9b3f7336b1ff7c2d76c3f"},
 ]
 
 [package.dependencies]
+diskcache = ">=5.6.3,<6.0.0"
+diskcache-stubs = ">=5.6.3.6.20240818,<6.0.0.0.0"
 jinja2 = ">=3.1.6,<4.0.0"
 packaging = ">=25.0,<26.0"
-pyparsing = ">=3.2,<4.0"
-pyyaml = ">=6.0,<7.0"
-requests = ">=2.32,<3.0"
-types-pyyaml = ">=6.0.12.20240917,<7.0.0.0"
+pyparsing = ">=3.2.5,<4.0.0"
+pyyaml = ">=6.0.3,<7.0.0"
+requests = ">=2.32.5,<3.0.0"
+types-pyyaml = ">=6.0.12.20250915,<7.0.0.0"
+typing-extensions = ">=4.15.0,<5.0.0"
 
 [[package]]
 name = "pytest"
@@ -958,7 +988,7 @@ version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = false
 python-versions = ">=3.9"
-groups = ["dev"]
+groups = ["main", "dev"]
 files = [
     {file = "typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548"},
     {file = "typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466"},
