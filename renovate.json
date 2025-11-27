@@ -5,6 +5,14 @@
     {
       "matchManagers": ["poetry"],
 	  "rangeStrategy": "replace"
+    },
+    {
+      "description": "Group together all GitHub Action updates in a single weekly commit (Tuesday, midnight GMT)",
+      "matchDepTypes": [
+        "action"
+      ],
+      "groupName": "GH Actions",
+      "schedule": ["* 0-2 * * 2"]
     }
   ]
 }
