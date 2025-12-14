@@ -1174,3 +1174,97 @@ def test_backend_options(loki_backend: LogQLBackend):
         LogQLBackend(unrecognise_argument=True)  # type: ignore[call-arg]
     except Exception as ex:
         assert isinstance(ex, TypeError)
+
+
+def test_loki_grafana_alerting_output(loki_backend: LogQLBackend):
+    """Test for output format grafana_alerting."""
+    result = loki_backend.convert(
+        SigmaCollection.from_yaml(
+            """
+            title: Test Sigma Rule
+            status: test
+            level: high
+            description: A test rule for grafana alerting
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                keyword:
+                    anything
+                condition: keyword
+        """
+        ),
+        "grafana_alerting",
+    )
+    assert "apiVersion: 1" in result
+    assert "folder: sigma" in result
+    assert "title: Test_Sigma_Rule" in result
+    assert "summary: Test Sigma Rule" in result
+    assert "description: A test rule for grafana alerting" in result
+    assert "severity: warning" in result
+    assert "sum(count_over_time(" in result
+    assert "receiver: default" in result
+
+
+def test_loki_grafana_alerting_with_options():
+    """Test grafana_alerting format with custom backend options."""
+    backend = LogQLBackend(
+        grafana_datasource_uid="custom-loki",
+        grafana_folder="security",
+        grafana_org_id=2,
+        grafana_interval="5m",
+        grafana_contact_point="slack",
+        loki_group_by_field="hostname",
+    )
+    result = backend.convert(
+        SigmaCollection.from_yaml(
+            """
+            title: Test Rule
+            status: test
+            level: critical
+            logsource:
+                category: test
+                product: test
+            detection:
+                sel:
+                    field: value
+                condition: sel
+        """
+        ),
+        "grafana_alerting",
+    )
+    assert "datasourceUid: custom-loki" in result
+    assert "folder: security" in result
+    assert "orgId: 2" in result
+    assert "interval: 5m" in result
+    assert "receiver: slack" in result
+    assert "sum by (hostname)" in result
+    assert "severity: critical" in result
+
+
+def test_grafana_alerting_backend_options():
+    """Test grafana_alerting backend options initialization."""
+    # Check defaults
+    backend = LogQLBackend()
+    assert backend.grafana_datasource_uid == "loki"
+    assert backend.grafana_folder == "sigma"
+    assert backend.grafana_org_id == 1
+    assert backend.grafana_interval == "1m"
+    assert backend.grafana_contact_point == "default"
+    assert backend.loki_group_by_field == ""
+
+    # Check custom values
+    custom_backend = LogQLBackend(
+        grafana_datasource_uid="my-loki",
+        grafana_folder="alerts",
+        grafana_org_id="3",
+        grafana_interval="10m",
+        grafana_contact_point="email",
+        loki_group_by_field="host",
+    )
+    assert custom_backend.grafana_datasource_uid == "my-loki"
+    assert custom_backend.grafana_folder == "alerts"
+    assert custom_backend.grafana_org_id == 3
+    assert custom_backend.grafana_interval == "10m"
+    assert custom_backend.grafana_contact_point == "email"
+    assert custom_backend.loki_group_by_field == "host"
