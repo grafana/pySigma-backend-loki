@@ -10,6 +10,7 @@ It supports the following output formats for Sigma rules:
 
 * `default`: plain Loki LogQL queries
 * `ruler`: creates Loki LogQL queries in the ruler (YAML) format for generating alerts
+* `grafana_alerting`: creates Grafana Alerting provisioning YAML format for deploying alerts directly to Grafana
 
 It also supports the following query formats for and categories of [Sigma Correlation rules](https://github.com/SigmaHQ/sigma-specification/blob/version_2/Sigma_meta_rules.md):
 * `default` format using [LogQL metric queries](https://grafana.com/docs/loki/latest/query/metric_queries/):
@@ -33,6 +34,26 @@ When converting rules into queries, the backend has the following optional argum
 * `add_line_filters` (boolean, default: `False`): if `True`, attempts to infer and add new line filters to queries without line filters, to [improve Loki query performance](https://grafana.com/docs/loki/latest/logql/log_queries/#line-filter-expression)
 * `case_sensitive` (boolean, default: `False`): if `True`, defaults to generating case-sensitive query filters, instead of case-insensitive filters that [the Sigma specification expects](https://github.com/SigmaHQ/sigma-specification/blob/main/Sigma_specification.md#general), trading between Loki query performance and potentially missing data with unexpected casing
   * Note: if the generated query will be executed on Loki v2.8.2 or older, this argument **should** be set to `False`, as these versions of Loki may contain issues with case-insensitive filters, which cause such queries to fail to match desired data
+
+When using the `grafana_alerting` output format, the following additional options are available:
+
+* `grafana_datasource_uid` (string, default: `loki`): the UID of the Loki datasource in Grafana
+* `grafana_folder` (string, default: `sigma`): the folder name where alerts will be provisioned in Grafana
+* `grafana_org_id` (integer, default: `1`): the Grafana organization ID
+* `grafana_interval` (string, default: `1m`): the evaluation interval for the alert rules
+* `grafana_contact_point` (string, default: `default`): the contact point to use for notifications
+* `loki_group_by_field` (string, default: empty): optional field name to group alerts by (e.g., `hostname`). If not specified, no grouping is applied.
+
+Example usage:
+
+```bash
+sigma convert -t loki -f grafana_alerting \
+  -O grafana_datasource_uid=my-loki \
+  -O grafana_folder=security-alerts \
+  -O grafana_contact_point=slack-security \
+  -o alerts.yml \
+  ./rules/
+```
 
 This backend is currently maintained by:
 

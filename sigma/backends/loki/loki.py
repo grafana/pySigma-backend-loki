@@ -114,6 +114,7 @@ class LogQLBackend(TextQueryBackend):
     formats: ClassVar[Dict[str, str]] = {
         "default": "Plain Loki queries",
         "ruler": "Loki 'ruler' output format for generating alerts",
+        "grafana_alerting": "Grafana Alerting provisioning YAML format",
     }
     requires_pipeline: ClassVar[bool] = False
 
@@ -267,6 +268,14 @@ class LogQLBackend(TextQueryBackend):
     add_line_filters: bool = False
     case_sensitive: bool = False
 
+    # Grafana Alerting options
+    grafana_datasource_uid: str = "loki"
+    grafana_folder: str = "sigma"
+    grafana_org_id: int = 1
+    grafana_interval: str = "1m"
+    grafana_contact_point: str = "default"
+    loki_group_by_field: str = ""
+
     # Field Ref Match Tracker
     label_tracker: int = 0
 
@@ -276,6 +285,12 @@ class LogQLBackend(TextQueryBackend):
         collect_errors: bool = False,
         add_line_filters: Union[bool, str] = False,
         case_sensitive: Union[bool, str] = False,
+        grafana_datasource_uid: str = "loki",
+        grafana_folder: str = "sigma",
+        grafana_org_id: Union[int, str] = 1,
+        grafana_interval: str = "1m",
+        grafana_contact_point: str = "default",
+        loki_group_by_field: str = "",
     ):
         super().__init__(processing_pipeline, collect_errors)
         # mypy type: ignore required due to incorrect typing on Backend
@@ -289,6 +304,14 @@ class LogQLBackend(TextQueryBackend):
             self.case_sensitive = case_sensitive
         else:
             self.case_sensitive = case_sensitive.lower() == "true"
+
+        # Grafana Alerting options
+        self.grafana_datasource_uid = grafana_datasource_uid
+        self.grafana_folder = grafana_folder
+        self.grafana_org_id = int(grafana_org_id) if isinstance(grafana_org_id, str) else grafana_org_id
+        self.grafana_interval = grafana_interval
+        self.grafana_contact_point = grafana_contact_point
+        self.loki_group_by_field = loki_group_by_field
 
     # Loki-specific functions
 
@@ -1162,3 +1185,91 @@ class LogQLBackend(TextQueryBackend):
         YAML format."""
         rules = {"groups": [{"name": "Sigma rules", "rules": queries}]}
         return dump(rules)
+
+    def finalize_query_grafana_alerting(
+        self, rule: SigmaRule, query: str, index: int, state: ConversionState
+    ) -> Dict[str, Any]:
+        """Convert a Sigma rule into Grafana Alerting provisioning format."""
+        import hashlib
+
+        # Generate UID from rule ID or title
+        if rule.id:
+            uid = str(rule.id)
+        else:
+            hash_obj = hashlib.md5(rule.title.encode())
+            uid = hash_obj.hexdigest()[:14]
+
+        title = self.field_replace_pattern.sub("_", rule.title).strip("_")
+        description = rule.description or rule.title or ""
+
+        # Wrap query in aggregation (skip if already a metric query from correlation rules)
+        if query.lstrip().startswith(("sum", "count", "avg", "min", "max")):
+            wrapped_expr = query
+        elif self.loki_group_by_field:
+            wrapped_expr = f"sum by ({self.loki_group_by_field})(count_over_time({query}[1m])) > 0"
+        else:
+            wrapped_expr = f"sum(count_over_time({query}[1m])) > 0"
+
+        # Build labels
+        labels: Dict[str, str] = {}
+        level_map = {
+            "critical": "critical",
+            "high": "warning",
+            "medium": "info",
+            "low": "info",
+            "informational": "info",
+        }
+        if rule.level:
+            labels["severity"] = level_map.get(rule.level.name.lower(), "info")
+        if rule.id:
+            labels["sigma_id"] = str(rule.id)
+
+        return {
+            "uid": uid,
+            "title": title,
+            "condition": "A",
+            "data": [{
+                "refId": "A",
+                "queryType": "instant",
+                "relativeTimeRange": {
+                    "from": 600,
+                    "to": 0,
+                },
+                "datasourceUid": self.grafana_datasource_uid,
+                "model": {
+                    "direction": "backward",
+                    "editorMode": "code",
+                    "expr": wrapped_expr,
+                    "instant": True,
+                    "intervalMs": 1000,
+                    "maxDataPoints": 43200,
+                    "queryType": "instant",
+                    "refId": "A",
+                },
+            }],
+            "noDataState": "OK",
+            "execErrState": "OK",
+            "annotations": {
+                "summary": rule.title,
+                "description": description,
+            },
+            "labels": labels,
+            "isPaused": False,
+            "notification_settings": {
+                "receiver": self.grafana_contact_point,
+            },
+        }
+
+    def finalize_output_grafana_alerting(self, queries: List[Dict[str, Any]]) -> str:
+        """Produce Grafana Alerting provisioning YAML format."""
+        grafana_config = {
+            "apiVersion": 1,
+            "groups": [{
+                "orgId": self.grafana_org_id,
+                "name": self.grafana_interval,
+                "folder": self.grafana_folder,
+                "interval": self.grafana_interval,
+                "rules": queries,
+            }],
+        }
+        return dump(grafana_config, default_flow_style=False, sort_keys=False, width=1000, allow_unicode=True)
