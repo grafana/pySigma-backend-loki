@@ -12,7 +12,7 @@ packages = [{ include = "sigma" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pysigma = "^1.0.0"
+pysigma = "^1.1.0"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.12.0"
