@@ -32,6 +32,7 @@ from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conversion.state import ConversionState
 from sigma.correlations import (
+    SigmaCorrelationCondition,
     SigmaCorrelationRule,
     SigmaCorrelationTypeLiteral,
     SigmaCorrelationConditionOperator,
@@ -1043,7 +1044,7 @@ class LogQLBackend(TextQueryBackend):
         template = templates[method]
         # When doing a value_count correlation, Loki must append the value field to the group-by
         groups = rule.group_by
-        if correlation_type == "value_count" and rule.condition and rule.condition.fieldref:
+        if correlation_type == "value_count" and isinstance(rule.condition, SigmaCorrelationCondition) and rule.condition.fieldref:
             if not groups:
                 groups = []
             if isinstance(rule.condition.fieldref, str):
@@ -1051,7 +1052,7 @@ class LogQLBackend(TextQueryBackend):
             else:
                 groups.extend(rule.condition.fieldref)
         range_vector_function = "count_over_time"
-        if (correlation_type in ("value_count", "event_count")) and rule.condition:
+        if (correlation_type in ("value_count", "event_count")) and isinstance(rule.condition, SigmaCorrelationCondition):
             if (
                 rule.condition.count == 0
                 and rule.condition.op
@@ -1066,8 +1067,8 @@ class LogQLBackend(TextQueryBackend):
                 rule.condition.count = 1
         return template.format(
             rule=rule,
-            referenced_rules=self.convert_referenced_rules(rule.rules, method),
-            field=rule.condition.fieldref if rule.condition else None,
+            referenced_rules=self.convert_referenced_rules(rule.rules, method) if rule.rules else "",
+            field=rule.condition.fieldref if isinstance(rule.condition, SigmaCorrelationCondition) else None,
             timespan=self.convert_timespan(rule.timespan, method),
             groupby=self.convert_correlation_aggregation_groupby_from_template(groups, method),
             search=search,
