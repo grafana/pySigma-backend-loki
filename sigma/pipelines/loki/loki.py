@@ -217,8 +217,9 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
             )
             super().apply(rule)
         else:
-            for ruleref in rule.rules:
-                self.apply(ruleref.rule)
+            if rule.rules:
+                for ruleref in rule.rules:
+                    self.apply(ruleref.rule)
 
 
 # Update pySigma transformations to include the above
