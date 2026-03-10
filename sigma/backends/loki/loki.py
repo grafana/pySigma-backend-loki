@@ -145,62 +145,32 @@ class LogQLBackend(TextQueryBackend):
         "^(?P<ext>\\(\\?[^)]\\))?(?P<start>\\^)?(?P<body>.*?)(?P<end>\\$)?$"
     )
 
-    current_templates: ClassVar[Union[bool, None]] = None
-    # Leave this to be set by the below function
-    eq_token: ClassVar[str]
-    field_null_expression: ClassVar[str]
-    re_expression: ClassVar[str]
+    # Loki uses negated operators at comparison level; pySigma handles this via convert_not_as_not_eq
+    convert_not_as_not_eq: ClassVar[bool] = True
+    eq_token: ClassVar[str] = "="
+    not_eq_token: ClassVar[str] = "!="
+    re_expression: ClassVar[str] = "{field}=~{regex}"
+    not_re_expression: ClassVar[str] = "{field}!~{regex}"
     re_flag_prefix: bool = True
-    cidr_expression: ClassVar[str]
-    compare_op_expression: ClassVar[str]
-    compare_operators: ClassVar[Dict[CompareOperators, str]]
-    case_sensitive_match_expression: ClassVar[str]
-    field_exists_expression: ClassVar[str]
-    field_not_exists_expression: ClassVar[str]
-
-    @staticmethod
-    def set_expression_templates(negated: bool) -> None:
-        """When converting field expressions, the TextBackend class uses the below
-        variables to format the rule. As LogQL applies negation directly via
-        expressions, we need to dynamically update these depending on whether the
-        expression was negated or not."""
-        if negated == LogQLBackend.current_templates:
-            return  # nothing to do!
-
-        # Set the expression templates regardless of the negation state
-        LogQLBackend.compare_op_expression = "{field}{operator}{value}"
-
-        if negated:
-            LogQLBackend.eq_token = "!="
-            LogQLBackend.field_null_expression = "{field}!=``"
-            LogQLBackend.re_expression = "{field}!~{regex}"
-            LogQLBackend.cidr_expression = '{field}!=ip("{value}")'
-            LogQLBackend.compare_operators = {
-                SigmaCompareExpression.CompareOperators.LT: ">=",
-                SigmaCompareExpression.CompareOperators.LTE: ">",
-                SigmaCompareExpression.CompareOperators.GT: "<=",
-                SigmaCompareExpression.CompareOperators.GTE: "<",
-            }
-            LogQLBackend.case_sensitive_match_expression = "{field}!={value}"
-            LogQLBackend.field_exists_expression = '{field}=""'
-            LogQLBackend.field_not_exists_expression = '{field}!=""'
-        else:
-            LogQLBackend.eq_token = "="
-            LogQLBackend.field_null_expression = "{field}=``"
-            LogQLBackend.re_expression = "{field}=~{regex}"
-            LogQLBackend.cidr_expression = '{field}=ip("{value}")'
-            LogQLBackend.compare_operators = {
-                SigmaCompareExpression.CompareOperators.LT: "<",
-                SigmaCompareExpression.CompareOperators.LTE: "<=",
-                SigmaCompareExpression.CompareOperators.GT: ">",
-                SigmaCompareExpression.CompareOperators.GTE: ">=",
-            }
-            LogQLBackend.case_sensitive_match_expression = "{field}={value}"
-            LogQLBackend.field_exists_expression = '{field}!=""'
-            LogQLBackend.field_not_exists_expression = '{field}=""'
-
-        # Cache the state of these variables, so we don't keep setting them needlessly
-        LogQLBackend.current_templates = negated
+    cidr_expression: ClassVar[str] = '{field}=ip("{value}")'
+    not_cidr_expression: ClassVar[str] = '{field}!=ip("{value}")'
+    compare_op_expression: ClassVar[str] = "{field}{operator}{value}"
+    compare_operators: ClassVar[Dict[CompareOperators, str]] = {
+        SigmaCompareExpression.CompareOperators.LT: "<",
+        SigmaCompareExpression.CompareOperators.LTE: "<=",
+        SigmaCompareExpression.CompareOperators.GT: ">",
+        SigmaCompareExpression.CompareOperators.GTE: ">=",
+    }
+    negated_compare_operators: ClassVar[Dict[CompareOperators, str]] = {
+        SigmaCompareExpression.CompareOperators.LT: ">=",
+        SigmaCompareExpression.CompareOperators.LTE: ">",
+        SigmaCompareExpression.CompareOperators.GT: "<=",
+        SigmaCompareExpression.CompareOperators.GTE: "<",
+    }
+    case_sensitive_match_expression: ClassVar[str] = "{field}={value}"
+    field_null_expression: ClassVar[str] = "{field}=``"
+    field_exists_expression: ClassVar[str] = '{field}!=""'
+    field_not_exists_expression: ClassVar[str] = '{field}=""'
 
     # LogQL does not support wildcards, but we convert them to regular expressions
     # Character used as multi-character wildcard (replaced with .*)
@@ -314,6 +284,18 @@ class LogQLBackend(TextQueryBackend):
         self.grafana_contact_point = grafana_contact_point
         self.loki_group_by_field = loki_group_by_field
 
+    @staticmethod
+    def _is_parent_not(cond: Any) -> bool:
+        """Walk up the parent chain counting ConditionNOT nodes.
+        Returns True if the count is odd (net negation), so that NOT(NOT(A)) == A."""
+        not_count = 0
+        parent = cond.parent
+        while parent is not None:
+            if isinstance(parent, ConditionNOT):
+                not_count += 1
+            parent = parent.parent
+        return not_count % 2 == 1
+
     # Loki-specific functions
 
     def select_log_parser(self, rule: SigmaRule) -> Union[str, LogQLLogParser]:
@@ -416,21 +398,20 @@ class LogQLBackend(TextQueryBackend):
         filter can be created."""
         # Can only use negation of expressions if the log format includes the field
         # name in the log line
+        is_negated = self._is_parent_not(expr)
         if log_parser is LogQLLogParser.LOGFMT and isinstance(
             expr.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
         ):
             value = "" if isinstance(expr.value, SigmaNull) else str(expr.value)
             return LogQLLineFilterInfo(
                 value=f"{expr.field}={value}",
-                negated=getattr(expr, "negated", False),
+                negated=is_negated,
                 deftype=LogQLDeferredType.STR,
             )
-        elif isinstance(expr.value, (SigmaString, SigmaNumber, SigmaBool)) and not getattr(
-            expr, "negated", False
-        ):
+        elif isinstance(expr.value, (SigmaString, SigmaNumber, SigmaBool)) and not is_negated:
             return LogQLLineFilterInfo(
                 value=str(expr.value),
-                negated=getattr(expr, "negated", False),
+                negated=False,
                 deftype=LogQLDeferredType.STR,
             )
         elif isinstance(expr.value, SigmaRegularExpression):
@@ -447,14 +428,14 @@ class LogQLBackend(TextQueryBackend):
                 )
             return LogQLLineFilterInfo(
                 value=regexp,
-                negated=getattr(expr, "negated", False),
+                negated=is_negated,
                 deftype=LogQLDeferredType.REGEXP,
             )
         elif isinstance(expr.value, SigmaCIDRExpression):
             # Could include field name if entries are logfmt
             return LogQLLineFilterInfo(
                 value=expr.value.cidr,
-                negated=getattr(expr, "negated", False),
+                negated=is_negated,
                 deftype=LogQLDeferredType.CIDR,
             )
         else:
@@ -546,74 +527,11 @@ class LogQLBackend(TextQueryBackend):
             # The longest common substring of all the arguments is permissible as a
             # line filter, as every candidate must contain at least that string
             return self.find_longest_common_string_line_filter(candidates, log_parser)
+        elif isinstance(cond, ConditionNOT):
+            # Negated comparisons are skipped for line filter consideration
+            return None
         else:  # pragma: no cover
-            # The above should cover all existing Sigma classes, but just in case...
-            # (Helpful for spotting ConditionNOTs that somehow got through)
             raise SigmaError(f"Unhandled type by Loki backend: {str(cond.__class__.__name__)}")
-
-    def update_parsed_conditions(self, condition: Conditions, negated: bool = False) -> Conditions:
-        """Do a depth-first recursive search of the parsed items and update conditions
-        to meet LogQL's structural requirements:
-
-        - LogQL does not support wildcards in strings, so we convert them instead to
-          regular expressions
-        - LogQL does case sensitive searches by default, but Sigma strings are case
-          insensitive, so to be fully spec compliant, we have to convert them into
-          regular expressions with a leading (?i) flag
-          - to enforce case_sensitive matching, rather than the Sigma default, set
-            case_sensitive to True
-        - LogQL does not support NOT operators, so we use De Morgan's law to push the
-          negation down the tree (flipping ANDs and ORs and swapping operators, i.e.,
-          = becomes !=, etc.)
-        """
-        if not condition:
-            return condition
-        if isinstance(
-            condition,
-            (ConditionFieldEqualsValueExpression, ConditionValueExpression),
-        ):
-            if (
-                isinstance(condition.value, SigmaString)
-                and (not self.case_sensitive or condition.value.contains_special())
-                and not isinstance(condition.value, SigmaCasedString)
-            ):
-                condition.value = convert_str_to_re(
-                    condition.value,
-                    field_filter=isinstance(condition, ConditionFieldEqualsValueExpression),
-                )
-        if isinstance(condition, ConditionItem):
-            if isinstance(condition, ConditionNOT) and condition.args[0] is not None:
-                negated = not negated
-                # Remove the ConditionNOT as the parent
-                condition.args[0].parent = condition.parent
-                return self.update_parsed_conditions(condition.args[0], negated)
-            elif isinstance(condition, (ConditionAND, ConditionOR)):
-                if negated:
-                    new_condition: ConditionItem
-                    if isinstance(condition, ConditionAND):
-                        new_condition = ConditionOR(condition.args, condition.source)
-                    else:
-                        new_condition = ConditionAND(condition.args, condition.source)
-                    # Update the parent references to reflect the new structure
-                    new_condition.parent = condition.parent
-                    for i in range(len(condition.args)):
-                        if condition.args[i] is not None:
-                            condition.args[i].parent = new_condition  # type: ignore
-                            condition.args[i] = self.update_parsed_conditions(
-                                condition.args[i], negated
-                            )
-                    setattr(new_condition, "negated", negated)
-                    return new_condition
-                else:
-                    for i in range(len(condition.args)):
-                        condition.args[i] = self.update_parsed_conditions(
-                            condition.args[i], negated
-                        )
-        # Record negation appropriately
-        # NOTE: the negated property does not exist on the above classes,
-        # so using setattr to set it dynamically
-        setattr(condition, "negated", negated)
-        return condition
 
     # Overriding Sigma TextQueryBackend functionality as necessary
     def convert_rule(
@@ -650,7 +568,7 @@ class LogQLBackend(TextQueryBackend):
             # conditions, we explicitly associate them together here so the
             # relationship can be maintained throughout.
             conditions: List[Tuple[int, Conditions]] = [
-                (index, self.update_parsed_conditions(cond.parsed))
+                (index, cond.parsed)
                 for index, cond in enumerate(rule.detection.parsed_condition)
             ]
             shortened_conditions: List[Tuple[int, Conditions]] = []
@@ -766,8 +684,6 @@ class LogQLBackend(TextQueryBackend):
                     unbound_deferred_or = LogQLDeferredOrUnboundExpression(
                         state, [], "|~", not self.case_sensitive
                     )
-                    if getattr(cond, "negated", False):
-                        unbound_deferred_or.negate()
                 unbound_deferred_or.exprs.append(arg.value)
             elif unbound_deferred_or is not None:
                 raise SigmaFeatureNotSupportedByBackendError(
@@ -877,8 +793,6 @@ class LogQLBackend(TextQueryBackend):
                     "=",
                     "true",
                 )
-                if getattr(cond, "negated", False):
-                    expr.negate()
                 self.label_tracker += 1
 
                 return expr
@@ -902,21 +816,10 @@ class LogQLBackend(TextQueryBackend):
                 state, label, f'{{{{ date "{timestamp_part}" (unixToTime .{field}) }}}}'
             )
             expr = LogQLDeferredLabelFilterExpression(state, label, value=str(cond.value))
-            if getattr(cond, "negated", False):
-                expr.negate()
             self.label_tracker += 1
 
             return expr
         return ""
-
-    def convert_condition_field_eq_val(
-        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
-    ) -> Union[str, DeferredQueryExpression]:
-        """Adjust the expression templates based on whether the condition is negated,
-        prior to converting it. Not required for convert_condition_val, as they use
-        deferred expressions, which use a different approach."""
-        LogQLBackend.set_expression_templates(getattr(cond, "negated", False))
-        return super().convert_condition_field_eq_val(cond, state)
 
     def convert_condition_field_eq_val_str(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
@@ -935,7 +838,64 @@ class LogQLBackend(TextQueryBackend):
         if isinstance(cond.value, SigmaString) and cond.value.contains_special():
             cond.value = convert_str_to_re(cond.value, False, True)
             return super().convert_condition_field_eq_val_re(cond, state)
+        # case_sensitive_match_expression is not swapped by not_equals_context_manager,
+        # so handle negation manually for plain (non-wildcard) strings
+        if self._is_parent_not(cond):
+            return "{field}!={value}".format(
+                field=self.escape_and_quote_field(cond.field),
+                value=self.convert_value_str(cond.value, state),
+            )
         return super().convert_condition_field_eq_val_str_case_sensitive(cond, state)
+
+    def convert_condition_field_eq_val_num(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """Use != for numeric equality when under a ConditionNOT, since eq_token is not
+        swapped by not_equals_context_manager."""
+        op = "!=" if self._is_parent_not(cond) else "="
+        return self.escape_and_quote_field(cond.field) + op + str(cond.value)
+
+    def convert_condition_field_eq_val_null(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """field_null_expression is not swapped by not_equals_context_manager."""
+        field = self.escape_and_quote_field(cond.field)
+        if self._is_parent_not(cond):
+            return f"{field}!=``"
+        return f"{field}=``"
+
+    def convert_condition_field_exists(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """field_exists_expression is not swapped by not_equals_context_manager."""
+        field = self.escape_and_quote_field(cond.field)
+        if self._is_parent_not(cond):
+            return f'{field}=""'
+        return f'{field}!=""'
+
+    def convert_condition_field_not_exists(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """field_not_exists_expression is not swapped by not_equals_context_manager."""
+        field = self.escape_and_quote_field(cond.field)
+        if self._is_parent_not(cond):
+            return f'{field}!=""'
+        return f'{field}=""'
+
+    def convert_condition_field_compare_op_val(
+        self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression]:
+        """compare_operators is not swapped by not_equals_context_manager."""
+        if not isinstance(cond.value, SigmaCompareExpression):
+            raise SigmaError(
+                "convert_condition_field_compare_op_val called on non-compare value"
+            )
+        operators = self.negated_compare_operators if self._is_parent_not(cond) else self.compare_operators
+        return self.compare_op_expression.format(
+            field=self.escape_and_quote_field(cond.field),
+            operator=operators[cond.value.op],
+            value=cond.value.number,
+        )
 
     def convert_condition_val_str(
         self, cond: ConditionValueExpression, state: ConversionState
@@ -948,18 +908,13 @@ class LogQLBackend(TextQueryBackend):
             )
         else:
             raise SigmaError("convert_condition_val_str called on non-string value")
-        if getattr(cond, "negated", False):
-            expr.negate()
         return expr
 
     def convert_condition_val_num(
         self, cond: ConditionValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """Convert unbound numeric queries into deferred line filters."""
-        expr = LogQLDeferredUnboundStrExpression(state, str(cond.value))
-        if getattr(cond, "negated", False):
-            expr.negate()
-        return expr
+        return LogQLDeferredUnboundStrExpression(state, str(cond.value))
 
     def convert_condition_val_re(  # type: ignore[override]
         self, cond: ConditionValueExpression, state: ConversionState
@@ -986,32 +941,29 @@ class LogQLBackend(TextQueryBackend):
             else:
                 # If there's no value between these wildcards, we can ignore the filter
                 return None
-        expr = LogQLDeferredUnboundStrExpression(
+        return LogQLDeferredUnboundStrExpression(
             state, self.convert_value_re(cond.value, state), "|~"
         )
-        if getattr(cond, "negated", False):
-            expr.negate()
-        return expr
 
     def convert_condition_field_eq_expansion(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Select appropriate condition to join together field values and push down
-        negation"""
+        """Select appropriate condition to join together field values, applying De Morgan's
+        law when under a ConditionNOT."""
         if not isinstance(cond.value, SigmaExpansion):
             raise SigmaError("convert_condition_field_eq_expansion called on non-expansion value")
-        is_negated = getattr(cond, "negated", False)
-        LogQLBackend.set_expression_templates(is_negated)
+        is_negated = self._is_parent_not(cond)
         exprs = [
             ConditionFieldEqualsValueExpression(cond.field, value) for value in cond.value.values
         ]
-        # Fun fact: map(lamdba expr: setattr(expr, "negated", is_negated), exprs)
-        # does nothing!
-        for expr in exprs:
-            setattr(expr, "negated", is_negated)
         # mypy type: ignore due to List[A] and List[A | B | C] being considered different
         new_condition: ConditionType
         if is_negated:
+            # De Morgan: NOT(A OR B) = NOT(A) AND NOT(B)
+            # Give each expr a ConditionNOT parent so _is_parent_not returns True when converted
+            dummy_not = ConditionNOT(exprs[:1], cond.source)
+            for expr in exprs:
+                expr.parent = dummy_not
             new_condition = ConditionAND(exprs, cond.source)  # type: ignore[arg-type]
         else:
             new_condition = ConditionOR(exprs, cond.source)  # type: ignore[arg-type]
