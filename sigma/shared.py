@@ -104,9 +104,12 @@ def escape_and_quote_re(r: SigmaRegularExpression, flag_prefix=True) -> str:
 def join_or_values_re(
     exprs: List[Union[SigmaString, SigmaRegularExpression]], case_insensitive: bool
 ) -> str:
-    # This makes the regex case insensitive if any values are SigmaStrings
-    # or if any of the regexes are case insensitive
-    # TODO: can we make this more precise?
+    # Convert any wildcard SigmaStrings to regex first, then determine case-insensitivity.
+    # Wildcards are converted respecting the caller's case_insensitive flag.
+    vals = [
+        convert_str_to_re(val, case_insensitive) if isinstance(val, SigmaString) and val.contains_special() else val
+        for val in exprs
+    ]
     case_insensitive = any(
         (
             isinstance(val, SigmaString)
@@ -114,12 +117,8 @@ def join_or_values_re(
             and not isinstance(val, SigmaCasedString)
         )
         or (isinstance(val, SigmaRegularExpression) and str(val.regexp).startswith("(?i)"))
-        for val in exprs
+        for val in vals
     )
-    vals = [
-        convert_str_to_re(val) if isinstance(val, SigmaString) and val.contains_special() else val
-        for val in exprs
-    ]
     or_value = "|".join(
         (
             (

@@ -528,8 +528,23 @@ class LogQLBackend(TextQueryBackend):
             # line filter, as every candidate must contain at least that string
             return self.find_longest_common_string_line_filter(candidates, log_parser)
         elif isinstance(cond, ConditionNOT):
-            # Negated comparisons are skipped for line filter consideration
-            return None
+            arg = cond.args[0]
+            if isinstance(arg, ConditionAND):
+                # De Morgan NOT(AND) → OR: need common LF across all args; negated candidates
+                # are rejected by find_longest_common_string_line_filter → returns None
+                candidates = [self.generate_candidate_line_filter(a, log_parser) for a in arg.args]
+                return self.find_longest_common_string_line_filter(candidates, log_parser)
+            elif isinstance(arg, ConditionOR):
+                # De Morgan NOT(OR) → AND: pick the longest candidate (may be negated)
+                candidates = [self.generate_candidate_line_filter(a, log_parser) for a in arg.args]
+                longest = None
+                for cand in candidates:
+                    if cand and (longest is None or len(cand.value) > len(longest.value)):
+                        longest = cand
+                return longest
+            else:
+                # Leaf: recurse into the negated field expression
+                return self.generate_candidate_line_filter(arg, log_parser)
         else:  # pragma: no cover
             raise SigmaError(f"Unhandled type by Loki backend: {str(cond.__class__.__name__)}")
 
@@ -670,19 +685,163 @@ class LogQLBackend(TextQueryBackend):
     def convert_value_re(self, r: SigmaRegularExpression, state: ConversionState) -> str:
         return escape_and_quote_re(r, self.re_flag_prefix)
 
+    def compare_precedence(self, outer: Any, inner: Any) -> bool:
+        """Override to correctly determine grouping when NOT wraps AND/OR via De Morgan.
+        NOT(AND) produces OR output (lower precedence), NOT(OR) produces AND output."""
+        if isinstance(inner, ConditionNOT) and inner.args and isinstance(
+            inner.args[0], (ConditionAND, ConditionOR)
+        ):
+            effective_inner_class = ConditionOR if isinstance(inner.args[0], ConditionAND) else ConditionAND
+            try:
+                idx_inner = self.precedence.index(effective_inner_class)
+            except ValueError:
+                idx_inner = -1
+            try:
+                idx_outer = self.precedence.index(outer.__class__)
+            except ValueError:
+                idx_outer = -1
+            return idx_inner <= idx_outer
+        return super().compare_precedence(outer, inner)
+
+    def convert_condition_not(
+        self, cond: ConditionNOT, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression, None]:
+        """Override to apply De Morgan's law for compound NOT conditions, and handle
+        unbound expression negation correctly."""
+        arg = cond.args[0]
+        if arg is None:
+            return None
+
+        # Double negation: NOT(NOT(A)) → convert A directly, fixing parent so _is_parent_not works
+        if isinstance(arg, ConditionNOT):
+            inner_arg = arg.args[0]
+            if inner_arg is None:
+                return None
+            inner_arg.parent = cond.parent
+            return self.convert_condition(inner_arg, state)
+
+        # Leaf nodes: delegate to super() which handles deferred negation and field negation
+        if not isinstance(arg, (ConditionAND, ConditionOR)):
+            return super().convert_condition_not(cond, state)
+
+        if isinstance(arg, ConditionAND):
+            return self._demorgan_not_and(cond, arg, state)
+        else:
+            return self._demorgan_not_or(cond, arg, state)
+
+    def _build_demorgan_compound(
+        self,
+        args: list,
+        compound_class: type,
+        cond: ConditionNOT,
+        state: ConversionState,
+    ) -> Union[str, DeferredQueryExpression, None]:
+        """Wrap each arg in ConditionNOT, build a new compound node (AND or OR), fix parents,
+        and convert. Used by both De Morgan NOT(AND) and NOT(OR) field cases."""
+        new_args = []
+        for a in args:
+            inner_not = ConditionNOT([a], cond.source)
+            a.parent = inner_not
+            new_args.append(inner_not)
+        new_compound = compound_class(new_args, cond.source)
+        new_compound.parent = cond.parent
+        for inner_not in new_args:
+            inner_not.parent = new_compound
+        return self.convert_condition(new_compound, state)
+
+    def _demorgan_not_and(
+        self, cond: ConditionNOT, arg: ConditionAND, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression, None]:
+        """Handle NOT(AND(...)) via De Morgan's law."""
+        field_args = []
+        unbound_args = []
+        for a in arg.args:
+            if isinstance(a, ConditionOR) and any(
+                isinstance(sa, ConditionValueExpression) for sa in a.args
+            ):
+                raise SigmaFeatureNotSupportedByBackendError(
+                    "Operator 'and' not supported by the backend for negated unbound conditions "
+                    "with OR",
+                    source=cond.source,
+                )
+            if isinstance(a, ConditionFieldEqualsValueExpression):
+                field_args.append(a)
+            elif isinstance(a, ConditionValueExpression):
+                unbound_args.append(a)
+
+        # Mixed unbound + field: not supported
+        if unbound_args and field_args:
+            raise SigmaFeatureNotSupportedByBackendError(
+                "Operator 'and' not supported by the backend for negated unbound conditions "
+                "combined with field conditions",
+                source=cond.source,
+            )
+
+        # All unbound: combine all values into a single negated OR regex
+        if unbound_args:
+            all_values = [a.value for a in unbound_args]
+            ci = not self.case_sensitive and not any(
+                isinstance(v, SigmaCasedString) for v in all_values if isinstance(v, SigmaString)
+            )
+            combined = LogQLDeferredOrUnboundExpression(state, all_values, "|~", ci)
+            combined.negate()
+            return combined
+
+        # All field/compound: De Morgan AND→OR, each arg wrapped in NOT
+        return self._build_demorgan_compound(arg.args, ConditionOR, cond, state)
+
+    def _demorgan_not_or(
+        self, cond: ConditionNOT, arg: ConditionOR, state: ConversionState
+    ) -> Union[str, DeferredQueryExpression, None]:
+        """Handle NOT(OR(...)) via De Morgan's law."""
+        args = arg.args
+        unbound_args = [a for a in args if isinstance(a, ConditionValueExpression)]
+        has_fields = any(isinstance(a, ConditionFieldEqualsValueExpression) for a in args)
+
+        # Mixed unbound + field: negate each individually
+        if unbound_args and has_fields:
+            field_results = []
+            for a in args:
+                inner_not = ConditionNOT([a], cond.source)
+                inner_not.parent = cond.parent
+                a.parent = inner_not
+                result = self.convert_condition(inner_not, state)
+                if result is not None and not isinstance(result, DeferredQueryExpression):
+                    field_results.append(result)
+            joiner = self.token_separator + self.and_token + self.token_separator
+            return joiner.join(field_results) if field_results else None
+
+        # All unbound: negate each individually (separate line filters)
+        if unbound_args:
+            for a in unbound_args:
+                inner_not = ConditionNOT([a], cond.source)
+                inner_not.parent = cond.parent
+                a.parent = inner_not
+                self.convert_condition(inner_not, state)
+            return None
+
+        # All field/compound: De Morgan OR→AND, each arg wrapped in NOT
+        return self._build_demorgan_compound(args, ConditionAND, cond, state)
+
     def convert_condition_or(
         self, cond: ConditionOR, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
         """Implements OR'd unbounded conditions as a regex that combines the search terms
         with |s."""
         unbound_deferred_or = None
+        any_wildcards = any(
+            isinstance(arg.value, SigmaString) and arg.value.contains_special()
+            for arg in cond.args
+            if isinstance(arg, ConditionValueExpression)
+        )
         for arg in cond.args:
             if isinstance(arg, ConditionValueExpression) and isinstance(
                 arg.value, (SigmaString, SigmaRegularExpression)
             ):
                 if unbound_deferred_or is None:
+                    ci = any_wildcards or not self.case_sensitive
                     unbound_deferred_or = LogQLDeferredOrUnboundExpression(
-                        state, [], "|~", not self.case_sensitive
+                        state, [], "|~", ci
                     )
                 unbound_deferred_or.exprs.append(arg.value)
             elif unbound_deferred_or is not None:
@@ -824,9 +983,10 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_field_eq_val_str(
         self, cond: ConditionFieldEqualsValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        if not self.case_sensitive and isinstance(cond.value, SigmaString) and len(cond.value) > 0:
-            cond.value = convert_str_to_re(cond.value, True, True)
-            return super().convert_condition_field_eq_val_re(cond, state)
+        if isinstance(cond.value, SigmaString) and len(cond.value) > 0:
+            if not self.case_sensitive or cond.value.contains_special():
+                cond.value = convert_str_to_re(cond.value, case_insensitive=True, field_filter=True)
+                return super().convert_condition_field_eq_val_re(cond, state)
         return super().convert_condition_field_eq_val_str(cond, state)
 
     def convert_condition_field_eq_val_str_case_sensitive(
@@ -900,15 +1060,25 @@ class LogQLBackend(TextQueryBackend):
     def convert_condition_val_str(
         self, cond: ConditionValueExpression, state: ConversionState
     ) -> Union[str, DeferredQueryExpression]:
-        """Converts all unbound wildcard conditions into regular expression queries,
-        replacing wildcards with appropriate regex metacharacters."""
+        """Converts unbound string conditions into line filter expressions. When not
+        in case-sensitive mode, or when the string contains wildcards, converts to a
+        case-insensitive regex (matching old update_parsed_conditions behaviour)."""
         if isinstance(cond.value, SigmaString):
-            expr = LogQLDeferredUnboundStrExpression(
+            is_cased = isinstance(cond.value, SigmaCasedString)
+            # For non-cased strings: always use (?i) when converting to regex (wildcard or
+            # case-insensitive mode). For cased strings: never add (?i).
+            ci_for_regex = not is_cased
+            needs_regex = (not self.case_sensitive and not is_cased) or cond.value.contains_special()
+            if needs_regex:
+                cond.value = convert_str_to_re(
+                    cond.value, case_insensitive=ci_for_regex, field_filter=False
+                )
+                return self.convert_condition_val_re(cond, state)
+            return LogQLDeferredUnboundStrExpression(
                 state, self.convert_value_str(cond.value, state)
             )
         else:
             raise SigmaError("convert_condition_val_str called on non-string value")
-        return expr
 
     def convert_condition_val_num(
         self, cond: ConditionValueExpression, state: ConversionState
