@@ -1,6 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>grafana/grafana-renovate-config//presets/base"],
+  "automerge": true,
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "minimumReleaseAge": "3 days",
   "packageRules": [
     {
       "matchManagers": ["poetry"],
