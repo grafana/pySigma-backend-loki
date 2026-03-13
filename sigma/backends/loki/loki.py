@@ -779,10 +779,14 @@ class LogQLBackend(TextQueryBackend):
 
         # All unbound: combine all values into a single negated OR regex
         if unbound_args:
-            all_values = [a.value for a in unbound_args]
-            ci = not self.case_sensitive and not any(
-                isinstance(v, SigmaCasedString) for v in all_values if isinstance(v, SigmaString)
-            )
+            all_values: List[Union[SigmaString, SigmaRegularExpression]] = []
+            has_cased = False
+            for a in unbound_args:
+                if isinstance(a.value, (SigmaString, SigmaRegularExpression)):
+                    all_values.append(a.value)
+                    if isinstance(a.value, SigmaCasedString):
+                        has_cased = True
+            ci = not self.case_sensitive and not has_cased
             combined = LogQLDeferredOrUnboundExpression(state, all_values, "|~", ci)
             combined.negate()
             return combined
@@ -802,6 +806,8 @@ class LogQLBackend(TextQueryBackend):
         if unbound_args and has_fields:
             field_results = []
             for a in args:
+                if a is None:
+                    continue
                 inner_not = ConditionNOT([a], cond.source)
                 inner_not.parent = cond.parent
                 a.parent = inner_not
@@ -1001,6 +1007,10 @@ class LogQLBackend(TextQueryBackend):
         # case_sensitive_match_expression is not swapped by not_equals_context_manager,
         # so handle negation manually for plain (non-wildcard) strings
         if self._is_parent_not(cond):
+            if not isinstance(cond.value, SigmaString):
+                raise SigmaError(
+                    "convert_condition_field_eq_val_str_case_sensitive called on non-string value"
+                )
             return "{field}!={value}".format(
                 field=self.escape_and_quote_field(cond.field),
                 value=self.convert_value_str(cond.value, state),
@@ -1057,12 +1067,14 @@ class LogQLBackend(TextQueryBackend):
             value=cond.value.number,
         )
 
-    def convert_condition_val_str(
+    def convert_condition_val_str(  # type: ignore[override]
         self, cond: ConditionValueExpression, state: ConversionState
-    ) -> Union[str, DeferredQueryExpression]:
+    ) -> Union[str, DeferredQueryExpression, None]:
         """Converts unbound string conditions into line filter expressions. When not
         in case-sensitive mode, or when the string contains wildcards, converts to a
-        case-insensitive regex (matching old update_parsed_conditions behaviour)."""
+        case-insensitive regex (matching old update_parsed_conditions behaviour).
+        May return None when the expression reduces to a pure-wildcard filter (e.g. '**'),
+        which the framework treats as a dropped condition."""
         if isinstance(cond.value, SigmaString):
             is_cased = isinstance(cond.value, SigmaCasedString)
             # For non-cased strings: always use (?i) when converting to regex (wildcard or
@@ -1073,6 +1085,7 @@ class LogQLBackend(TextQueryBackend):
                 cond.value = convert_str_to_re(
                     cond.value, case_insensitive=ci_for_regex, field_filter=False
                 )
+                # May return None for pure-wildcard patterns like '**' (no body after stripping)
                 return self.convert_condition_val_re(cond, state)
             return LogQLDeferredUnboundStrExpression(
                 state, self.convert_value_str(cond.value, state)
@@ -1131,7 +1144,9 @@ class LogQLBackend(TextQueryBackend):
         if is_negated:
             # De Morgan: NOT(A OR B) = NOT(A) AND NOT(B)
             # Give each expr a ConditionNOT parent so _is_parent_not returns True when converted
-            dummy_not = ConditionNOT(exprs[:1], cond.source)
+            # ConditionFieldEqualsValueExpression is valid in ConditionItem.args, but mypy rejects
+            # List[ConditionFieldEqualsValueExpression] due to list invariance.
+            dummy_not = ConditionNOT(exprs[:1], cond.source)  # type: ignore[arg-type]
             for expr in exprs:
                 expr.parent = dummy_not
             new_condition = ConditionAND(exprs, cond.source)  # type: ignore[arg-type]
