@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import auto
 from typing import List, Union
+from typing_extensions import Self
 
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.types import SigmaRegularExpression, SigmaString
@@ -29,7 +30,7 @@ class LogQLDeferredUnboundStrExpression(DeferredQueryExpression):
     value: str
     op: str = "|="  # default to matching
 
-    def negate(self) -> DeferredQueryExpression:
+    def negate(self) -> Self:
         self.op = negated_line_filter_operator[self.op]
         return self
 
@@ -44,7 +45,7 @@ class LogQLDeferredUnboundCIDRExpression(DeferredQueryExpression):
     ip: str
     op: str = "|="  # default to matching
 
-    def negate(self) -> DeferredQueryExpression:
+    def negate(self) -> Self:
         self.op = negated_line_filter_operator[self.op]
         return self
 
@@ -60,7 +61,7 @@ class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
     regexp: str
     op: str = "|~"  # default to matching
 
-    def negate(self) -> DeferredQueryExpression:
+    def negate(self) -> Self:
         self.op = negated_line_filter_operator[self.op]
         return self
 
@@ -80,7 +81,7 @@ class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
     op: str = "|~"  # default to matching
     case_insensitive: bool = True
 
-    def negate(self) -> DeferredQueryExpression:
+    def negate(self) -> Self:
         self.op = negated_line_filter_operator[self.op]
         return self
 
@@ -109,7 +110,7 @@ class LogQLDeferredLabelFilterExpression(DeferredQueryExpression):
     op: str = "="
     value: str = "true"
 
-    def negate(self) -> DeferredQueryExpression:
+    def negate(self) -> Self:
         self.op = negated_label_filter_operator[self.op]
         return self
 
