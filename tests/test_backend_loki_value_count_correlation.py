@@ -2,7 +2,7 @@ import pytest
 from sigma.collection import SigmaCollection
 
 from sigma.backends.loki import LogQLBackend
-from sigma.pipelines.loki import loki_okta_system_log, pipelines
+from sigma.pipelines.loki import loki_okta_system_log
 
 
 @pytest.fixture
