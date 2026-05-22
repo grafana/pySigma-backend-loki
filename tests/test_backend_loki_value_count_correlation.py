@@ -1,8 +1,7 @@
 import pytest
-
-from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 
+from sigma.backends.loki import LogQLBackend
 from sigma.pipelines.loki import loki_okta_system_log
 
 
@@ -167,4 +166,54 @@ level: high
         '(count_over_time({job=~".+"} | json | event_actor_alternateId!="" and '
         'event_client_geographicalContext_country!="" [1h]))) '
         "> 1"
+    ]
+
+
+def test_request_path_dotted():
+    rules = SigmaCollection.from_yaml(
+        """
+title: Sanitize test
+id: 7fbad3c7-7b5d-4362-9581-c814ca975b2f
+status: experimental
+description: Tests correlation with field value that should be sanitized
+author: TEST_RULE
+date: 2026-05-20
+correlation:
+    type: value_count
+    rules:
+        - a3ecb779-194e-4354-8dad-0fab37346670
+    group-by:
+        - auth.display_name
+    timespan: 1m
+    condition:
+        field: request.path
+        gt: 5
+level: high
+---
+title: Sanitize test base
+id: a3ecb779-194e-4354-8dad-0fab37346670
+status: experimental
+description: Tests sanitization of fields
+author: TEST_RULE
+date: 2026-05-20
+tags:
+    - attack.discovery
+    - attack.t1083
+    - attack.credential_access
+logsource:
+    product: test
+    service: test
+detection:
+    selection:
+        request.type: "response"
+        request.op: "read"
+    condition: selection
+level: informational
+        """
+    )
+
+    loki_backend = LogQLBackend()
+    queries = loki_backend.convert(rules)
+    assert queries == [
+        'count without (request_path) (sum by (auth_display_name, request_path) (count_over_time({job=~".+"} | logfmt | request_type=~`(?i)^response$` and request_op=~`(?i)^read$` [1m]))) > 5'
     ]

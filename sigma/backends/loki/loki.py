@@ -1065,10 +1065,12 @@ class LogQLBackend(TextQueryBackend):
                 # Since absent_over_time returns a 1 when the condition is true, we need to update the condition to an equality condition
                 rule.condition.op = SigmaCorrelationConditionOperator.EQ
                 rule.condition.count = 1
+        fieldref = rule.condition.fieldref if isinstance(rule.condition, SigmaCorrelationCondition) else None
+        field = self.escape_and_quote_field(fieldref) if isinstance(fieldref, str) else fieldref
         return template.format(
             rule=rule,
             referenced_rules=self.convert_referenced_rules(rule.rules, method) if rule.rules else "",
-            field=rule.condition.fieldref if isinstance(rule.condition, SigmaCorrelationCondition) else None,
+            field=field,
             timespan=self.convert_timespan(rule.timespan, method),
             groupby=self.convert_correlation_aggregation_groupby_from_template(groups, method),
             search=search,
