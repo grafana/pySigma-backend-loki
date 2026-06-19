@@ -35,7 +35,7 @@ jobs:
       - name: Build packages
         run: poetry build
       - name: Get service account token for PyPI
-        uses: grafana/shared-workflows/actions/get-vault-secrets@main
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a53fc80bc30b0a16a262520465db899fa3af08b7 # get-vault-secrets/v1.3.2
         with:
           repo_secrets: |
             TEST_PYPI_API_TOKEN=pypi-deploy:pypi_test

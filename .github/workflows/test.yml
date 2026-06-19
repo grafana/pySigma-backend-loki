@@ -9,6 +9,8 @@ on:
 
 jobs:
   test:
+    permissions:
+      statuses: write
     strategy:
       matrix:
         os: [ 'ubuntu-latest' ]
@@ -45,6 +47,8 @@ jobs:
           flag-name: python-${{ matrix.python-version }}
   finish:
     needs: test
+    permissions:
+      statuses: write
     runs-on: ubuntu-latest
     steps:
       - name: Finish coveralls
