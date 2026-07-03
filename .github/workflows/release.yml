@@ -8,11 +8,10 @@ on:
       - v*.*.*
 
 jobs:
-  build-and-publish:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -34,20 +33,42 @@ jobs:
         run: poetry run pytest
       - name: Build packages
         run: poetry build
-      - name: Get service account token for PyPI
-        uses: grafana/shared-workflows/actions/get-vault-secrets@main
+      - name: Upload dist
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          repo_secrets: |
-            TEST_PYPI_API_TOKEN=pypi-deploy:pypi_test
-            PYPI_API_TOKEN=pypi-deploy:pypi_main
-      - name: Configure Poetry
-        run: |
-          poetry config repositories.testpypi https://test.pypi.org/legacy/
-          poetry config pypi-token.testpypi "${{ env.TEST_PYPI_API_TOKEN }}"
-          poetry config pypi-token.pypi "${{ env.PYPI_API_TOKEN }}"
-      - name: Publish to test PyPI
-        if: ${{ github.event_name == 'push' }}
-        run: poetry publish -r testpypi
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@ec4db0b4ddc65acdf4bff5fa45ac92d78b56bdf0 # v1.9.0
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  publish-pypi:
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist/
       - name: Publish to PyPI
-        if: ${{ github.event_name == 'release' }}
-        run: poetry publish
+        uses: pypa/gh-action-pypi-publish@ec4db0b4ddc65acdf4bff5fa45ac92d78b56bdf0 # v1.9.0
