@@ -34,7 +34,7 @@ jobs:
         with:
           socket_api_token: ${{ fromJSON(steps.vault-secrets.outputs.secrets).SOCKET_API_TOKEN }}
           socket_org: grafana
-          output_file: sigma-rule-deployment-${{ github.event.release.tag_name || inputs.tag }}.spdx.json
+          output_file: ${{ github.event.repository.name }}-${{ github.event.release.tag_name || inputs.tag }}.spdx.json
 
       - name: "Upload SBOM to release"
         env:
