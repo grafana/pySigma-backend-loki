@@ -4,6 +4,12 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to export the SBOM for and attach it to (for testing)"
+        required: true
+        type: string
 
 permissions: {}
 
@@ -22,12 +28,18 @@ jobs:
           common_secrets: |
             SOCKET_API_TOKEN=socket:SOCKET_API_KEY
 
+      - name: "Checkout"
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
       - name: "Export SPDX SBOM from Socket"
         id: export-sbom
-        uses: grafana/shared-workflows/actions/socket-export-sbom@ff9aaa53f25716fcd6dde39f6d4e41c4e16fb5e1 # socket-export-sbom/v0.1.2
+        uses: grafana/shared-workflows/actions/socket-export-sbom@3df2e7826f102419ae3da1817dc03987dd21b317 # ezebunandu/socket-branch-specific-sbom
         with:
           socket_api_token: ${{ fromJSON(steps.vault-secrets.outputs.secrets).SOCKET_API_TOKEN }}
           socket_org: grafana
+          branch: ${{ github.event.release.tag_name || inputs.tag }}
           output_file: ${{ github.event.repository.name }}-${{ github.event.release.tag_name || inputs.tag }}.spdx.json
 
       - name: "Upload SBOM to release"
