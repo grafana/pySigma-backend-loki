@@ -832,3 +832,130 @@ correlation:
     assert loki_rule[0].startswith("sum by (actor_alternateid)")
     assert "name=`okta-logs`" in loki_rule[0]
     assert "eventType=`core.user_auth.login_failed`" in loki_rule[0]
+
+
+def test_remove_from_detection_partial():
+    """
+    When remove_from_detection=True and a fieldref field is only one of several items in its
+    detection group, only that item is removed and the group remains.
+    """
+    pipeline = ProcessingPipeline(
+        name="Test remove_from_detection partial",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={"eventType|fieldref": "eventType"},
+                    remove_from_detection=True,
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: okta
+                service: okta
+            detection:
+                sel:
+                    eventType: policy.lifecycle.update
+                    legacyeventtype: core.user_auth.login_failed
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    # eventType consumed by selector; legacyeventtype remains in filter
+    assert loki_rule == [
+        "{eventType=`policy.lifecycle.update`} | logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$`"
+    ]
+
+
+def test_remove_from_detection_whole_group():
+    """
+    When remove_from_detection=True and all items in a detection group are consumed by fieldrefs,
+    the entire group is removed and its reference is dropped from the condition string.
+    """
+    pipeline = ProcessingPipeline(
+        name="Test remove_from_detection whole group",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "eventType|fieldref": "eventType",
+                        "stream|fieldref": "ruleField",
+                    },
+                    remove_from_detection=True,
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: okta
+                service: okta
+            detection:
+                sel1:
+                    legacyeventtype: core.user_auth.login_failed
+                    displaymessage: Failed login to Okta
+                sel2:
+                    eventType: policy.lifecycle.update
+                    ruleField|re: '.*out'
+                condition: sel1 and not sel2
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    # sel2 is fully consumed by the selector and removed from the filter
+    assert loki_rule == [
+        "{eventType!=`policy.lifecycle.update`,stream!~`.*out`} "
+        "| logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
+        "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$`"
+    ]
+
+
+def test_remove_from_detection_preserves_sole_condition():
+    """
+    When remove_from_detection=True and removing a detection group would leave a condition string
+    empty, the group (and its detection items) are left intact.
+    """
+    pipeline = ProcessingPipeline(
+        name="Test remove_from_detection preserves sole condition",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={"eventType|fieldref": "eventType"},
+                    remove_from_detection=True,
+                ),
+            )
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: okta
+                service: okta
+            detection:
+                sel:
+                    eventType: policy.lifecycle.update
+                condition: sel
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    # sel is the only condition group; removing it would empty the condition, so it stays
+    assert loki_rule == [
+        "{eventType=`policy.lifecycle.update`} | logfmt | eventType=~`(?i)^policy\\.lifecycle\\.update$`"
+    ]

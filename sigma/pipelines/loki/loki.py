@@ -1,3 +1,4 @@
+import re
 import string
 from dataclasses import dataclass
 from enum import Enum
@@ -12,6 +13,7 @@ from sigma.conditions import (
     ConditionType,
     ConditionAND,
     ConditionIdentifier,
+    SigmaCondition,
 )
 from sigma.correlations import SigmaCorrelationRule
 from sigma.exceptions import (
@@ -25,7 +27,7 @@ from sigma.processing.transformations import (
     FieldMappingTransformation,
     PreprocessingTransformation,
 )
-from sigma.rule import SigmaRule, SigmaDetection
+from sigma.rule import SigmaRule, SigmaDetection, SigmaDetectionItem
 from sigma.types import (
     SigmaString,
     SigmaRegularExpression,
@@ -80,6 +82,31 @@ def traverse_conditions(item: ConditionType):
             yield cond
 
 
+def _remove_detection_from_condition(condition: str, det_name: str) -> str:
+    """Remove a detection identifier (and its adjacent logical operator) from a condition string.
+
+    Handles common patterns like 'sel and det', 'det and sel', 'sel and not det', etc.
+    Does not support parenthesised sub-expressions or wildcard selectors (those are handled
+    separately by removing the detection from the detections dict).
+    """
+    name_re = re.escape(det_name)
+    term_re = rf"(?:not\s+)?{name_re}"
+
+    # " and/or [not] det_name" — operator precedes the term
+    result = re.sub(rf"\s+(?:and|or)\s+{term_re}\b", "", condition, flags=re.IGNORECASE)
+    if result != condition:
+        return result.strip()
+
+    # "[not] det_name and/or " — operator follows the term
+    result = re.sub(rf"\b{term_re}\s+(?:and|or)\s+", "", condition, flags=re.IGNORECASE)
+    if result != condition:
+        return result.strip()
+
+    # term alone
+    result = re.sub(rf"^\s*{term_re}\s*$", "", condition, flags=re.IGNORECASE)
+    return result.strip()
+
+
 def count_negated(classes: List[Type[Any]]) -> int:
     return len([neg for neg in classes if neg == ConditionNOT])
 
@@ -92,6 +119,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
     selection: Dict[str, Union[str, List[str]]]
     case_insensitive: bool = False
     template: bool = False
+    remove_from_detection: bool = False
 
     def apply(self, rule: Union[SigmaRule, SigmaCorrelationRule]):
         if isinstance(rule, SigmaRule):
@@ -99,6 +127,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
             logsource_detections = SigmaDetection.from_definition(self.selection)
             conds = logsource_detections.postprocess(rule.detection)
             fields_set = set()
+            detection_fields_consumed: set = set()
             args: List[
                 Union[
                     ConditionIdentifier,
@@ -120,6 +149,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                 field: Union[str, None] = None
                 op: Union[str, None] = None
                 value: Union[SigmaType, str, None] = None
+                detection_field: Union[str, None] = None
                 if isinstance(cond, ConditionValueExpression):
                     raise SigmaFeatureNotSupportedByBackendError(
                         "the custom log source selector only supports field equals value conditions"
@@ -166,6 +196,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
 
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
+                    detection_field = value.field
                     values = []
                     negated = None
                     for item in rule_conditions:
@@ -204,6 +235,8 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                     value = escape_and_quote_re(value)
                 if field and op and value:
                     fields_set.add(field)
+                    if detection_field is not None:
+                        detection_fields_consumed.add(detection_field)
                     selectors.append(f"{sanitize_label_key(field)}{op}{value}")
             formatted_selectors = "{" + ",".join(selectors) + "}"
             if self.template:
@@ -215,11 +248,69 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
             rule.custom_attributes[LokiCustomAttributes.LOGSOURCE_SELECTION.value] = (
                 formatted_selectors
             )
+            if self.remove_from_detection and detection_fields_consumed:
+                self._remove_fields_from_detection(rule, detection_fields_consumed)
             super().apply(rule)
         else:
             if rule.rules:
                 for ruleref in rule.rules:
                     self.apply(ruleref.rule)
+
+    def _remove_fields_from_detection(self, rule: SigmaRule, fields_to_remove: set) -> None:
+        """Remove SigmaDetectionItems for consumed fields from rule.detection.
+
+        For each detection group, items whose field is in fields_to_remove are dropped.
+        If all items in a group are removed, the group is deleted from rule.detection.detections
+        and all condition strings are updated to remove references to that group name — unless
+        doing so would leave a condition string empty, in which case the group is left intact.
+        """
+        # Separate groups into those that become empty vs those that are only partially pruned
+        groups_to_empty: List[str] = []
+        groups_partial: Dict[str, list] = {}
+
+        for det_name, detection in rule.detection.detections.items():
+            new_items = [
+                item
+                for item in detection.detection_items
+                if not (isinstance(item, SigmaDetectionItem) and item.field in fields_to_remove)
+            ]
+            if len(new_items) == 0:
+                groups_to_empty.append(det_name)
+            elif len(new_items) < len(detection.detection_items):
+                groups_partial[det_name] = new_items
+
+        # Apply partial pruning immediately — these groups stay in the detection
+        for det_name, new_items in groups_partial.items():
+            rule.detection.detections[det_name].detection_items = new_items
+
+        # For groups that would become completely empty, only remove them when it is safe to do so
+        # (i.e. the condition strings remain non-empty after the reference is dropped)
+        safe_to_remove: List[str] = []
+        for det_name in groups_to_empty:
+            updated_conditions = []
+            safe = True
+            for cond_str in rule.detection.condition:
+                new_cond = _remove_detection_from_condition(cond_str, det_name)
+                if new_cond == "":
+                    safe = False
+                    break
+                updated_conditions.append(new_cond)
+            if safe:
+                safe_to_remove.append(det_name)
+
+        if safe_to_remove:
+            for det_name in safe_to_remove:
+                del rule.detection.detections[det_name]
+            new_conditions = list(rule.detection.condition)
+            for det_name in safe_to_remove:
+                new_conditions = [
+                    _remove_detection_from_condition(c, det_name) for c in new_conditions
+                ]
+            rule.detection.condition = new_conditions
+            rule.detection.parsed_condition = [
+                SigmaCondition(cond, rule.detection, rule.detection.source)
+                for cond in rule.detection.condition
+            ]
 
 
 # Update pySigma transformations to include the above
