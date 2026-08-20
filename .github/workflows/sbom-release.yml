@@ -36,7 +36,7 @@ jobs:
 
       - name: "Export SPDX SBOM from Socket"
         id: export-sbom
-        uses: grafana/shared-workflows/actions/socket-export-sbom@73f73d35ceadf46221741d45faefec0c5a990e6b # socket-export-sbom/v1.0.0
+        uses: grafana/shared-workflows/actions/socket-export-sbom@5e31abaa7ebe57af7ce159969512fea1c6408678 # testing unreleased changes
         with:
           socket_api_token: ${{ fromJSON(steps.vault-secrets.outputs.secrets).SOCKET_API_TOKEN }}
           socket_org: grafana
