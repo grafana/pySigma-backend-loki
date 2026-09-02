@@ -626,3 +626,78 @@ def test_loki_field_not_exists_negated(loki_backend: LogQLBackend):
         """
         )
     ) == ['{job=~".+"} | logfmt | fieldA!=""']
+
+
+def test_neq_modifier_double_negation(loki_backend: LogQLBackend):
+    """The neq modifier negates a detection item by wrapping it in a ConditionNOT.
+    Combining it with an explicit 'not' in the condition should cancel back out to
+    a positive match, exercising the backend's De Morgan's-based negation pushdown."""
+    rule = """
+    title: Test
+    status: test
+    logsource:
+        category: test_category
+        product: test_product
+    detection:
+        selection:
+            fieldA|neq: valueA
+        condition: not selection
+    """
+    query = loki_backend.convert(SigmaCollection.from_yaml(rule))
+    assert "fieldA=~`(?i)^valueA$`" in query[0]
+
+
+def test_neq_modifier_multiple_values(loki_backend: LogQLBackend):
+    """A neq detection item with multiple (OR-linked) values should have its negation
+    pushed down via De Morgan's law into an AND of negated terms."""
+    rule = """
+    title: Test
+    status: test
+    logsource:
+        category: test_category
+        product: test_product
+    detection:
+        selection:
+            fieldA|neq:
+                - valueA
+                - valueB
+        condition: selection
+    """
+    query = loki_backend.convert(SigmaCollection.from_yaml(rule))
+    assert "fieldA!~`(?i)^valueA$` and fieldA!~`(?i)^valueB$`" in query[0]
+
+
+def test_neq_modifier_numeric_value(loki_backend: LogQLBackend):
+    """Numeric values are not converted to regexes, so neq should produce a literal
+    != comparison rather than a negated regex."""
+    rule = """
+    title: Test
+    status: test
+    logsource:
+        category: test_category
+        product: test_product
+    detection:
+        selection:
+            fieldA|neq: 1
+        condition: selection
+    """
+    query = loki_backend.convert(SigmaCollection.from_yaml(rule))
+    assert "fieldA!=1" in query[0]
+
+
+def test_neq_modifier_keyword_value(loki_backend: LogQLBackend):
+    """A neq modifier on an unbound (keyword) value should negate the resulting
+    line filter."""
+    rule = """
+    title: Test
+    status: test
+    logsource:
+        category: test_category
+        product: test_product
+    detection:
+        selection:
+            '|neq': valueA
+        condition: selection
+    """
+    query = loki_backend.convert(SigmaCollection.from_yaml(rule))
+    assert "!~ `(?i)valueA`" in query[0]

@@ -36,6 +36,8 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
         "fieldA=~`(?i)^dmFsdWVB$` or fieldA=~`(?i)^ZhbHVlQ$` or fieldA=~`(?i)^2YWx1ZU$`",
     ),
     "wide": ("valueA", "fieldA=~`(?i)^v\x00a\x00l\x00u\x00e\x00A\x00$`"),
+    "utf16": ("valueA", "fieldA=~`(?i)^﻿v\x00a\x00l\x00u\x00e\x00A\x00$`"),
+    "utf16be": ("valueA", "fieldA=~`(?i)^\x00v\x00a\x00l\x00u\x00e\x00A$`"),
     "windash": ("-foo", "fieldA=~`(?i)^\\-foo$` or fieldA=~`(?i)^/foo$`"),
     "re": (".*valueA$", "fieldA=~`.*valueA$`"),
     "i": ("valueA", "fieldA=~`(?i)valueA`"),
@@ -54,6 +56,7 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "lte": (1, "fieldA<=1"),
     "gt": (1, "fieldA>1"),
     "gte": (1, "fieldA>=1"),
+    "neq": ("valueA", "fieldA!~`(?i)^valueA$`"),
     "fieldref": (
         "fieldB",
         "label_format match_0=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`,"
