@@ -1,10 +1,12 @@
-from typing import Any, Dict, Tuple
+from typing import Any
+
 import pytest
-from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError, SigmaTypeError
 from sigma.modifiers import modifier_mapping
 from sigma.processing.pipeline import ProcessingPipeline
+
+from sigma.backends.loki import LogQLBackend
 
 
 @pytest.fixture
@@ -24,7 +26,7 @@ def loki_backend() -> LogQLBackend:
 
 
 # Mapping from modifier identifier strings to modifier classes
-modifier_sample_data: Dict[str, Tuple[Any, str]] = {
+modifier_sample_data: dict[str, tuple[Any, str]] = {
     # "modifier": (value, expected_output)
     "contains": ("valueA", "fieldA=~`(?i).*valueA.*`"),
     "startswith": ("valueA", "fieldA=~`(?i)^valueA.*`"),
@@ -59,46 +61,58 @@ modifier_sample_data: Dict[str, Tuple[Any, str]] = {
     "neq": ("valueA", "fieldA!~`(?i)^valueA$`"),
     "fieldref": (
         "fieldB",
-        "label_format match_0=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`,"
-        "match_1=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`"
-        " | match_0=`true` and match_1!=`true`",
+        (
+            "label_format match_0=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`,"
+            "match_1=`{{ if eq .fieldB .fieldA }}true{{ else }}false{{ end }}`"
+            " | match_0=`true` and match_1!=`true`"
+        ),
     ),
     "expand": ('"%test%"', "fieldA=~`(?i)^valueA$`"),
     "minute": (
         1,
-        'label_format date_0=`{{ date "04" (unixToTime .fieldA) }}`,'
-        'date_1=`{{ date "04" (unixToTime .fieldA) }}`'
-        " | date_0=`1` and date_1!=`1`",
+        (
+            'label_format date_0=`{{ date "04" (unixToTime .fieldA) }}`,'
+            'date_1=`{{ date "04" (unixToTime .fieldA) }}`'
+            " | date_0=`1` and date_1!=`1`"
+        ),
     ),
     "hour": (
         1,
-        'label_format date_0=`{{ date "15" (unixToTime .fieldA) }}`,'
-        'date_1=`{{ date "15" (unixToTime .fieldA) }}`'
-        " | date_0=`1` and date_1!=`1`",
+        (
+            'label_format date_0=`{{ date "15" (unixToTime .fieldA) }}`,'
+            'date_1=`{{ date "15" (unixToTime .fieldA) }}`'
+            " | date_0=`1` and date_1!=`1`"
+        ),
     ),
     "day": (
         1,
-        'label_format date_0=`{{ date "02" (unixToTime .fieldA) }}`,'
-        'date_1=`{{ date "02" (unixToTime .fieldA) }}`'
-        " | date_0=`1` and date_1!=`1`",
+        (
+            'label_format date_0=`{{ date "02" (unixToTime .fieldA) }}`,'
+            'date_1=`{{ date "02" (unixToTime .fieldA) }}`'
+            " | date_0=`1` and date_1!=`1`"
+        ),
     ),
     "week": (1, "---"),  # Unsupported by the datetime layout
     "month": (
         1,
-        'label_format date_0=`{{ date "01" (unixToTime .fieldA) }}`,'
-        'date_1=`{{ date "01" (unixToTime .fieldA) }}`'
-        " | date_0=`1` and date_1!=`1`",
+        (
+            'label_format date_0=`{{ date "01" (unixToTime .fieldA) }}`,'
+            'date_1=`{{ date "01" (unixToTime .fieldA) }}`'
+            " | date_0=`1` and date_1!=`1`"
+        ),
     ),
     "year": (
         1,
-        'label_format date_0=`{{ date "2006" (unixToTime .fieldA) }}`,'
-        'date_1=`{{ date "2006" (unixToTime .fieldA) }}`'
-        " | date_0=`1` and date_1!=`1`",
+        (
+            'label_format date_0=`{{ date "2006" (unixToTime .fieldA) }}`,'
+            'date_1=`{{ date "2006" (unixToTime .fieldA) }}`'
+            " | date_0=`1` and date_1!=`1`"
+        ),
     ),
 }
 
 
-def generate_rule_with_field_modifier(modifier: str, value: Tuple[Any, str]) -> Tuple[str, str]:
+def generate_rule_with_field_modifier(modifier: str, value: tuple[Any, str]) -> tuple[str, str]:
     """Generate a Sigma rule with a field modifier."""
     rule = """
     title: Test
@@ -123,9 +137,7 @@ def test_modifiers(loki_backend: LogQLBackend):
     # Check if all modifiers are tested.
     # This is to ensure that the test suite is updated when new modifiers are added.
     if len(modifier_sample_data) != len(modifier_mapping):
-        diff = set(sorted(modifier_sample_data.keys())).symmetric_difference(
-            set(sorted(modifier_mapping.keys()))
-        )
+        diff = set(modifier_sample_data.keys()).symmetric_difference(set(modifier_mapping.keys()))
         pytest.fail(
             "Not all modifiers are tested, please update the sample data: modifier_sample_data.\n"
             f"Missing modifiers: {diff}"
@@ -140,5 +152,5 @@ def test_loki_field_modifiers(loki_backend: LogQLBackend, label: str):
         assert output_expr in query[0]
     except (SigmaFeatureNotSupportedByBackendError, SigmaTypeError):
         pytest.skip(f"Backend does not support {modifier_mapping[label].__name__} modifier")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - re-raised as a pytest failure, not swallowed
         pytest.fail(f"Unexpected exception: {e}")

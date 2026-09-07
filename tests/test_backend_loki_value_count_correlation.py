@@ -38,8 +38,10 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'count without (fieldB) (sum by (fieldB) (count_over_time({job=~".+"} | '
-        "logfmt | fieldA=~`(?i)^valueA$` [30s]))) == 42"
+        (
+            'count without (fieldB) (sum by (fieldB) (count_over_time({job=~".+"} | '
+            "logfmt | fieldA=~`(?i)^valueA$` [30s]))) == 42"
+        )
     ]
 
 
@@ -73,8 +75,10 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        "count without (fieldC) (sum by (fieldB, fieldC) (count_over_time("
-        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [5m]))) >= 1'
+        (
+            "count without (fieldC) (sum by (fieldB, fieldC) (count_over_time("
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [5m]))) >= 1'
+        )
     ]
 
 
@@ -109,8 +113,10 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        "count without (fieldD) (sum by (fieldB, fieldC, fieldD) (count_over_time("
-        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [1d]))) < 100'
+        (
+            "count without (fieldD) (sum by (fieldB, fieldC, fieldD) (count_over_time("
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [1d]))) < 100'
+        )
     ]
 
 
@@ -160,12 +166,14 @@ level: high
     loki_backend = LogQLBackend(processing_pipeline=pipeline)
     queries = loki_backend.convert(rules)
     assert queries == [
-        "count without (event_client_geographicalContext_country) "
-        "(sum by (event_actor_alternateId, "
-        "event_client_geographicalContext_country) "
-        '(count_over_time({job=~".+"} | json | event_actor_alternateId!="" and '
-        'event_client_geographicalContext_country!="" [1h]))) '
-        "> 1"
+        (
+            "count without (event_client_geographicalContext_country) "
+            "(sum by (event_actor_alternateId, "
+            "event_client_geographicalContext_country) "
+            '(count_over_time({job=~".+"} | json | event_actor_alternateId!="" and '
+            'event_client_geographicalContext_country!="" [1h]))) '
+            "> 1"
+        )
     ]
 
 

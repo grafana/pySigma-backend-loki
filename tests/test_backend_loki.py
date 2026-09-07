@@ -1,10 +1,12 @@
-import pytest
 import random
 import string
 import warnings
-from sigma.backends.loki import LogQLBackend
+
+import pytest
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
+
+from sigma.backends.loki import LogQLBackend
 
 
 @pytest.fixture
@@ -146,8 +148,10 @@ def test_loki_and_or_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA1$` or fieldA=~`(?i)^valueA2$`) and '
-        "(fieldB=~`(?i)^valueB1$` or fieldB=~`(?i)^valueB2$`)"
+        (
+            '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA1$` or fieldA=~`(?i)^valueA2$`) and '
+            "(fieldB=~`(?i)^valueB1$` or fieldB=~`(?i)^valueB2$`)"
+        )
     ]
 
 
@@ -171,8 +175,10 @@ def test_loki_or_and_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA1$` and fieldB=~`(?i)^valueB1$` or '
-        "fieldA=~`(?i)^valueA2$` and fieldB=~`(?i)^valueB2$`"
+        (
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA1$` and fieldB=~`(?i)^valueB1$` or '
+            "fieldA=~`(?i)^valueA2$` and fieldB=~`(?i)^valueB2$`"
+        )
     ]
 
 
@@ -196,8 +202,10 @@ def test_loki_in_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$` or '
-        "fieldA=~`(?i)^valueC$`"
+        (
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$` or '
+            "fieldA=~`(?i)^valueC$`"
+        )
     ]
 
 
@@ -870,8 +878,10 @@ def test_loki_fields(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` and fieldB=~`(?i)^valueB$` | '
-        'line_format "{{.fieldA}} {{.fieldB}}"'
+        (
+            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` and fieldB=~`(?i)^valueB$` | '
+            'line_format "{{.fieldA}} {{.fieldB}}"'
+        )
     ]
 
 
@@ -1071,7 +1081,6 @@ filter:
 def test_loki_default_output(loki_backend: LogQLBackend):
     """Test for output format default."""
     # TODO: implement a test for the output format
-    pass
 
 
 def test_loki_ruler_output(loki_backend: LogQLBackend):
@@ -1170,10 +1179,8 @@ def test_backend_options(loki_backend: LogQLBackend):
     assert not ci_backend_str_false.case_sensitive
     assert ci_backend_str_true.case_sensitive
     # Check unrecognised argument
-    try:
+    with pytest.raises(TypeError):
         LogQLBackend(unrecognise_argument=True)  # type: ignore[call-arg]
-    except Exception as ex:
-        assert isinstance(ex, TypeError)
 
 
 def test_loki_grafana_alerting_output(loki_backend: LogQLBackend):

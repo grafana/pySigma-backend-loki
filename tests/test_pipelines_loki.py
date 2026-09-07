@@ -1,17 +1,17 @@
 import pytest
+from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
+from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
+from sigma.processing.transformations import FieldMappingTransformation, transformations
 
 from sigma.backends.loki import LogQLBackend
-from sigma.collection import SigmaCollection
-from sigma.processing.transformations import transformations, FieldMappingTransformation
-from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.pipelines.loki import (
+    CustomLogSourceTransformation,
     LokiCustomAttributes,
     SetCustomAttributeTransformation,
-    CustomLogSourceTransformation,
     loki_grafana_logfmt,
-    loki_promtail_sysmon,
     loki_okta_system_log,
+    loki_promtail_sysmon,
 )
 
 
@@ -58,8 +58,10 @@ def test_loki_grafana_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~".+"} | logfmt | (path=~`(?i)^/a/path/to/something$`'
-        " or path=~`(?i)^/a/different/path$`) and status=200"
+        (
+            '{job=~".+"} | logfmt | (path=~`(?i)^/a/path/to/something$`'
+            " or path=~`(?i)^/a/different/path$`) and status=200"
+        )
     ]
 
 
@@ -82,10 +84,12 @@ def test_windows_grafana_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
-        '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
-        '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
-        "| logfmt | Image=~`(?i).*\\.exe$` and event_id=1"
+        (
+            '{job=~"eventlog|winlog|windows|fluentbit.*"} | json '
+            '| label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '
+            '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '
+            "| logfmt | Image=~`(?i).*\\.exe$` and event_id=1"
+        )
     ]
 
 
@@ -111,10 +115,12 @@ def test_okta_json_pipeline():
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        '{job=~".+"} | json | (event_eventType=~`(?i)^policy\\.lifecycle\\.update$` or '
-        "event_eventType=~`(?i)^policy\\.lifecycle\\.delete$`) and "
-        "event_legacyEventType=~`(?i)^core\\.user_auth\\.login_failed$` and "
-        "event_displayMessage=~`(?i)^Failed\\ login\\ to\\ Okta$`"
+        (
+            '{job=~".+"} | json | (event_eventType=~`(?i)^policy\\.lifecycle\\.update$` or '
+            "event_eventType=~`(?i)^policy\\.lifecycle\\.delete$`) and "
+            "event_legacyEventType=~`(?i)^core\\.user_auth\\.login_failed$` and "
+            "event_displayMessage=~`(?i)^Failed\\ login\\ to\\ Okta$`"
+        )
     ]
 
 
@@ -163,15 +169,19 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "client.geographicalcontext.geolocation.lat",
             [
-                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lat=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_client_geographicalContext_geolocation_lat=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
             "client.geographicalcontext.geolocation.lon",
             [
-                '{job=~".+"} | json | event_client_geographicalContext_geolocation_lon=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_client_geographicalContext_geolocation_lon=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
@@ -189,8 +199,10 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "client.geographicalcontext.postalcode",
             [
-                '{job=~".+"} | json | event_client_geographicalContext_postalCode=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_client_geographicalContext_postalCode=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
@@ -204,29 +216,37 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "debugcontext.debugdata.originalprincipal.id",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_id=~`(?i)^test'
-                "_value$`"
+                (
+                    '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_id=~`(?i)^test'
+                    "_value$`"
+                )
             ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.type",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_type=~`(?i)'
-                "^test_value$`"
+                (
+                    '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_type=~`(?i)'
+                    "^test_value$`"
+                )
             ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.alternateid",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_alternateId=~`'
-                "(?i)^test_value$`"
+                (
+                    '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_alternateId=~`'
+                    "(?i)^test_value$`"
+                )
             ],
         ),
         (
             "debugcontext.debugdata.originalprincipal.displayname",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_displayName=~`'
-                "(?i)^test_value$`"
+                (
+                    '{job=~".+"} | json | event_debugContext_debugData_originalPrincipal_displayName=~`'
+                    "(?i)^test_value$`"
+                )
             ],
         ),
         (
@@ -236,29 +256,37 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "debugcontext.debugdata.logonlysecuritydata",
             [
-                '{job=~".+"} | json | event_debugContext_debugData_logOnlySecurityData=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_debugContext_debugData_logOnlySecurityData=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
             "authenticationcontext.authenticationprovider",
             [
-                '{job=~".+"} | json | event_authenticationContext_authenticationProvider=~`(?i)'
-                "^test_value$`"
+                (
+                    '{job=~".+"} | json | event_authenticationContext_authenticationProvider=~`(?i)'
+                    "^test_value$`"
+                )
             ],
         ),
         (
             "authenticationcontext.authenticationstep",
             [
-                '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_authenticationContext_authenticationStep=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
             "authenticationcontext.credentialprovider",
             [
-                '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_authenticationContext_credentialProvider=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
@@ -276,8 +304,10 @@ def test_okta_json_pipeline_exclusive_exhaustive():
         (
             "authenticationcontext.externalsessionid",
             [
-                '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)^test_'
-                "value$`"
+                (
+                    '{job=~".+"} | json | event_authenticationContext_externalSessionId=~`(?i)^test_'
+                    "value$`"
+                )
             ],
         ),
         (
@@ -474,13 +504,15 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{name=~`okta.logs`,job=~`.*secops.*`,"
-        "eventType=~`policy\\.life.*\\.|policy\\.lifecycle\\.update|policy\\.lifecycle\\.del.*`} "
-        "| logfmt | (eventType=~`(?i)^policy\\.lifecycle\\.update$` "
-        "or eventType=~`(?i)^policy\\.lifecycle\\.del.*`) "
-        "and legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
-        "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
-        "and eventType=~`policy\\.life.*\\.`"
+        (
+            "{name=~`okta.logs`,job=~`.*secops.*`,"
+            "eventType=~`policy\\.life.*\\.|policy\\.lifecycle\\.update|policy\\.lifecycle\\.del.*`} "
+            "| logfmt | (eventType=~`(?i)^policy\\.lifecycle\\.update$` "
+            "or eventType=~`(?i)^policy\\.lifecycle\\.del.*`) "
+            "and legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
+            "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
+            "and eventType=~`policy\\.life.*\\.`"
+        )
     ]
 
 
@@ -562,8 +594,10 @@ def test_skip_both_negated_and_positive_custom_log_source_pipeline(
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{name=`okta-logs`} | logfmt | eventType=~`(?i)^policy\\.lifecycle\\..*` "
-        "and eventType!~`(?i).*create$`"
+        (
+            "{name=`okta-logs`} | logfmt | eventType=~`(?i)^policy\\.lifecycle\\..*` "
+            "and eventType!~`(?i).*create$`"
+        )
     ]
 
 
@@ -604,11 +638,13 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     )
     loki_rule = backend.convert(sigma_rule)
     assert loki_rule == [
-        "{eventType!=`policy.lifecycle.update`,stream!~`.*out`} "
-        "| logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
-        "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
-        "and (eventType!~`(?i)^policy\\.lifecycle\\.update$` "
-        "or ruleField!~`.*out`)"
+        (
+            "{eventType!=`policy.lifecycle.update`,stream!~`.*out`} "
+            "| logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
+            "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
+            "and (eventType!~`(?i)^policy\\.lifecycle\\.update$` "
+            "or ruleField!~`.*out`)"
+        )
     ]
 
 
@@ -630,14 +666,10 @@ def test_unsupported_line_filter_custom_log_source_pipeline(
         ],
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
-    raised_error = False
-    try:
+    with pytest.raises(
+        SigmaFeatureNotSupportedByBackendError, match="only supports field equals value conditions"
+    ):
         backend.convert(sigma_rules)
-    except Exception as e:
-        raised_error = True
-        assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
-        assert "only supports field equals value conditions" in str(e)
-    assert raised_error
 
 
 def test_unsupported_nested_or_custom_log_source_pipeline(sigma_rules: SigmaCollection):
@@ -656,14 +688,10 @@ def test_unsupported_nested_or_custom_log_source_pipeline(sigma_rules: SigmaColl
         ],
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
-    raised_error = False
-    try:
+    with pytest.raises(
+        SigmaFeatureNotSupportedByBackendError, match="allows one required value for a field"
+    ):
         backend.convert(sigma_rules)
-    except Exception as e:
-        raised_error = True
-        assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
-        assert "allows one required value for a field" in str(e)
-    assert raised_error
 
 
 def test_unsupported_filter_custom_log_source_pipeline(sigma_rules: SigmaCollection):
@@ -682,14 +710,11 @@ def test_unsupported_filter_custom_log_source_pipeline(sigma_rules: SigmaCollect
         ],
     )
     backend = LogQLBackend(processing_pipeline=pipeline)
-    raised_error = False
-    try:
+    with pytest.raises(
+        SigmaFeatureNotSupportedByBackendError,
+        match="only supports: string values, field references and regular expressions",
+    ):
         backend.convert(sigma_rules)
-    except Exception as e:
-        raised_error = True
-        assert isinstance(e, SigmaFeatureNotSupportedByBackendError)
-        assert "only supports: string values, field references and regular expressions" in str(e)
-    assert raised_error
 
 
 def test_processing_pipeline_custom_attribute_from_dict():

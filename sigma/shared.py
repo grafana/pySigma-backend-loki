@@ -1,21 +1,20 @@
 import re
-from typing import Dict, List, Union
 
 from sigma.types import (
     SigmaCasedString,
-    SigmaString,
     SigmaRegularExpression,
+    SigmaString,
     SpecialChars,
 )
 
-negated_line_filter_operator: Dict[str, str] = {
+negated_line_filter_operator: dict[str, str] = {
     "|=": "!=",
     "!=": "|=",
     "|~": "!~",
     "!~": "|~",
 }
 
-negated_label_filter_operator: Dict[str, str] = {
+negated_label_filter_operator: dict[str, str] = {
     "=": "!=",
     "==": "!=",
     "!=": "=",
@@ -40,16 +39,14 @@ def sanitize_label_key(key: str, isprefix: bool = True) -> str:
         key = "_" + key
     return "".join(
         (
-            (
-                r
-                if (r >= "a" and r <= "z")
-                or (r >= "A" and r <= "Z")
-                or r == "_"
-                or (r >= "0" and r <= "9")
-                else "_"
-            )
-            for r in key
+            r
+            if (r >= "a" and r <= "z")
+            or (r >= "A" and r <= "Z")
+            or r == "_"
+            or (r >= "0" and r <= "9")
+            else "_"
         )
+        for r in key
     )
 
 
@@ -58,7 +55,7 @@ def quote_string_value(s: SigmaString) -> str:
     If the value contains a tilde character, use double quotes and apply more rigourous
     escaping."""
     quote = "`"
-    if any([c == quote for c in str(s)]):
+    if any(c == quote for c in str(s)):
         quote = '"'
     # If our string doesn't contain any tilde characters
     if quote == "`":
@@ -102,7 +99,7 @@ def escape_and_quote_re(r: SigmaRegularExpression, flag_prefix=True) -> str:
 
 
 def join_or_values_re(
-    exprs: List[Union[SigmaString, SigmaRegularExpression]], case_insensitive: bool
+    exprs: list[SigmaString | SigmaRegularExpression], case_insensitive: bool
 ) -> str:
     # This makes the regex case insensitive if any values are SigmaStrings
     # or if any of the regexes are case insensitive
@@ -122,13 +119,11 @@ def join_or_values_re(
     ]
     or_value = "|".join(
         (
-            (
-                re.escape(str(val))
-                if isinstance(val, SigmaString)
-                else re.sub("^\\(\\?i\\)", "", str(val.regexp))
-            )
-            for val in vals
+            re.escape(str(val))
+            if isinstance(val, SigmaString)
+            else re.sub("^\\(\\?i\\)", "", str(val.regexp))
         )
+        for val in vals
     )
     if case_insensitive:
         or_value = f"(?i){or_value}"

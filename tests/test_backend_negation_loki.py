@@ -1,7 +1,8 @@
 import pytest
-from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
+
+from sigma.backends.loki import LogQLBackend
 
 
 @pytest.fixture
@@ -125,8 +126,10 @@ def test_loki_not_and_or_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA1$` and fieldA!~`(?i)^valueA2$` '
-        "or fieldB!~`(?i)^valueB1$` and fieldB!~`(?i)^valueB2$`"
+        (
+            '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA1$` and fieldA!~`(?i)^valueA2$` '
+            "or fieldB!~`(?i)^valueB1$` and fieldB!~`(?i)^valueB2$`"
+        )
     ]
 
 
@@ -150,8 +153,10 @@ def test_loki_not_or_and_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | (fieldA!~`(?i)^valueA1$` or fieldB!~`(?i)^valueB1$`) and '
-        "(fieldA!~`(?i)^valueA2$` or fieldB!~`(?i)^valueB2$`)"
+        (
+            '{job=~".+"} | logfmt | (fieldA!~`(?i)^valueA1$` or fieldB!~`(?i)^valueB1$`) and '
+            "(fieldA!~`(?i)^valueA2$` or fieldB!~`(?i)^valueB2$`)"
+        )
     ]
 
 
@@ -175,8 +180,10 @@ def test_loki_not_in_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldA!~`(?i)^valueB$` and '
-        "fieldA!~`(?i)^valueC$`"
+        (
+            '{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldA!~`(?i)^valueB$` and '
+            "fieldA!~`(?i)^valueC$`"
+        )
     ]
 
 
@@ -222,8 +229,10 @@ def test_loki_not_all_bracket_query(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$`) and '
-        "(fieldB!~`(?i)^valueC$` or fieldB!~`(?i)^valueD$`)"
+        (
+            '{job=~".+"} | logfmt | (fieldA=~`(?i)^valueA$` or fieldA=~`(?i)^valueB$`) and '
+            "(fieldB!~`(?i)^valueC$` or fieldB!~`(?i)^valueD$`)"
+        )
     ]
 
 
@@ -261,8 +270,10 @@ def test_loki_not_base64offset_query(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdW$` and fieldA!~`(?i)^ZhbHVl$` and '
-        "fieldA!~`(?i)^2YWx1Z$`"
+        (
+            '{job=~".+"} | logfmt | fieldA!~`(?i)^dmFsdW$` and fieldA!~`(?i)^ZhbHVl$` and '
+            "fieldA!~`(?i)^2YWx1Z$`"
+        )
     ]
 
 

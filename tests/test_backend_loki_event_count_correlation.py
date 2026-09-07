@@ -1,9 +1,9 @@
 import pytest
-from sigma.processing.pipeline import ProcessingPipeline, ProcessingItem
+from sigma.collection import SigmaCollection
+from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import FieldMappingTransformation
 
 from sigma.backends.loki import LogQLBackend
-from sigma.collection import SigmaCollection
 
 
 @pytest.fixture
@@ -105,8 +105,10 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum by (fieldB, fieldC) (count_over_time({job=~".+"} | logfmt | '
-        "fieldA=~`(?i)^valueA$` [1d])) < 100"
+        (
+            'sum by (fieldB, fieldC) (count_over_time({job=~".+"} | logfmt | '
+            "fieldA=~`(?i)^valueA$` [1d])) < 100"
+        )
     ]
 
 
@@ -155,8 +157,10 @@ correlation:
     loki_backend = LogQLBackend(processing_pipeline=pipeline)
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum by (fieldC) (count_over_time({job=~".+"} | logfmt | '
-        "fieldA=~`(?i)^valueA$` and fieldC=~`(?i).*valueB.*` [36h])) <= 5000"
+        (
+            'sum by (fieldC) (count_over_time({job=~".+"} | logfmt | '
+            "fieldA=~`(?i)^valueA$` and fieldC=~`(?i).*valueB.*` [36h])) <= 5000"
+        )
     ]
 
 
@@ -187,8 +191,10 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum(count_over_time({job=~"eventlog|winlog|windows|fluentbit.*"} | json | '
-        "fieldA=~`(?i)^valueA$` [1d])) >= 100"
+        (
+            'sum(count_over_time({job=~"eventlog|winlog|windows|fluentbit.*"} | json | '
+            "fieldA=~`(?i)^valueA$` [1d])) >= 100"
+        )
     ]
 
 
@@ -252,6 +258,8 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        'sum by (fieldB) (absent_over_time({job=~".+"} | logfmt | '
-        "fieldA=~`(?i)^valueA$` [5m])) == 1"
+        (
+            'sum by (fieldB) (absent_over_time({job=~".+"} | logfmt | '
+            "fieldA=~`(?i)^valueA$` [5m])) == 1"
+        )
     ]
