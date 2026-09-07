@@ -19,8 +19,30 @@ It also supports the following query formats for and categories of [Sigma Correl
 
 It includes the following pipeline transformations in `sigma.pipelines.loki`:
 
-* `SetCustomAttributeTransformation`: adds a specified custom attribute to a rule, which can be used to introduce a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector) or [parser expression](https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression) into the generated query
-  * The `LokiCustomAttributes` enum contains the relevant custom attribute names used by the backend
+* `SetCustomAttributeTransformation` (pipeline identifier: `set_custom_attribute`): sets an arbitrary custom attribute on a rule, which can be used to introduce a [stream selector](https://grafana.com/docs/loki/latest/logql/log_queries/#log-stream-selector) or [parser expression](https://grafana.com/docs/loki/latest/logql/log_queries/#parser-expression) into the generated query
+  * `attribute` (string, required): the name of the custom attribute to set. The `LokiCustomAttributes` enum defines the attribute names recognised by the backend: `LokiCustomAttributes.LOGSOURCE_SELECTION` for the stream selector and `LokiCustomAttributes.PARSER` for the parser expression
+  * `value` (any, required): the value to assign to the attribute
+
+* `CustomLogSourceTransformation` (pipeline identifier: `set_custom_log_source`): builds a Loki stream selector from a YAML mapping of label names to values, optionally referencing field values from the rule's own detection conditions
+  * `selection` (mapping, required): defines the label selectors to emit. Each key is a Loki label name (with optional Sigma-style modifiers such as `|re`, `|contains`, `|startswith`, etc.) and each value is either a literal string/list or a `|fieldref` reference to a detection field whose runtime values will be extracted from the rule
+    * `|fieldref` values look up all occurrences of the referenced detection field across the rule's detection conditions and fold them into the stream selector. If the referenced field appears with both positive and negated values the entry is skipped.
+  * `case_insensitive` (boolean, default: `False`): when `True`, regular expressions added to the stream selector are made case-insensitive
+  * `template` (boolean, default: `False`): when `True`, the finished selector string is passed through Python's `string.Template`, substituting `$category`, `$product`, and `$service` with the corresponding logsource values from the rule
+  * `remove_from_detection` (boolean, default: `False`): when `True`, any detection items whose field was consumed by a `|fieldref` entry are removed from the rule's detection conditions after the stream selector is built — eliminating the redundant filter from the generated query. Specifically:
+    * Detection items for the consumed field are dropped from their group.
+    * If an entire detection group becomes empty as a result, the group is deleted and its reference is removed from the condition string (e.g. `sel1 and not sel2` becomes `sel1`).
+    * If removing a group would leave a condition string empty (i.e. it was the sole term), the group and its detection items are preserved unchanged.
+
+  Example pipeline entry using `set_custom_log_source`:
+
+  ```yaml
+  - id: my_logsource_selector
+    type: set_custom_log_source
+    selection:
+      job: mylogs
+      channel|fieldref: channel
+    remove_from_detection: true
+  ```
 
 Further, it contains the processing pipelines in `sigma.pipelines.loki`:
 
