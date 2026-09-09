@@ -1,10 +1,11 @@
 import pytest
 from sigma.plugins import InstalledSigmaPlugins
+
 from sigma.backends.loki import LogQLBackend
 from sigma.pipelines.loki import (
     loki_grafana_logfmt,
-    loki_promtail_sysmon,
     loki_okta_system_log,
+    loki_promtail_sysmon,
 )
 
 

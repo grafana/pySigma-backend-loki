@@ -1,15 +1,14 @@
 from dataclasses import dataclass
 from enum import auto
-from typing import List, Union
-from typing_extensions import Self
 
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.types import SigmaRegularExpression, SigmaString
+from typing_extensions import Self
 
 from sigma.shared import (
     join_or_values_re,
-    negated_line_filter_operator,
     negated_label_filter_operator,
+    negated_line_filter_operator,
 )
 
 
@@ -77,7 +76,7 @@ class LogQLDeferredUnboundRegexpExpression(DeferredQueryExpression):
 class LogQLDeferredOrUnboundExpression(DeferredQueryExpression):
     """'Defer' unbounded OR matching to pipelined command **BEFORE** main search expression."""
 
-    exprs: List[Union[SigmaString, SigmaRegularExpression]]
+    exprs: list[SigmaString | SigmaRegularExpression]
     op: str = "|~"  # default to matching
     case_insensitive: bool = True
 

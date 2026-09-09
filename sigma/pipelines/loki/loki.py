@@ -1,17 +1,17 @@
 import string
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Union, Type
+from typing import Any
 
 from sigma.conditions import (
-    ConditionValueExpression,
-    ConditionNOT,
-    ConditionFieldEqualsValueExpression,
-    ConditionOR,
-    ConditionItem,
-    ConditionType,
     ConditionAND,
+    ConditionFieldEqualsValueExpression,
     ConditionIdentifier,
+    ConditionItem,
+    ConditionNOT,
+    ConditionOR,
+    ConditionType,
+    ConditionValueExpression,
 )
 from sigma.correlations import SigmaCorrelationRule
 from sigma.exceptions import (
@@ -20,25 +20,25 @@ from sigma.exceptions import (
 from sigma.processing.conditions import LogsourceCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import (
-    transformations,
     AddFieldnamePrefixTransformation,
     FieldMappingTransformation,
     PreprocessingTransformation,
+    transformations,
 )
-from sigma.rule import SigmaRule, SigmaDetection
+from sigma.rule import SigmaDetection, SigmaRule
 from sigma.types import (
-    SigmaString,
-    SigmaRegularExpression,
     SigmaFieldReference,
+    SigmaRegularExpression,
+    SigmaString,
     SigmaType,
 )
 
 from sigma.shared import (
-    sanitize_label_key,
-    quote_string_value,
-    join_or_values_re,
-    escape_and_quote_re,
     convert_str_to_re,
+    escape_and_quote_re,
+    join_or_values_re,
+    quote_string_value,
+    sanitize_label_key,
 )
 
 
@@ -57,20 +57,18 @@ class SetCustomAttributeTransformation(PreprocessingTransformation):
     attribute: str
     value: Any
 
-    def apply(self, rule: Union[SigmaRule, SigmaCorrelationRule]) -> None:
+    def apply(self, rule: SigmaRule | SigmaCorrelationRule) -> None:
         super().apply(rule)
         rule.custom_attributes[self.attribute] = self.value
 
 
 def traverse_conditions(item: ConditionType):
-    queue: List[
-        Union[
-            ConditionIdentifier,
-            ConditionItem,
-            ConditionFieldEqualsValueExpression,
-            ConditionValueExpression,
-            None,
-        ]
+    queue: list[
+        ConditionIdentifier
+        | ConditionItem
+        | ConditionFieldEqualsValueExpression
+        | ConditionValueExpression
+        | None
     ] = [item]
     while len(queue) > 0:
         cond = queue.pop(0)
@@ -80,7 +78,7 @@ def traverse_conditions(item: ConditionType):
             yield cond
 
 
-def count_negated(classes: List[Type[Any]]) -> int:
+def count_negated(classes: list[type[Any]]) -> int:
     return len([neg for neg in classes if neg == ConditionNOT])
 
 
@@ -89,24 +87,22 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
     """Allow the definition of a log source selector using YAML structured data, including
     referencing log source and/or detection fields from the rule"""
 
-    selection: Dict[str, Union[str, List[str]]]
+    selection: dict[str, str | list[str]]
     case_insensitive: bool = False
     template: bool = False
 
-    def apply(self, rule: Union[SigmaRule, SigmaCorrelationRule]):
+    def apply(self, rule: SigmaRule | SigmaCorrelationRule):
         if isinstance(rule, SigmaRule):
-            selectors: List[str] = []
+            selectors: list[str] = []
             logsource_detections = SigmaDetection.from_definition(self.selection)
             conds = logsource_detections.postprocess(rule.detection)
             fields_set = set()
-            args: List[
-                Union[
-                    ConditionIdentifier,
-                    ConditionItem,
-                    ConditionFieldEqualsValueExpression,
-                    ConditionValueExpression,
-                    None,
-                ]
+            args: list[
+                ConditionIdentifier
+                | ConditionItem
+                | ConditionFieldEqualsValueExpression
+                | ConditionValueExpression
+                | None
             ] = []
             if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
                 args.append(conds)
@@ -117,9 +113,9 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                     "the custom log source selector only supports field equals value conditions"
                 )
             for cond in args:
-                field: Union[str, None] = None
-                op: Union[str, None] = None
-                value: Union[SigmaType, str, None] = None
+                field: str | None = None
+                op: str | None = None
+                value: SigmaType | str | None = None
                 if isinstance(cond, ConditionValueExpression):
                     raise SigmaFeatureNotSupportedByBackendError(
                         "the custom log source selector only supports field equals value conditions"
@@ -292,8 +288,8 @@ def loki_promtail_sysmon() -> ProcessingPipeline:
                 identifier="loki_promtail_sysmon_parser",
                 transformation=SetCustomAttributeTransformation(
                     attribute=LokiCustomAttributes.PARSER.value,
-                    value='json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '  # noqa: E501
-                    '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '  # noqa: E501
+                    value='json | label_format Message=`{{ .message | replace "\\\\" "\\\\\\\\" | replace "\\"" "\\\\\\"" }}` '
+                    '| line_format `{{ regexReplaceAll "([^:]+): ?((?:[^\\\\r]*|$))(\\r\\n|$)" .Message "${1}=\\"${2}\\" "}}` '
                     "| logfmt",
                 ),
                 rule_conditions=[
@@ -329,7 +325,7 @@ def loki_okta_system_log() -> ProcessingPipeline:
             ProcessingItem(
                 identifier="loki_okta_field_name_mapping",
                 # Transform event fields names that should be camelCase
-                # See https://developer.okta.com/docs/reference/api/system-log/#logevent-object-annotated-example  # noqa: E501
+                # See https://developer.okta.com/docs/reference/api/system-log/#logevent-object-annotated-example
                 transformation=FieldMappingTransformation(
                     {
                         v.lower().replace("_", "."): v

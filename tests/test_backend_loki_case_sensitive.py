@@ -1,10 +1,12 @@
-import pytest
 import random
 import string
 import warnings
-from sigma.backends.loki import LogQLBackend
+
+import pytest
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
+
+from sigma.backends.loki import LogQLBackend
 
 
 @pytest.fixture
@@ -146,8 +148,10 @@ def test_loki_and_or_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and '
-        "(fieldB=`valueB1` or fieldB=`valueB2`)"
+        (
+            '{job=~".+"} | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and '
+            "(fieldB=`valueB1` or fieldB=`valueB2`)"
+        )
     ]
 
 
@@ -171,8 +175,10 @@ def test_loki_or_and_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or '
-        "fieldA=`valueA2` and fieldB=`valueB2`"
+        (
+            '{job=~".+"} | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or '
+            "fieldA=`valueA2` and fieldB=`valueB2`"
+        )
     ]
 
 
@@ -927,8 +933,10 @@ def test_loki_fields(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB` | '
-        'line_format "{{.fieldA}} {{.fieldB}}"'
+        (
+            '{job=~".+"} | logfmt | fieldA=`valueA` and fieldB=`valueB` | '
+            'line_format "{{.fieldA}} {{.fieldB}}"'
+        )
     ]
 
 
@@ -1097,7 +1105,6 @@ def test_loki_collect_not_supported_errors(loki_backend: LogQLBackend):
 def test_loki_default_output(loki_backend: LogQLBackend):
     """Test for output format default."""
     # TODO: implement a test for the output format
-    pass
 
 
 def test_loki_ruler_output(loki_backend: LogQLBackend):

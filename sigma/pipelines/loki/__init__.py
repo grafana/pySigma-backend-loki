@@ -1,19 +1,19 @@
 from .loki import (
+    CustomLogSourceTransformation,
     LokiCustomAttributes,
     SetCustomAttributeTransformation,
-    CustomLogSourceTransformation,
     loki_grafana_logfmt,
-    loki_promtail_sysmon,
     loki_okta_system_log,
+    loki_promtail_sysmon,
 )
 
 __all__ = (
+    "CustomLogSourceTransformation",
     "LokiCustomAttributes",
     "SetCustomAttributeTransformation",
-    "CustomLogSourceTransformation",
     "loki_grafana_logfmt",
-    "loki_promtail_sysmon",
     "loki_okta_system_log",
+    "loki_promtail_sysmon",
 )
 
 pipelines = {

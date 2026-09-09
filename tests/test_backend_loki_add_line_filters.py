@@ -1,9 +1,11 @@
-import pytest
 import random
 import re
 import string
-from sigma.backends.loki import LogQLBackend
+
+import pytest
 from sigma.collection import SigmaCollection
+
+from sigma.backends.loki import LogQLBackend
 
 # from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 
@@ -235,8 +237,10 @@ def test_loki_lf_and_or_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |= `fieldA=valueA` | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and '
-        "(fieldB=`valueB1` or fieldB=`valueB2`)"
+        (
+            '{job=~".+"} |= `fieldA=valueA` | logfmt | (fieldA=`valueA1` or fieldA=`valueA2`) and '
+            "(fieldB=`valueB1` or fieldB=`valueB2`)"
+        )
     ]
 
 
@@ -260,8 +264,10 @@ def test_loki_lf_or_and_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or '
-        "fieldA=`valueA2` and fieldB=`valueB2`"
+        (
+            '{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA1` and fieldB=`valueB1` or '
+            "fieldA=`valueA2` and fieldB=`valueB2`"
+        )
     ]
 
 
@@ -285,8 +291,10 @@ def test_loki_lf_in_expression(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |= `fieldA=value` | logfmt | fieldA=`valueA` or fieldA=`valueB` '
-        "or fieldA=`valueC`"
+        (
+            '{job=~".+"} |= `fieldA=value` | logfmt | fieldA=`valueA` or fieldA=`valueB` '
+            "or fieldA=`valueC`"
+        )
     ]
 
 
@@ -328,8 +336,10 @@ def test_loki_lf_all_contains_query(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |~ `(?i).*valueA.*` | logfmt | fieldA=~`(?i).*valueA.*` '
-        "and fieldA=~`(?i).*valueB.*`"
+        (
+            '{job=~".+"} |~ `(?i).*valueA.*` | logfmt | fieldA=~`(?i).*valueA.*` '
+            "and fieldA=~`(?i).*valueB.*`"
+        )
     ]
 
 
@@ -407,8 +417,10 @@ def test_loki_lf_wildcard_escape(loki_backend: LogQLBackend):
         """
         )
     ) == [
-        '{job=~".+"} |~ `(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$` | logfmt | '
-        "fieldA=~`(?i)^\\^v\\)\\+\\[al\\]u\\(e.*\\$$`"
+        (
+            '{job=~".+"} |~ `(?i)\\^v\\)\\+\\[al\\]u\\(e.*\\$` | logfmt | '
+            "fieldA=~`(?i)^\\^v\\)\\+\\[al\\]u\\(e.*\\$$`"
+        )
     ]
 
 

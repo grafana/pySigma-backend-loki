@@ -3,14 +3,15 @@ import collections
 import operator
 import os
 import subprocess
-from typing import Any, Dict
+import sys
+from typing import Any
 
+from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaError
+from sigma.rule import SigmaDetection
 
 from sigma.backends.loki import LogQLBackend
-from sigma.collection import SigmaCollection
 from sigma.pipelines.loki import loki_grafana_logfmt
-from sigma.rule import SigmaDetection
 
 parser = argparse.ArgumentParser(
     description="A script to help test pySigma backends using Sigma signature files",
@@ -84,7 +85,7 @@ backend = LogQLBackend(
     add_line_filters=args.add_line_filters,
 )
 
-counters: Dict[str, Any] = {
+counters: dict[str, Any] = {
     "parse_error": 0,
     "convert_error": 0,
     "validate_error": 0,
@@ -109,7 +110,10 @@ def validate_with_backend(query, test_file=subprocess.DEVNULL):
     if test_file is None:
         test_file = subprocess.DEVNULL
     result = subprocess.run(
-        ["logcli", "--stdin", "query", query], stdin=test_file, capture_output=True
+        ["logcli", "--stdin", "query", query],
+        stdin=test_file,
+        capture_output=True,
+        check=False,
     )
     stdout = result.stdout.decode()
     stderr = result.stderr.decode()
@@ -142,15 +146,12 @@ def process_file(file_path, test_file, args, counters):
             counters["total_sigs"] += len(sigma_rules)
             if args.summarize:
                 for rule in sigma_rules:
-                    fields = (
-                        list(
-                            item.field
-                            for detection in rule.detection.detections.values()
-                            for item in find_all_detection_items(detection, [])
-                            if item.field is not None
-                        )
-                        + rule.fields
-                    )
+                    fields = [
+                        item.field
+                        for detection in rule.detection.detections.values()
+                        for item in find_all_detection_items(detection, [])
+                        if item.field is not None
+                    ] + rule.fields
                     for field in fields:
                         counters["fields"][field] = counters["fields"].get(field, 0) + 1
                     cat = rule.logsource.category
@@ -222,19 +223,19 @@ test_file = None
 test_dir = None
 if args.tests:
     if os.path.isfile(args.tests):
-        test_file = open(args.tests)
+        test_file = open(args.tests)  # noqa: SIM115 - kept open across the whole script
         counters["total_test_logs"] += 1
     elif os.path.isdir(args.tests):
         test_dir = args.tests
     else:
         print(f"Could not find test file/directory: {args.tests}")
-        exit(1)
+        sys.exit(1)
 
 if os.path.isfile(rule_path):
     if test_dir:
         test_file_path = os.path.join(test_dir, get_log_file(rule_path))
         if os.path.isfile(test_file_path):
-            test_file = open(test_file_path)
+            test_file = open(test_file_path)  # noqa: SIM115 - reused across process_file() calls
             counters["total_test_logs"] += 1
     process_file(rule_path, test_file, args, counters)
 elif os.path.isdir(rule_path):
@@ -250,7 +251,7 @@ elif os.path.isdir(rule_path):
                     get_log_file(filename),
                 )
                 if os.path.isfile(test_file_path):
-                    test_file = open(test_file_path)
+                    test_file = open(test_file_path)  # noqa: SIM115 - closed explicitly above
                     counters["total_test_logs"] += 1
                 else:
                     test_file = None
@@ -259,7 +260,7 @@ elif os.path.isdir(rule_path):
             process_file(rule_file_path, test_file, args, counters)
 else:
     print(f"Could not find rule file/directory: {rule_path}")
-    exit(1)
+    sys.exit(1)
 
 if args.counts:
     percent_conv = counters["convert_success"] / counters["total_sigs"] * 100

@@ -35,6 +35,7 @@ jobs:
         run: |
           poetry run mypy --explicit-package-bases .
           poetry run ruff check .
+          poetry run ruff format --check .
       - name: Run unit tests
         run: poetry run pytest --cov=sigma --cov-report term --cov-report lcov:coverage.lcov -vv
       - name: Submit coverage report to Coveralls

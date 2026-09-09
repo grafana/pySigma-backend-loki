@@ -1,7 +1,8 @@
 import pytest
-from sigma.backends.loki import LogQLBackend
 from sigma.collection import SigmaCollection
 from sigma.processing.pipeline import ProcessingPipeline
+
+from sigma.backends.loki import LogQLBackend
 
 
 @pytest.fixture
@@ -88,9 +89,11 @@ def test_loki_field_ref_json_multi_selection(loki_backend: LogQLBackend):
             """
         )
     ) == [
-        '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)^Something$`'
-        "| label_format match_0=`{{ if eq .fieldA .field1 }}true{{ else }}false{{ end }}` "
-        "| match_0=`true`"
+        (
+            '{job=~"eventlog|winlog|windows|fluentbit.*"}  | json | field2=~`(?i)^Something$`'
+            "| label_format match_0=`{{ if eq .fieldA .field1 }}true{{ else }}false{{ end }}` "
+            "| match_0=`true`"
+        )
     ]
 
 
