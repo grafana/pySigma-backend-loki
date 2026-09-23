@@ -1157,9 +1157,6 @@ class LogQLBackend(TextQueryBackend):
             else None
         )
         field = self.escape_and_quote_field(fieldref) if isinstance(fieldref, str) else fieldref
-        # rstrip removes the trailing space left by the groupby template when it is used as a
-        # suffix (e.g. for value_avg/value_median/value_percentile), which would otherwise
-        # collide with the space this result is joined with in the correlation query template
         return template.format(
             rule=rule,
             referenced_rules=self.convert_referenced_rules(rule.rules, method)
