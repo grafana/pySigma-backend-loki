@@ -32,7 +32,11 @@ from sigma.correlations import (
     SigmaCorrelationRule,
     SigmaCorrelationTypeLiteral,
 )
-from sigma.exceptions import SigmaError, SigmaFeatureNotSupportedByBackendError
+from sigma.exceptions import (
+    SigmaConversionError,
+    SigmaError,
+    SigmaFeatureNotSupportedByBackendError,
+)
 from sigma.processing.pipeline import ProcessingPipeline
 from sigma.rule import SigmaRule
 from sigma.types import (
@@ -227,6 +231,18 @@ class LogQLBackend(TextQueryBackend):
     value_count_correlation_query: ClassVar[dict[str, str]] = {
         "default": "{aggregate} {condition}",
     }
+    value_sum_correlation_query: ClassVar[dict[str, str]] = {
+        "default": "{aggregate} {condition}",
+    }
+    value_avg_correlation_query: ClassVar[dict[str, str]] = {
+        "default": "{aggregate} {condition}",
+    }
+    value_median_correlation_query: ClassVar[dict[str, str]] = {
+        "default": "{aggregate} {condition}",
+    }
+    value_percentile_correlation_query: ClassVar[dict[str, str]] = {
+        "default": "{aggregate} {condition}",
+    }
     correlation_search_single_rule_expression = "{query}"
     event_count_aggregation_expression: ClassVar[dict[str, str]] = {
         "default": "sum{groupby}({range_vector_function}({search} [{timespan}]))",
@@ -235,6 +251,23 @@ class LogQLBackend(TextQueryBackend):
     #       convert_correlation_aggregation_from_template
     value_count_aggregation_expression: ClassVar[dict[str, str]] = {
         "default": "count without ({field}) (sum{groupby}({range_vector_function}({search} [{timespan}])))",
+    }
+    # value_sum uses sum_over_time, which (unlike avg_over_time/quantile_over_time) does not
+    # support a by/without grouping clause of its own, so grouping is done via an outer sum()
+    value_sum_aggregation_expression: ClassVar[dict[str, str]] = {
+        "default": "sum{groupby}({range_vector_function}({search} | unwrap {field} [{timespan}]))",
+    }
+    # avg_over_time and quantile_over_time support grouping directly, which (unlike wrapping in
+    # an outer aggregation operator) correctly aggregates over the raw unwrapped values rather
+    # than over per-stream averages/quantiles
+    value_avg_aggregation_expression: ClassVar[dict[str, str]] = {
+        "default": "{range_vector_function}({search} | unwrap {field} [{timespan}]){groupby}",
+    }
+    value_median_aggregation_expression: ClassVar[dict[str, str]] = {
+        "default": "{range_vector_function}({percentile}, {search} | unwrap {field} [{timespan}]){groupby}",
+    }
+    value_percentile_aggregation_expression: ClassVar[dict[str, str]] = {
+        "default": "{range_vector_function}({percentile}, {search} | unwrap {field} [{timespan}]){groupby}",
     }
     # Loki supports all the default time span specifiers (s, m, h, d) defined for correlation rules
     timespan_mapping: ClassVar[dict[str, str]] = {}
@@ -251,6 +284,18 @@ class LogQLBackend(TextQueryBackend):
         "default": "{op} {count}",
     }
     value_count_condition_expression: ClassVar[dict[str, str]] = {
+        "default": "{op} {count}",
+    }
+    value_sum_condition_expression: ClassVar[dict[str, str]] = {
+        "default": "{op} {count}",
+    }
+    value_avg_condition_expression: ClassVar[dict[str, str]] = {
+        "default": "{op} {count}",
+    }
+    value_median_condition_expression: ClassVar[dict[str, str]] = {
+        "default": "{op} {count}",
+    }
+    value_percentile_condition_expression: ClassVar[dict[str, str]] = {
         "default": "{op} {count}",
     }
     # Taken from https://pkg.go.dev/time#pkg-constants
@@ -1050,43 +1095,83 @@ class LogQLBackend(TextQueryBackend):
                 groups.append(rule.condition.fieldref)
             else:
                 groups.extend(rule.condition.fieldref)
-        range_vector_function = "count_over_time"
-        if (
-            (correlation_type in ("value_count", "event_count"))
-            and isinstance(rule.condition, SigmaCorrelationCondition)
-            and (
-                (
-                    rule.condition.count == 0
-                    and rule.condition.op
-                    in (SigmaCorrelationConditionOperator.EQ, SigmaCorrelationConditionOperator.LTE)
+        # value_avg/value_median/value_percentile append the group-by directly onto the
+        # unwrapped range vector function (rather than wrapping in an outer aggregation
+        # operator like sum() or avg()). Unlike outer aggregation operators, omitting the
+        # by/without clause entirely does *not* collapse all series into one - it leaves every
+        # extracted field as a distinct label, so with no group-by we must emit an explicit
+        # empty "by ()" to force aggregation across all matching series into a single result.
+        elif correlation_type in ("value_avg", "value_median", "value_percentile") and not groups:
+            groups = []
+        value_calc_range_vector_functions = {
+            "value_sum": "sum_over_time",
+            "value_avg": "avg_over_time",
+            "value_median": "quantile_over_time",
+            "value_percentile": "quantile_over_time",
+        }
+        if correlation_type in value_calc_range_vector_functions:
+            range_vector_function = value_calc_range_vector_functions[correlation_type]
+        else:
+            range_vector_function = "count_over_time"
+            if (
+                (correlation_type in ("value_count", "event_count"))
+                and isinstance(rule.condition, SigmaCorrelationCondition)
+                and (
+                    (
+                        rule.condition.count == 0
+                        and rule.condition.op
+                        in (
+                            SigmaCorrelationConditionOperator.EQ,
+                            SigmaCorrelationConditionOperator.LTE,
+                        )
+                    )
+                    or (
+                        rule.condition.count == 1
+                        and rule.condition.op == SigmaCorrelationConditionOperator.LT
+                    )
                 )
-                or (
-                    rule.condition.count == 1
-                    and rule.condition.op == SigmaCorrelationConditionOperator.LT
+            ):
+                range_vector_function = "absent_over_time"
+                # Since absent_over_time returns a 1 when the condition is true, we need to update the condition to an equality condition
+                rule.condition.op = SigmaCorrelationConditionOperator.EQ
+                rule.condition.count = 1
+        # value_median always computes the 50th percentile; value_percentile requires the
+        # percentile to be specified in the condition
+        percentile = ""
+        if correlation_type == "value_median":
+            percentile = "0.5"
+        elif correlation_type == "value_percentile":
+            if (
+                not isinstance(rule.condition, SigmaCorrelationCondition)
+                or rule.condition.percentile is None
+            ):
+                raise SigmaConversionError(
+                    rule,
+                    rule.source,
+                    "Percentile must be specified in condition for value_percentile correlation type",
                 )
-            )
-        ):
-            range_vector_function = "absent_over_time"
-            # Since absent_over_time returns a 1 when the condition is true, we need to update the condition to an equality condition
-            rule.condition.op = SigmaCorrelationConditionOperator.EQ
-            rule.condition.count = 1
+            percentile = str(rule.condition.percentile / 100)
         fieldref = (
             rule.condition.fieldref
             if isinstance(rule.condition, SigmaCorrelationCondition)
             else None
         )
         field = self.escape_and_quote_field(fieldref) if isinstance(fieldref, str) else fieldref
+        # rstrip removes the trailing space left by the groupby template when it is used as a
+        # suffix (e.g. for value_avg/value_median/value_percentile), which would otherwise
+        # collide with the space this result is joined with in the correlation query template
         return template.format(
             rule=rule,
             referenced_rules=self.convert_referenced_rules(rule.rules, method)
             if rule.rules
             else "",
             field=field,
+            percentile=percentile,
             timespan=self.convert_timespan(rule.timespan, method),
             groupby=self.convert_correlation_aggregation_groupby_from_template(groups, method),
             search=search,
             range_vector_function=range_vector_function,
-        )
+        ).rstrip()
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
     # rather than the end (since this is the recommended approach for LogQL), and add in log
