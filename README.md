@@ -58,7 +58,6 @@ sigma convert -t loki -f grafana_alerting \
 This backend is currently maintained by:
 
 * [Nick Moore](https://github.com/kelnage)
-* [Mostafa Moradian](https://github.com/mostafa)
 
 ## Installation
 
