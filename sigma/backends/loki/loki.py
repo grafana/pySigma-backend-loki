@@ -1209,6 +1209,8 @@ class LogQLBackend(TextQueryBackend):
         """Convert a (basic, unordered) temporal correlation rule into a LogQL query that
         intersects a metric query per referenced rule using the "and" operator."""
         condition = rule.condition
+        # required for mypy type checking
+        assert isinstance(condition, SigmaCorrelationCondition)
         rule_count = len(rule.referenced_rules)
         if (
             condition.op
