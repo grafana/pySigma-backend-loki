@@ -4,10 +4,10 @@
 # https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 
 version: 2
-cooldown:
-  default-days: 3
 updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3

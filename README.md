@@ -16,6 +16,10 @@ It also supports the following query formats for and categories of [Sigma Correl
 * `default` format using [LogQL metric queries](https://grafana.com/docs/loki/latest/query/metric_queries/):
   * `event_count`
   * `value_count`
+  * `value_sum`
+  * `value_avg`
+  * `value_median`
+  * `value_percentile`
 
 It includes the following pipeline transformations in `sigma.pipelines.loki`:
 
