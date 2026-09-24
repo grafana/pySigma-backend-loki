@@ -1209,11 +1209,6 @@ class LogQLBackend(TextQueryBackend):
         """Convert a (basic, unordered) temporal correlation rule into a LogQL query that
         intersects a metric query per referenced rule using the "and" operator."""
         condition = rule.condition
-        if not isinstance(condition, SigmaCorrelationCondition):
-            raise SigmaFeatureNotSupportedByBackendError(
-                "Extended (boolean) temporal correlation conditions are not supported by the "
-                "Loki backend."
-            )
         rule_count = len(rule.referenced_rules)
         if (
             condition.op

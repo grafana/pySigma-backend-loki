@@ -511,3 +511,45 @@ correlation:
     )
     with pytest.raises(SigmaFeatureNotSupportedByBackendError, match="[Ee]xtended"):
         loki_backend.convert(rules)
+
+
+def test_loki_temporal_ordered_extended_condition_unsupported(loki_backend: LogQLBackend):
+    rules = SigmaCollection.from_yaml(
+        """
+title: Test Rule A
+name: test_rule_a
+status: test
+logsource:
+    category: test_category
+    product: test_product
+detection:
+    sel:
+        fieldA: valueA
+    condition: sel
+---
+title: Test Rule B
+name: test_rule_b
+status: test
+logsource:
+    category: test_category
+    product: test_product
+detection:
+    sel:
+        fieldB: valueB
+    condition: sel
+---
+title: Test Correlation
+status: test
+correlation:
+    type: temporal_ordered
+    rules:
+        - test_rule_a
+        - test_rule_b
+    group-by:
+        - fieldC
+    timespan: 5m
+    condition: "test_rule_a and test_rule_b"
+"""
+    )
+    with pytest.raises(SigmaFeatureNotSupportedByBackendError, match="[Oo]rdered"):
+        loki_backend.convert(rules)
