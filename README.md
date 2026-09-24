@@ -20,6 +20,9 @@ It also supports the following query formats for and categories of [Sigma Correl
   * `value_avg`
   * `value_median`
   * `value_percentile`
+  * `temporal`: converted using [LogQL's `and` set operator](https://grafana.com/docs/loki/latest/query/query_reference/#logical-and-set-operators) to intersect a metric query per referenced rule
+    * Only correlation rules whose condition requires all referenced rules to match (i.e. no condition, or a condition equivalent to requiring all rules) are supported
+    * `temporal_ordered` and extended (boolean) correlation conditions are not supported, as LogQL's set operators have no concept of event ordering
 
 It includes the following pipeline transformations in `sigma.pipelines.loki`:
 
