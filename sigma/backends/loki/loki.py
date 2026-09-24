@@ -31,6 +31,7 @@ from sigma.correlations import (
     SigmaCorrelationConditionOperator,
     SigmaCorrelationRule,
     SigmaCorrelationTypeLiteral,
+    SigmaRuleReference,
 )
 from sigma.exceptions import (
     SigmaConversionError,
@@ -1169,6 +1170,115 @@ class LogQLBackend(TextQueryBackend):
             search=search,
             range_vector_function=range_vector_function,
         ).rstrip()
+
+    # Temporal correlation rule support: identifying two or more distinct events that occur
+    # within the same time window is implemented by aggregating each referenced rule into its
+    # own metric query, and combining them with LogQL's "and" set operator, which returns the
+    # intersection of vectors that have exactly matching label sets. See:
+    # https://sigmahq.io/docs/meta/correlations.html#temporal
+    # https://grafana.com/docs/loki/latest/query/query_reference/#logical-and-set-operators
+    def convert_correlation_temporal_search(
+        self, rule: SigmaCorrelationRule, rule_reference: SigmaRuleReference
+    ) -> str:
+        """Build the metric search expression for a single rule referenced by a temporal
+        correlation rule, renaming any aliased group-by fields to their shared alias name so
+        that the resulting vectors line up correctly for use with the "and" operator."""
+        queries = rule_reference.rule.get_conversion_result()
+        if len(queries) != 1:
+            raise SigmaFeatureNotSupportedByBackendError(
+                "Temporal correlation rules are only supported for Sigma rules that convert "
+                "into a single query."
+            )
+        search = queries[0]
+        renames = [
+            f"{self.escape_and_quote_field(alias.alias)}="
+            f"{self.escape_and_quote_field(alias.mapping[rule_reference])}"
+            for alias in rule.aliases
+            if rule_reference in alias.mapping
+        ]
+        if renames:
+            search = f"{search} | label_format {', '.join(renames)}"
+        return search
+
+    def convert_correlation_temporal_rule(
+        self,
+        rule: SigmaCorrelationRule,
+        output_format: str | None = None,
+        method: str = "default",
+    ) -> list[str]:
+        """Convert a (basic, unordered) temporal correlation rule into a LogQL query that
+        intersects a metric query per referenced rule using the "and" operator."""
+        condition = rule.condition
+        if not isinstance(condition, SigmaCorrelationCondition):
+            raise SigmaFeatureNotSupportedByBackendError(
+                "Extended (boolean) temporal correlation conditions are not supported by the "
+                "Loki backend."
+            )
+        rule_count = len(rule.referenced_rules)
+        if (
+            condition.op
+            not in (
+                SigmaCorrelationConditionOperator.GTE,
+                SigmaCorrelationConditionOperator.EQ,
+            )
+            or condition.count != rule_count
+        ):
+            raise SigmaFeatureNotSupportedByBackendError(
+                "The Loki backend only supports temporal correlation rules that require all "
+                "referenced rules to match within the timespan (i.e., no condition, or a "
+                "condition equivalent to requiring all rules to match)."
+            )
+
+        timespan = self.convert_timespan(rule.timespan, method)
+        groupby = self.convert_correlation_aggregation_groupby_from_template(rule.group_by, method)
+        aggregation_template = self.event_count_aggregation_expression[method]
+        aggregates = [
+            aggregation_template.format(
+                rule=rule,
+                referenced_rules="",
+                field=None,
+                timespan=timespan,
+                groupby=groupby,
+                search=self.convert_correlation_temporal_search(rule, rule_reference),
+                range_vector_function="count_over_time",
+            )
+            for rule_reference in rule.referenced_rules
+        ]
+        joiner = f"{self.token_separator}{self.and_token}{self.token_separator}"
+        return [joiner.join(aggregates)]
+
+    def convert_correlation_temporal_ordered_rule(
+        self,
+        rule: SigmaCorrelationRule,
+        output_format: str | None = None,
+        method: str = "default",
+    ) -> list[str]:
+        raise SigmaFeatureNotSupportedByBackendError(
+            "Ordered temporal correlation rules are not supported by the Loki backend, as "
+            "LogQL's logical/set operators do not support enforcing an order between events."
+        )
+
+    def convert_correlation_extended_temporal_rule(
+        self,
+        rule: SigmaCorrelationRule,
+        output_format: str | None = None,
+        method: str = "default",
+    ) -> list[str]:
+        raise SigmaFeatureNotSupportedByBackendError(
+            "Extended (boolean) temporal correlation conditions are not supported by the Loki "
+            "backend."
+        )
+
+    def convert_correlation_extended_temporal_ordered_rule(
+        self,
+        rule: SigmaCorrelationRule,
+        output_format: str | None = None,
+        method: str = "default",
+    ) -> list[str]:
+        raise SigmaFeatureNotSupportedByBackendError(
+            "Ordered temporal correlation rules are not supported by the Loki backend, as "
+            "LogQL's logical/set operators do not support enforcing an order between events."
+        )
 
     # Swapping the meaning of "deferred" expressions so they appear at the start of a query,
     # rather than the end (since this is the recommended approach for LogQL), and add in log
