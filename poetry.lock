@@ -1076,14 +1076,14 @@ diagrams = ["jinja2", "railroad-diagrams"]
 
 [[package]]
 name = "pysigma"
-version = "1.5.0"
+version = "1.5.1"
 description = "Sigma rule processing and conversion tools"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "pysigma-1.5.0-py3-none-any.whl", hash = "sha256:871452a262aedb17d9e85344142944c5a0ac50e8b57408ec355efeb1329231b6"},
-    {file = "pysigma-1.5.0.tar.gz", hash = "sha256:2c258cf676d2896c94279fb54c7eea664118cf08285bde122b4df75cc7b6b194"},
+    {file = "pysigma-1.5.1-py3-none-any.whl", hash = "sha256:1e6e080bde31db6039eb5d87d43322bf416534f30048091c65038e88225b8200"},
+    {file = "pysigma-1.5.1.tar.gz", hash = "sha256:5f27ea435bc53480b43f9e385104c6df3d473715321d662a52a1fc283ab0b8db"},
 ]
 
 [package.dependencies]
@@ -1091,11 +1091,11 @@ diskcache = ">=5.6.3,<6.0.0"
 diskcache-stubs = ">=5.6.3"
 jinja2 = ">=3.1.6,<4.0.0"
 jq = ">=1.12,<2.0"
-packaging = ">=26.0,<27.0"
+packaging = ">=26.3,<27.0"
 pyparsing = ">=3.2.5,<4.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
 requests = ">=2.32.5,<3.0.0"
-types-pyyaml = ">=6.0.12.20260724,<7.0.0.0"
+types-pyyaml = ">=6.0.12.20260815,<7.0.0.0"
 typing-extensions = ">=4.16.0,<5.0.0"
 
 [[package]]
