@@ -1197,6 +1197,13 @@ class LogQLBackend(TextQueryBackend):
             if rule_reference in alias.mapping
         ]
         if renames:
+            if isinstance(rule_reference.rule, SigmaCorrelationRule):
+                raise SigmaFeatureNotSupportedByBackendError(
+                    "Temporal correlation aliases cannot be applied to a referenced "
+                    "correlation rule — LogQL's label_format works on log pipelines, "
+                    "not metric expressions. Align group-by field names in the nested "
+                    "correlation instead."
+                )
             search = f"{search} | label_format {', '.join(renames)}"
         return search
 
@@ -1229,18 +1236,27 @@ class LogQLBackend(TextQueryBackend):
         timespan = self.convert_timespan(rule.timespan, method)
         groupby = self.convert_correlation_aggregation_groupby_from_template(rule.group_by, method)
         aggregation_template = self.event_count_aggregation_expression[method]
-        aggregates = [
-            aggregation_template.format(
-                rule=rule,
-                referenced_rules="",
-                field=None,
-                timespan=timespan,
-                groupby=groupby,
-                search=self.convert_correlation_temporal_search(rule, rule_reference),
-                range_vector_function="count_over_time",
-            )
-            for rule_reference in rule.referenced_rules
-        ]
+        aggregates = []
+        for rule_reference in rule.referenced_rules:
+            search = self.convert_correlation_temporal_search(rule, rule_reference)
+            # A referenced rule that is itself a correlation has already been converted to
+            # a metric expression with its own time window and grouping — re-wrapping it in
+            # count_over_time(...[timespan]) produces invalid LogQL (parse error), so use
+            # the inner metric query directly.
+            if isinstance(rule_reference.rule, SigmaCorrelationRule):
+                aggregates.append(search)
+            else:
+                aggregates.append(
+                    aggregation_template.format(
+                        rule=rule,
+                        referenced_rules="",
+                        field=None,
+                        timespan=timespan,
+                        groupby=groupby,
+                        search=search,
+                        range_vector_function="count_over_time",
+                    )
+                )
         joiner = f"{self.token_separator}{self.and_token}{self.token_separator}"
         return [joiner.join(aggregates)]
 
