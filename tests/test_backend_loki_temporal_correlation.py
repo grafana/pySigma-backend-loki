@@ -614,10 +614,6 @@ correlation:
         (
             "count without (region) (sum by (user, region) (count_over_time("
             '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [10m]))) >= 3'
-        ),
-        (
-            "count without (region) (sum by (user, region) (count_over_time("
-            '{job=~".+"} | logfmt | fieldA=~`(?i)^valueA$` [10m]))) >= 3'
             " and "
             'sum by (user) (count_over_time({job=~".+"} | logfmt | '
             "fieldB=~`(?i)^valueB$` [15m]))"
@@ -679,10 +675,6 @@ correlation:
     )
     queries = loki_backend.convert(rules)
     assert queries == [
-        (
-            'sum by (user) (count_over_time({job=~".+"} | logfmt | '
-            "fieldA=~`(?i)^valueA$` [10m])) >= 5"
-        ),
         (
             'sum by (user) (count_over_time({job=~".+"} | logfmt | '
             "fieldA=~`(?i)^valueA$` [10m])) >= 5"
