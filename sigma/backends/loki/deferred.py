@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from enum import auto
+from typing import Self
 
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.types import SigmaRegularExpression, SigmaString
-from typing_extensions import Self
 
 from sigma.shared import (
     join_or_values_re,
