@@ -5,7 +5,7 @@ plugin="loki"
 
 # Ensure current environment is up-to-date
 poetry install
-poetry run pip install sigma-cli==1.1.0rc1
+poetry run pip install sigma-cli==4.0.0
 
 sigma=$(poetry run sigma version)
 
