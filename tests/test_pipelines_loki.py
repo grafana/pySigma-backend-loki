@@ -637,15 +637,106 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
         """
     )
     loki_rule = backend.convert(sigma_rule)
+    # "not (eventType and ruleField)" is "not eventType or not ruleField", so neither can be lifted
+    # into the stream selector without dropping events the rule should match
     assert loki_rule == [
         (
-            "{eventType!=`policy.lifecycle.update`,stream!~`.*out`} "
+            "{} "
             "| logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
             "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
             "and (eventType!~`(?i)^policy\\.lifecycle\\.update$` "
             "or ruleField!~`.*out`)"
         )
     ]
+
+
+def _fieldref_pipeline() -> ProcessingPipeline:
+    return ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="complex_custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={
+                        "name": "audit",
+                        "action|fieldref": "action",
+                    },
+                ),
+            )
+        ],
+    )
+
+
+def test_negated_or_values_are_lifted_into_selector():
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    actor: bot
+                filter:
+                    action:
+                        - a
+                        - b
+                condition: sel and not filter
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule[0].startswith("{name=`audit`,action!~`a|b`} |")
+
+
+def test_negated_and_group_is_not_lifted_into_selector():
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel:
+                    actor: bot
+                filter_a:
+                    action: x
+                filter_b:
+                    action:
+                        - y
+                        - z
+                    event: comment
+                condition: sel and not 1 of filter_*
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    # "not (action in [y, z] and event)" must not remove y and z events from the stream
+    assert loki_rule[0].startswith("{name=`audit`,action!=`x`} |")
+
+
+def test_field_in_or_with_other_field_is_not_lifted_into_selector():
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                sel_action:
+                    action: x
+                sel_actor:
+                    actor: bot
+                condition: sel_action or sel_actor
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule[0].startswith("{name=`audit`} |")
 
 
 def test_unsupported_line_filter_custom_log_source_pipeline(

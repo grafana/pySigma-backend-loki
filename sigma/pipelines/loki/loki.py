@@ -82,6 +82,34 @@ def count_negated(classes: list[type[Any]]) -> int:
     return len([neg for neg in classes if neg == ConditionNOT])
 
 
+def is_required_condition(item: ConditionFieldEqualsValueExpression) -> bool:
+    """Whether a rule can only match if this condition holds (or, for an OR on a single field, one
+    of the field's values holds), so that it is safe to lift it into the log stream selector.
+
+    Walking from the root of the condition tree, a negation flips AND to OR and OR to AND
+    (De Morgan). An effective AND is always safe. An effective OR is only safe if it is not
+    negated and every branch tests the same field, as the values then merge into a single
+    selector. Anything else (for example ``not (a and b)``, which is ``not a or not b``) would
+    make the stream selector drop events the rule should still match."""
+    negated = False
+    for node in reversed(item.parent_chain()):
+        if isinstance(node, ConditionNOT):
+            negated = not negated
+        elif isinstance(node, (ConditionAND, ConditionOR)):
+            effective_or = isinstance(node, ConditionOR) != negated
+            if not effective_or:
+                continue
+            if negated:
+                return False
+            for leaf in traverse_conditions(node):
+                if not (
+                    isinstance(leaf, ConditionFieldEqualsValueExpression)
+                    and leaf.field == item.field
+                ):
+                    return False
+    return True
+
+
 @dataclass
 class CustomLogSourceTransformation(PreprocessingTransformation):
     """Allow the definition of a log source selector using YAML structured data, including
@@ -170,6 +198,10 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                             and item.field == value.field
                             and isinstance(item.value, (SigmaString, SigmaRegularExpression))
                         ):
+                            if not is_required_condition(item):
+                                # Conditions that are not strictly required (for example inside
+                                # an OR with another field) must not narrow the stream selector
+                                continue
                             classes = item.parent_chain_condition_classes()
                             new_negated = count_negated(classes) % 2 == 1
                             if negated is not None and negated != new_negated:
