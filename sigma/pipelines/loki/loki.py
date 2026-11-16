@@ -90,8 +90,10 @@ def is_required_condition(item: ConditionFieldEqualsValueExpression) -> bool:
     (De Morgan). An effective AND is always safe. An effective OR is only safe if it is not
     negated and every branch tests the same field, as the values then merge into a single
     selector. Anything else (for example ``not (a and b)``, which is ``not a or not b``) would
-    make the stream selector drop events the rule should still match."""
+    make the stream selector drop events the rule should still match. The condition's own sign
+    matters too: a negated condition under an OR (``not a or not b``) can't be merged either."""
     negated = False
+    in_or = False
     for node in reversed(item.parent_chain()):
         if isinstance(node, ConditionNOT):
             negated = not negated
@@ -107,7 +109,9 @@ def is_required_condition(item: ConditionFieldEqualsValueExpression) -> bool:
                     and leaf.field == item.field
                 ):
                     return False
-    return True
+            in_or = True
+    # A NOT below an OR flips the sign of the condition after the OR has been checked
+    return not (in_or and negated)
 
 
 @dataclass

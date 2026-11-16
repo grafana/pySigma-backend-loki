@@ -748,6 +748,49 @@ def test_or_of_negated_and_groups_is_not_lifted_into_selector():
     ]
 
 
+def test_or_of_negated_single_field_conditions_is_not_lifted_into_selector():
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                filter_a:
+                    action: x
+                filter_b:
+                    action: y
+                condition: not filter_a or not filter_b
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    # "not x or not y" is true for every event, so lifting "action!~x|y" would drop x and y events
+    assert loki_rule == ["{name=`audit`} | logfmt | action!~`(?i)^x$` or action!~`(?i)^y$`"]
+
+
+def test_or_of_positive_single_field_conditions_is_lifted_into_selector():
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                filter_a:
+                    action: x
+                filter_b:
+                    action: y
+                condition: filter_a or filter_b
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule[0].startswith("{name=`audit`,action=~`x|y`} |")
+
+
 def test_field_in_or_with_other_field_is_not_lifted_into_selector():
     backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
     sigma_rule = SigmaCollection.from_yaml(
