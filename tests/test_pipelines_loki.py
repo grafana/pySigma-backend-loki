@@ -718,6 +718,36 @@ def test_negated_and_group_is_not_lifted_into_selector():
     assert loki_rule[0].startswith("{name=`audit`,action!=`x`} |")
 
 
+def test_or_of_negated_and_groups_is_not_lifted_into_selector():
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(
+        """
+            title: Test
+            status: test
+            logsource:
+                product: test
+                service: test
+            detection:
+                filter_a:
+                    action: x
+                    event: something
+                filter_b:
+                    action: y
+                    event: something_else
+                condition: not filter_a or not filter_b
+        """
+    )
+    loki_rule = backend.convert(sigma_rule)
+    # "not (a and b) or not (c and d)" is a plain OR of four negated conditions, so none of them
+    # can be lifted into the stream selector
+    assert loki_rule == [
+        (
+            "{name=`audit`} | logfmt | action!~`(?i)^x$` or event!~`(?i)^something$` "
+            "or action!~`(?i)^y$` or event!~`(?i)^something_else$`"
+        )
+    ]
+
+
 def test_field_in_or_with_other_field_is_not_lifted_into_selector():
     backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
     sigma_rule = SigmaCollection.from_yaml(
