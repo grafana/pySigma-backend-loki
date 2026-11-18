@@ -2,7 +2,11 @@ import pytest
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
-from sigma.processing.transformations import FieldMappingTransformation, transformations
+from sigma.processing.transformations import (
+    AddFieldnamePrefixTransformation,
+    FieldMappingTransformation,
+    transformations,
+)
 
 from sigma.backends.loki import LogQLBackend
 from sigma.pipelines.loki import (
@@ -506,7 +510,7 @@ def test_multiple_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     assert loki_rule == [
         (
             "{name=~`okta.logs`,job=~`.*secops.*`,"
-            "eventType=~`policy\\.life.*\\.|policy\\.lifecycle\\.update|policy\\.lifecycle\\.del.*`} "
+            "eventType=~`policy\\.lifecycle\\.update|policy\\.lifecycle\\.del.*|policy\\.life.*\\.`} "
             "| logfmt | (eventType=~`(?i)^policy\\.lifecycle\\.update$` "
             "or eventType=~`(?i)^policy\\.lifecycle\\.del.*`) "
             "and legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
@@ -610,6 +614,7 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
                 identifier="complex_custom_log_source",
                 transformation=CustomLogSourceTransformation(
                     selection={
+                        "job": "okta",
                         "eventType|fieldref": "eventType",
                         "stream|fieldref": "ruleField",
                     },
@@ -641,7 +646,7 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     # into the stream selector without dropping events the rule should match
     assert loki_rule == [
         (
-            "{} "
+            "{job=`okta`} "
             "| logfmt | legacyeventtype=~`(?i)^core\\.user_auth\\.login_failed$` "
             "and displaymessage=~`(?i)^Failed\\ login\\ to\\ Okta$` "
             "and (eventType!~`(?i)^policy\\.lifecycle\\.update$` "
@@ -650,7 +655,7 @@ def test_negated_custom_log_source_pipeline(sigma_rules: SigmaCollection):
     ]
 
 
-def _fieldref_pipeline() -> ProcessingPipeline:
+def _fieldref_pipeline(selection: dict | None = None) -> ProcessingPipeline:
     return ProcessingPipeline(
         name="Test custom Loki logsource pipeline",
         priority=20,
@@ -658,158 +663,313 @@ def _fieldref_pipeline() -> ProcessingPipeline:
             ProcessingItem(
                 identifier="complex_custom_log_source",
                 transformation=CustomLogSourceTransformation(
-                    selection={
-                        "name": "audit",
-                        "action|fieldref": "action",
-                    },
+                    selection=selection or {"name": "audit", "action|fieldref": "action"},
                 ),
             )
         ],
     )
 
 
-def test_negated_or_values_are_lifted_into_selector():
+FIELDREF_RULE = """
+    title: Test
+    status: test
+    logsource:
+        product: test
+        service: test
+    detection:
+        sel_a:
+            action: a
+        sel_b:
+            action: b
+        sel_e1:
+            event: e1
+        sel_a_e1:
+            action: a
+            event: e1
+        sel_b_e2:
+            action: b
+            event: e2
+        sel_wildcard:
+            action: a*
+        sel_re:
+            action|re: 'a.+'
+        sel_number:
+            action: 5
+        keywords:
+            - foo
+        condition: CONDITION
+"""
+
+
+@pytest.mark.parametrize(
+    ("condition", "selector"),
+    [
+        # Leaves: a single condition on the field, or on something else
+        pytest.param(
+            "sel_a",
+            "{name=`audit`,action=`a`}",
+            id="value",
+        ),
+        pytest.param(
+            "not sel_a",
+            "{name=`audit`,action!=`a`}",
+            id="negated-value",
+        ),
+        pytest.param(
+            "sel_wildcard",
+            "{name=`audit`,action=~`a.*`}",
+            id="wildcard",
+        ),
+        # A negated wildcard keeps its negation once it has become a regex
+        pytest.param(
+            "not sel_wildcard",
+            "{name=`audit`,action!~`a.*`}",
+            id="negated-wildcard",
+        ),
+        pytest.param(
+            "sel_re",
+            "{name=`audit`,action=~`a.+`}",
+            id="regex",
+        ),
+        pytest.param(
+            "not sel_re",
+            "{name=`audit`,action!~`a.+`}",
+            id="negated-regex",
+        ),
+        pytest.param(
+            "sel_e1",
+            "{name=`audit`}",
+            id="other-field",
+        ),
+        pytest.param(
+            "sel_number",
+            "{name=`audit`}",
+            id="non-string-value",
+        ),
+        # AND: every branch holds, so the rule requires each branch's constraint
+        pytest.param(
+            "not sel_a and not sel_b",
+            "{name=`audit`,action!~`a|b`}",
+            id="and-of-negated-values",
+        ),
+        pytest.param(
+            "not (sel_a or sel_b)",
+            "{name=`audit`,action!~`a|b`}",
+            id="negated-or",
+        ),
+        pytest.param(
+            "sel_a and sel_b",
+            "{name=`audit`,action=~`a|b`}",
+            id="and-of-values-merged-looser",
+        ),
+        pytest.param(
+            "sel_a and sel_e1",
+            "{name=`audit`,action=`a`}",
+            id="and-with-other-field",
+        ),
+        pytest.param(
+            "sel_a and not sel_e1",
+            "{name=`audit`,action=`a`}",
+            id="and-with-negated-other-field",
+        ),
+        pytest.param(
+            "sel_a and sel_number",
+            "{name=`audit`,action=`a`}",
+            id="and-with-non-string-value",
+        ),
+        pytest.param(
+            "sel_a and not sel_b",
+            "{name=`audit`}",
+            id="and-of-value-and-negated-value",
+        ),
+        pytest.param(
+            "sel_e1 and not (sel_a or sel_b_e2)",
+            "{name=`audit`,action!=`a`}",
+            id="negated-or-next-to-negated-and",
+        ),
+        # OR: only one branch has to hold, so the field is lifted when every branch requires a
+        # positive value of it
+        pytest.param(
+            "sel_a or sel_b",
+            "{name=`audit`,action=~`a|b`}",
+            id="or-of-values",
+        ),
+        pytest.param(
+            "sel_a_e1 or sel_b_e2",
+            "{name=`audit`,action=~`a|b`}",
+            id="or-of-ands-each-requiring-the-field",
+        ),
+        pytest.param(
+            "not (not sel_a and not sel_b)",
+            "{name=`audit`,action=~`a|b`}",
+            id="double-negation",
+        ),
+        pytest.param(
+            "sel_a or sel_e1",
+            "{name=`audit`}",
+            id="or-with-other-field",
+        ),
+        pytest.param(
+            "sel_a or not sel_b",
+            "{name=`audit`}",
+            id="or-of-value-and-negated-value",
+        ),
+        pytest.param(
+            "not sel_a or sel_b",
+            "{name=`audit`}",
+            id="or-of-negated-value-and-value",
+        ),
+        pytest.param(
+            "not sel_a or not sel_b",
+            "{name=`audit`}",
+            id="or-of-negated-values",
+        ),
+        pytest.param(
+            "not sel_a_e1",
+            "{name=`audit`}",
+            id="negated-and",
+        ),
+        pytest.param(
+            "not sel_a_e1 or not sel_b_e2",
+            "{name=`audit`}",
+            id="or-of-negated-ands",
+        ),
+        pytest.param(
+            "sel_a or sel_number",
+            "{name=`audit`}",
+            id="or-with-non-string-value",
+        ),
+        pytest.param(
+            "sel_a or keywords",
+            "{name=`audit`}",
+            id="or-with-keyword",
+        ),
+        # A value that is required more than once is lifted once
+        pytest.param(
+            "sel_a or sel_a_e1",
+            "{name=`audit`,action=`a`}",
+            id="duplicate-values-merged-in-or",
+        ),
+        pytest.param(
+            "sel_a and sel_a_e1",
+            "{name=`audit`,action=`a`}",
+            id="duplicate-values-merged-in-and",
+        ),
+        # A detection used more than once is judged at each place it is used
+        pytest.param(
+            "(sel_a or sel_b) and (sel_e1 or sel_b)",
+            "{name=`audit`,action=~`a|b`}",
+            id="detection-used-twice-in-or-with-other-field",
+        ),
+        pytest.param(
+            "(sel_a or sel_b) and not (sel_e1 and sel_b)",
+            "{name=`audit`,action=~`a|b`}",
+            id="detection-used-twice-under-negated-and",
+        ),
+        # Several conditions: each becomes its own query, and they all share the selector
+        pytest.param(
+            "[sel_a, sel_b]",
+            "{name=`audit`,action=~`a|b`}",
+            id="conditions-all-with-a-value",
+        ),
+        pytest.param(
+            "[sel_a, sel_e1]",
+            "{name=`audit`}",
+            id="condition-without-the-field",
+        ),
+        pytest.param(
+            "[not sel_a, not sel_b]",
+            "{name=`audit`}",
+            id="conditions-with-negated-values",
+        ),
+        pytest.param(
+            "[sel_e1 and not sel_a]",
+            "{name=`audit`,action!=`a`}",
+            id="single-condition-in-a-list",
+        ),
+    ],
+)
+def test_fieldref_selector_for_condition(condition: str, selector: str):
     backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
+    sigma_rule = SigmaCollection.from_yaml(FIELDREF_RULE.replace("CONDITION", condition))
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule[0].startswith(f"{selector} |")
+
+
+@pytest.mark.parametrize(
+    ("selection", "selector"),
+    [
+        pytest.param(
+            {"action|fieldref": "action", "action": "x"},
+            "{action=`x`}",
+            id="fixed-label-after-fieldref",
+        ),
+        pytest.param(
+            {"action": "x", "action|fieldref": "action"},
+            "{action=`x`}",
+            id="fixed-label-before-fieldref",
+        ),
+        pytest.param(
+            {"action": ["x", "y"], "action|fieldref": "action"},
+            "{action=~`x|y`}",
+            id="fixed-label-list-before-fieldref",
+        ),
+    ],
+)
+def test_fixed_label_wins_over_fieldref_on_the_same_label(selection: dict, selector: str):
+    # The fieldref alone would lift action=`a`
+    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline(selection))
+    sigma_rule = SigmaCollection.from_yaml(FIELDREF_RULE.replace("CONDITION", "sel_a"))
+    loki_rule = backend.convert(sigma_rule)
+    assert loki_rule[0].startswith(f"{selector} |")
+
+
+def test_fieldref_with_field_name_prefix():
+    # A prefix renames the rule fields before the custom log source looks them up
+    pipeline = ProcessingPipeline(
+        name="Test custom Loki logsource pipeline",
+        priority=20,
+        items=[
+            ProcessingItem(
+                identifier="field_prefix",
+                transformation=AddFieldnamePrefixTransformation(prefix="event_"),
+            ),
+            ProcessingItem(
+                identifier="custom_log_source",
+                transformation=CustomLogSourceTransformation(
+                    selection={"name": "gh-audit-logs", "action|fieldref": "event_action"}
+                ),
+            ),
+        ],
+    )
+    backend = LogQLBackend(processing_pipeline=pipeline)
     sigma_rule = SigmaCollection.from_yaml(
         """
             title: Test
             status: test
             logsource:
-                product: test
-                service: test
+                product: github
+                service: audit
             detection:
-                sel:
-                    actor: bot
-                filter:
+                selection:
+                    actor: some-bot
+                filter_actions:
                     action:
-                        - a
-                        - b
-                condition: sel and not filter
-        """
-    )
-    loki_rule = backend.convert(sigma_rule)
-    assert loki_rule[0].startswith("{name=`audit`,action!~`a|b`} |")
-
-
-def test_negated_and_group_is_not_lifted_into_selector():
-    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                sel:
-                    actor: bot
-                filter_a:
-                    action: x
-                filter_b:
+                        - api.request
+                        - issue_comment.update
+                filter_comment_workflow:
                     action:
-                        - y
-                        - z
-                    event: comment
-                condition: sel and not 1 of filter_*
+                        - workflows.created_workflow_run
+                        - workflows.completed_workflow_run
+                    event: issue_comment
+                condition: selection and not 1 of filter_*
         """
     )
     loki_rule = backend.convert(sigma_rule)
-    # "not (action in [y, z] and event)" must not remove y and z events from the stream
-    assert loki_rule[0].startswith("{name=`audit`,action!=`x`} |")
-
-
-def test_or_of_negated_and_groups_is_not_lifted_into_selector():
-    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                filter_a:
-                    action: x
-                    event: something
-                filter_b:
-                    action: y
-                    event: something_else
-                condition: not filter_a or not filter_b
-        """
+    # The workflow actions sit in a negated AND with the event, so they stay out of the selector
+    assert loki_rule[0].startswith(
+        "{name=`gh-audit-logs`,action!~`api\\.request|issue_comment\\.update`} |"
     )
-    loki_rule = backend.convert(sigma_rule)
-    # "not (a and b) or not (c and d)" is a plain OR of four negated conditions, so none of them
-    # can be lifted into the stream selector
-    assert loki_rule == [
-        (
-            "{name=`audit`} | logfmt | action!~`(?i)^x$` or event!~`(?i)^something$` "
-            "or action!~`(?i)^y$` or event!~`(?i)^something_else$`"
-        )
-    ]
-
-
-def test_or_of_negated_single_field_conditions_is_not_lifted_into_selector():
-    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                filter_a:
-                    action: x
-                filter_b:
-                    action: y
-                condition: not filter_a or not filter_b
-        """
-    )
-    loki_rule = backend.convert(sigma_rule)
-    # "not x or not y" is true for every event, so lifting "action!~x|y" would drop x and y events
-    assert loki_rule == ["{name=`audit`} | logfmt | action!~`(?i)^x$` or action!~`(?i)^y$`"]
-
-
-def test_or_of_positive_single_field_conditions_is_lifted_into_selector():
-    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                filter_a:
-                    action: x
-                filter_b:
-                    action: y
-                condition: filter_a or filter_b
-        """
-    )
-    loki_rule = backend.convert(sigma_rule)
-    assert loki_rule[0].startswith("{name=`audit`,action=~`x|y`} |")
-
-
-def test_field_in_or_with_other_field_is_not_lifted_into_selector():
-    backend = LogQLBackend(processing_pipeline=_fieldref_pipeline())
-    sigma_rule = SigmaCollection.from_yaml(
-        """
-            title: Test
-            status: test
-            logsource:
-                product: test
-                service: test
-            detection:
-                sel_action:
-                    action: x
-                sel_actor:
-                    actor: bot
-                condition: sel_action or sel_actor
-        """
-    )
-    loki_rule = backend.convert(sigma_rule)
-    assert loki_rule[0].startswith("{name=`audit`} |")
 
 
 def test_unsupported_line_filter_custom_log_source_pipeline(
