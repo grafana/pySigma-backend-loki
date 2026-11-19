@@ -78,8 +78,96 @@ def traverse_conditions(item: ConditionType):
             yield cond
 
 
-def count_negated(classes: list[type[Any]]) -> int:
-    return len([neg for neg in classes if neg == ConditionNOT])
+ConditionNode = (
+    ConditionIdentifier
+    | ConditionItem
+    | ConditionFieldEqualsValueExpression
+    | ConditionValueExpression
+    | None
+)
+LiftableValue = SigmaString | SigmaRegularExpression
+
+
+@dataclass
+class FieldConstraint:
+    """What a rule requires of one field in order to match: one of ``values`` must match or, if
+    ``negated``, none of them may. This is what can be lifted into the log stream selector."""
+
+    negated: bool
+    values: list[LiftableValue]
+
+
+def merge_values(constraints: list[FieldConstraint]) -> list[LiftableValue]:
+    """All values of the constraints, in order and without duplicates."""
+    values: list[LiftableValue] = []
+    for value in (value for constraint in constraints for value in constraint.values):
+        # Compare the types first: a SigmaString raises when compared with a regular expression
+        if not any(type(value) is type(seen) and value == seen for seen in values):
+            values.append(value)
+    return values
+
+
+def all_of(constraints: list[FieldConstraint | None]) -> FieldConstraint | None:
+    """Combine the branches of an AND: every branch must hold, so the rule requires each branch's
+    constraint. Negated values merge exactly (``not a and not b``), positive ones into a looser
+    OR. Branches without a constraint add nothing. If the branches have both positive and negated
+    values, nothing is lifted: lifting one side alone would also be safe, but this keeps the
+    previous behaviour and one matcher per label."""
+    found = [constraint for constraint in constraints if constraint is not None]
+    if not found or any(constraint.negated != found[0].negated for constraint in found):
+        return None
+    return FieldConstraint(found[0].negated, merge_values(found))
+
+
+def any_of(constraints: list[FieldConstraint | None]) -> FieldConstraint | None:
+    """Combine the branches of an OR: only one branch has to hold, so the field is lifted when
+    every branch requires a positive value of it, and the values merge into one OR. Any other OR
+    is not lifted: a branch without a constraint also matches other values of the field, and
+    negated branches (``not a or not b``) can't be merged into one matcher. This is
+    conservative, as a few such ORs could still be lifted (``not a or not a``). An OR of a single
+    branch is just that branch."""
+    if len(constraints) == 1:
+        return constraints[0]
+    if not constraints or any(c is None or c.negated for c in constraints):
+        return None
+    return FieldConstraint(False, merge_values([c for c in constraints if c is not None]))
+
+
+def required_constraint(
+    node: ConditionNode, field: str, negated: bool = False
+) -> FieldConstraint | None:
+    """What the condition tree below ``node`` requires of ``field`` that can be lifted into the
+    stream selector, or None if there is nothing to lift: either the rule can match whatever the
+    field's value is, or what it requires can't be expressed here (for example a number, or
+    positive and negated values of the field together).
+
+    Negations are pushed down to the conditions (De Morgan): under a NOT, an AND acts as an OR
+    and an OR as an AND. The tree is walked from the root, so a detection that is used more
+    than once in the condition is judged at each place it is used."""
+    if isinstance(node, ConditionNOT):
+        return required_constraint(node.args[0], field, not negated)
+    if isinstance(node, (ConditionAND, ConditionOR)):
+        branches = [required_constraint(arg, field, negated) for arg in node.args]
+        acts_as_and = isinstance(node, ConditionOR if negated else ConditionAND)
+        return all_of(branches) if acts_as_and else any_of(branches)
+    if (
+        isinstance(node, ConditionFieldEqualsValueExpression)
+        and node.field == field
+        and isinstance(node.value, LiftableValue)
+    ):
+        return FieldConstraint(negated, [node.value])
+    # Other fields, keywords and values that can't be lifted (numbers, null, CIDR, ...)
+    return None
+
+
+def fixed_labels(selection: ConditionType) -> set[str]:
+    """The labels a selection sets to fixed values, rather than to values from the rule."""
+    return {
+        cond.field
+        for cond in traverse_conditions(selection)
+        if isinstance(cond, ConditionFieldEqualsValueExpression)
+        and not isinstance(cond.value, SigmaFieldReference)
+    }
 
 
 @dataclass
@@ -97,13 +185,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
             logsource_detections = SigmaDetection.from_definition(self.selection)
             conds = logsource_detections.postprocess(rule.detection)
             fields_set = set()
-            args: list[
-                ConditionIdentifier
-                | ConditionItem
-                | ConditionFieldEqualsValueExpression
-                | ConditionValueExpression
-                | None
-            ] = []
+            args: list[ConditionNode] = []
             if isinstance(conds, (ConditionOR, ConditionFieldEqualsValueExpression)):
                 args.append(conds)
             elif isinstance(conds, ConditionAND):
@@ -112,6 +194,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                 raise SigmaFeatureNotSupportedByBackendError(
                     "the custom log source selector only supports field equals value conditions"
                 )
+            fixed = fixed_labels(conds)
             for cond in args:
                 field: str | None = None
                 op: str | None = None
@@ -150,36 +233,29 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                             "the custom log selector pipeline only supports: string values, field "
                             "references and regular expressions"
                         )
+                if isinstance(value, SigmaFieldReference) and field in fixed:
+                    # The selection sets this label to a fixed value, which wins over a value
+                    # lifted from the rule
+                    continue
                 if field in fields_set:
                     raise SigmaFeatureNotSupportedByBackendError(
                         "the custom log source selector only allows one required value for a field"
                     )
 
-                skip = False
-                rule_conditions = []
-                for parsed_conds in rule.detection.parsed_condition:
-                    rule_conditions.extend(traverse_conditions(parsed_conds.parsed))  # type: ignore
-
                 # Note: the order of these if statements is important and should be preserved
                 if isinstance(value, SigmaFieldReference):
-                    values = []
-                    negated = None
-                    for item in rule_conditions:
-                        if (
-                            isinstance(item, ConditionFieldEqualsValueExpression)
-                            and item.field == value.field
-                            and isinstance(item.value, (SigmaString, SigmaRegularExpression))
-                        ):
-                            classes = item.parent_chain_condition_classes()
-                            new_negated = count_negated(classes) % 2 == 1
-                            if negated is not None and negated != new_negated:
-                                # Skipping fields refs with both negated and un-negated values
-                                skip = True
-                            else:
-                                negated = new_negated
-                            values.append(item.value)
-                    if len(values) == 0 or skip:
+                    # Each condition of the rule becomes its own query with this selector, so a
+                    # line that matches any one of them must pass it
+                    constraint = any_of(
+                        [
+                            required_constraint(parsed.parsed, value.field)
+                            for parsed in rule.detection.parsed_condition
+                        ]
+                    )
+                    if constraint is None:
                         continue
+                    negated = constraint.negated
+                    values = constraint.values
                     if len(values) == 1 and isinstance(values[0], SigmaString):
                         if negated:
                             op = "!="
@@ -196,7 +272,7 @@ class CustomLogSourceTransformation(PreprocessingTransformation):
                         value = quote_string_value(value)
                 # Not elif, as if the value was a string containing wildcards, it is now a RegEx
                 if isinstance(value, SigmaRegularExpression):
-                    op = "=~"
+                    op = "!~" if op == "!=" else "=~"
                     value = escape_and_quote_re(value)
                 if field and op and value:
                     fields_set.add(field)
