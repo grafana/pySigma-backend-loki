@@ -49,7 +49,7 @@ def test_loki_field_not_eq(loki_backend: LogQLBackend):
                 condition: not sel
         """
         )
-    ) == ['{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueA$`']
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$`']
 
 
 def test_loki_lf_field_eq_wildcard(loki_backend: LogQLBackend):
@@ -85,7 +85,7 @@ def test_loki_lf_field_not_eq_wildcard(loki_backend: LogQLBackend):
                 condition: not sel
         """
         )
-    ) == ['{job=~".+"} !~ `(?i)value.A` | logfmt | fieldA!~`(?i)^value.A$`']
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^value.A$`']
 
 
 def test_loki_lf_field_eq_num(loki_backend: LogQLBackend):
@@ -186,9 +186,7 @@ def test_loki_lf_not_or_expression(loki_backend: LogQLBackend):
                 condition: not 1 of sel*
         """
         )
-    ) == [
-        '{job=~".+"} !~ `(?i)valueA` | logfmt | fieldA!~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`'
-    ]
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^valueA$` and fieldB!~`(?i)^valueB$`']
 
 
 def test_loki_lf_or_no_filter_expression(loki_backend: LogQLBackend):
@@ -568,7 +566,7 @@ def test_loki_lf_not_cidr_query(loki_backend: LogQLBackend):
                 condition: not sel
         """
         )
-    ) == ['{job=~".+"} != ip("192.168.0.0/16") | logfmt | fieldA!=ip("192.168.0.0/16")']
+    ) == ['{job=~".+"} | logfmt | fieldA!=ip("192.168.0.0/16")']
 
 
 def test_loki_lf_base64_query(loki_backend: LogQLBackend):
