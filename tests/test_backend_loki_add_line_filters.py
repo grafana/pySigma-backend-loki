@@ -34,8 +34,8 @@ def test_loki_lf_field_eq(loki_backend: LogQLBackend):
     ) == ['{job=~".+"} |= `fieldA=valueA` | logfmt | fieldA=`valueA`']
 
 
-# In this context, a full negation of fieldA=valueA would be acceptable to include
-# however the likely performance benefit is not obvious
+# A negated line filter (`!= fieldA=valueA`) is never safe: it would also drop
+# `fieldA=valueAB`, which does satisfy `fieldA != valueA`
 def test_loki_field_not_eq(loki_backend: LogQLBackend):
     assert loki_backend.convert(
         SigmaCollection.from_yaml(
@@ -51,7 +51,7 @@ def test_loki_field_not_eq(loki_backend: LogQLBackend):
                 condition: not sel
         """
         )
-    ) == ['{job=~".+"} != `fieldA=valueA` | logfmt | fieldA!=`valueA`']
+    ) == ['{job=~".+"} | logfmt | fieldA!=`valueA`']
 
 
 def test_loki_lf_field_eq_wildcard(loki_backend: LogQLBackend):
@@ -87,7 +87,7 @@ def test_loki_lf_field_not_eq_wildcard(loki_backend: LogQLBackend):
                 condition: not sel
         """
         )
-    ) == ['{job=~".+"} !~ `(?i)value.A` | logfmt | fieldA!~`(?i)^value.A$`']
+    ) == ['{job=~".+"} | logfmt | fieldA!~`(?i)^value.A$`']
 
 
 def test_loki_lf_field_eq_num(loki_backend: LogQLBackend):
@@ -193,7 +193,7 @@ def test_loki_lf_not_or_expression(loki_backend: LogQLBackend):
                 condition: not 1 of sel*
         """
         )
-    ) == ['{job=~".+"} != `fieldA=valueA` | logfmt | fieldA!=`valueA` and fieldB!=`valueB`']
+    ) == ['{job=~".+"} | logfmt | fieldA!=`valueA` and fieldB!=`valueB`']
 
 
 def test_loki_lf_or_no_filter_expression(loki_backend: LogQLBackend):
@@ -566,7 +566,7 @@ def test_loki_lf_not_cidr_query(loki_backend: LogQLBackend):
                 condition: not sel
         """
         )
-    ) == ['{job=~".+"} != ip("192.168.0.0/16") | logfmt | fieldA!=ip("192.168.0.0/16")']
+    ) == ['{job=~".+"} | logfmt | fieldA!=ip("192.168.0.0/16")']
 
 
 def test_loki_lf_base64_query(loki_backend: LogQLBackend):
@@ -810,3 +810,53 @@ def test_loki_lf_very_long_query_or_right_filters(loki_backend: LogQLBackend):
     assert len(test) > 1 and all(
         re.match("|= `field([AB])=value\1{4000}` | .* | field\1=`value\1{4000}`", q) for q in test
     )
+
+
+# A negative line filter drops every line containing the pattern *anywhere*, not just
+# those where the negated field matches it, so it can hide valid hits (e.g. a value
+# an attacker placed in a different field, or `fieldA=valueAB` for `fieldA != valueA`).
+# Negated conditions must therefore never be lifted into a line filter, whatever the
+# value type, modifier or case mode.
+@pytest.mark.parametrize("case_sensitive", [True, False])
+@pytest.mark.parametrize(
+    "field_expr",
+    [
+        "fieldA: value",
+        "fieldA|cased: value",
+        "fieldA: 5",
+        "fieldA: null",
+        "fieldA: value?A",
+        "fieldA|contains: value",
+        "fieldA|startswith: value",
+        "fieldA|endswith: value",
+        "fieldA|endswith: ['value', 'other']",
+        "fieldA|re: 'val.e'",
+        "fieldA|cidr: 192.168.0.0/16",
+    ],
+)
+def test_loki_lf_negated_condition_never_adds_negative_line_filter(
+    case_sensitive: bool, field_expr: str
+):
+    backend = LogQLBackend(add_line_filters=True, case_sensitive=case_sensitive)
+    query = backend.convert(
+        SigmaCollection.from_yaml(
+            f"""
+            title: Test
+            status: test
+            logsource:
+                category: test_category
+                product: test_product
+            detection:
+                sel:
+                    m: x
+                filter:
+                    {field_expr}
+                condition: sel and not filter
+        """
+        )
+    )[0]
+    pre_parser = query.split("| logfmt")[0]
+    assert "!~" not in pre_parser
+    assert "!=" not in pre_parser
+    # The field-level exclusion must still be applied after parsing
+    assert "fieldA!" in query

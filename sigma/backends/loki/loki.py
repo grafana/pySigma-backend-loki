@@ -459,23 +459,26 @@ class LogQLBackend(TextQueryBackend):
         that can be added to a query to improve its performance without reducing the
         number of results that will be produced by that query. Returns None if no such
         filter can be created."""
-        # Can only use negation of expressions if the log format includes the field
-        # name in the log line
+        # Never introduce a negated line filter. It would drop every line containing
+        # the pattern *anywhere* (not just where this field matches it), which can
+        # exclude valid hits: the field name and anchors are lost for regexes/CIDRs,
+        # and even a logfmt `field=value` is a prefix match that also hides
+        # `field=value2` (and `field=` hides every line that sets the field at all).
+        if getattr(expr, "negated", False):
+            return None
         if log_parser is LogQLLogParser.LOGFMT and isinstance(
             expr.value, (SigmaString, SigmaNumber, SigmaBool, SigmaNull)
         ):
             value = "" if isinstance(expr.value, SigmaNull) else str(expr.value)
             return LogQLLineFilterInfo(
                 value=f"{expr.field}={value}",
-                negated=getattr(expr, "negated", False),
+                negated=False,
                 deftype=LogQLDeferredType.STR,
             )
-        elif isinstance(expr.value, (SigmaString, SigmaNumber, SigmaBool)) and not getattr(
-            expr, "negated", False
-        ):
+        elif isinstance(expr.value, (SigmaString, SigmaNumber, SigmaBool)):
             return LogQLLineFilterInfo(
                 value=str(expr.value),
-                negated=getattr(expr, "negated", False),
+                negated=False,
                 deftype=LogQLDeferredType.STR,
             )
         elif isinstance(expr.value, SigmaRegularExpression):
@@ -492,14 +495,14 @@ class LogQLBackend(TextQueryBackend):
                 )
             return LogQLLineFilterInfo(
                 value=regexp,
-                negated=getattr(expr, "negated", False),
+                negated=False,
                 deftype=LogQLDeferredType.REGEXP,
             )
         elif isinstance(expr.value, SigmaCIDRExpression):
             # Could include field name if entries are logfmt
             return LogQLLineFilterInfo(
                 value=expr.value.cidr,
-                negated=getattr(expr, "negated", False),
+                negated=False,
                 deftype=LogQLDeferredType.CIDR,
             )
         else:
